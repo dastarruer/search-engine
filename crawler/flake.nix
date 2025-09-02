@@ -41,11 +41,15 @@
           rustToolchain
           pkg-config
           rust-analyzer
+
+          # Required for reqwest crate
+          openssl
         ];
 
         env = {
           # Required by rust-analyzer
           RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
+
         };
       };
       nativeBuildInputs = with pkgs; [pkg-config];
