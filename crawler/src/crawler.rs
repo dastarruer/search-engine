@@ -1,7 +1,11 @@
+use std::collections::VecDeque;
+
 use reqwest::IntoUrl;
 use scraper::{Html, Selector};
 
-pub struct Crawler {}
+pub struct Crawler {
+    queue: VecDeque<Box<dyn IntoUrl>>,
+}
 
 impl Crawler {
     /// Make a get request to a specific URL.
