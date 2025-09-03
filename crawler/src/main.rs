@@ -52,25 +52,30 @@ mod test {
 
         use super::super::extract_urls_from_html;
 
-        #[test]
-        fn extract_single_href() {
-            let html_file_name = "extract_single_href.html";
-
+        fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
             // CARGO_MANIFEST_DIR gets the source dir of the project
             let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("src")
                 .join("test-files")
-                .join(html_file_name);
+                .join(filename);
 
-            let mut html = File::open(html_file)
-                .expect(format!("'{}' should exist.", html_file_name).as_str());
+            let mut html =
+                File::open(html_file).expect(format!("'{}' should exist.", filename).as_str());
 
             let mut buf = String::new();
             html.read_to_string(&mut buf).unwrap();
 
             let urls = extract_urls_from_html(buf);
 
-            assert_eq!(urls, vec!["https://www.wikipedia.org/"])
+            assert_eq!(urls, expected_urls)
+        }
+
+        #[test]
+        fn test_single_href() {
+            let filename = "extract_single_href.html";
+            let expected_urls = vec!["https://www.wikipedia.org/".to_string()];
+
+            test_and_extract_urls_from_html_file(filename, expected_urls);
         }
     }
 }
