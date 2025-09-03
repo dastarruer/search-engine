@@ -77,5 +77,17 @@ mod test {
 
             test_and_extract_urls_from_html_file(filename, expected_urls);
         }
+
+        #[test]
+        fn test_multiple_hrefs() {
+            let filename = "extract_multiple_hrefs.html";
+            let expected_urls = vec![
+                "https://www.wikipedia.org/".to_string(),
+                "https://www.britannica.com/".to_string(),
+                "https://www.youtube.com/".to_string(),
+            ];
+
+            test_and_extract_urls_from_html_file(filename, expected_urls);
+        }
     }
 }
