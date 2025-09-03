@@ -1,4 +1,5 @@
 use reqwest::IntoUrl;
+use scraper::{Html, Selector};
 use tokio;
 
 #[tokio::main]
@@ -16,7 +17,18 @@ async fn make_get_request(url: impl IntoUrl) -> Result<String, Box<dyn std::erro
 }
 
 fn extract_urls_from_html(html: String) -> Vec<String> {
-    todo!()
+    let mut urls = vec![];
+
+    let fragment = Html::parse_fragment(html.as_str());
+    let selector = Selector::parse("a").unwrap();
+
+    for element in fragment.select(&selector) {
+        if let Some(url) = element.value().attr("href") {
+            urls.push(url.to_string());
+        }
+    }
+
+    urls
 }
 
 #[cfg(test)]
