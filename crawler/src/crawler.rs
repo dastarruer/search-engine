@@ -16,18 +16,15 @@ impl Crawler {
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        for _ in self.queue.clone() {
-            self.crawl_next_url().await.unwrap();
+        while let Some(url) = self.queue.pop_back() {
+            self.crawl_from_url(url).await.unwrap();
         }
 
         Ok(())
     }
 
-    async fn crawl_next_url(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let url = self.queue.pop_back().unwrap();
-
+    async fn crawl_from_url(&mut self, url: Url) -> Result<(), Box<dyn std::error::Error>> {
         let html = Self::make_get_request(url.clone()).await?;
-
         let urls = self.extract_urls_from_html(html);
 
         let base_url = url;
@@ -95,7 +92,7 @@ mod test {
 
             assert_eq!(crawler.queue, vec![url.clone()]);
 
-            crawler.crawl_next_url().await.unwrap();
+            crawler.crawl_from_url(url.clone()).await.unwrap();
 
             let expected_url = url.join("catalogue/category/books_1/index.html").unwrap();
 
