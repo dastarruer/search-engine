@@ -26,12 +26,19 @@ impl Crawler {
     async fn crawl_next_url(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let url = self.queue.pop_back().unwrap();
 
-        let html = Self::make_get_request(url).await?;
+        let html = Self::make_get_request(url.clone()).await?;
 
-        let urls = Self::extract_urls_from_html(html);
+        let urls = self.extract_urls_from_html(html);
+
+        let base_url = url;
 
         for url in urls {
-            self.queue.push_front(Url::parse(&url.to_string()).unwrap());
+            if url.starts_with("https://") || url.starts_with("http://") {
+                let url = Url::parse(url.as_str()).unwrap();
+                self.queue.push_front(url);
+            } else {
+                self.queue.push_front(base_url.join(url.as_str()).unwrap());
+            }
         }
 
         Ok(())
@@ -43,7 +50,7 @@ impl Crawler {
         Ok(reqwest::get(url).await?.text().await?)
     }
 
-    fn extract_urls_from_html(html: String) -> Vec<Url> {
+    fn extract_urls_from_html(&self, html: String) -> Vec<String> {
         let mut urls = vec![];
 
         let fragment = Html::parse_fragment(html.as_str());
@@ -51,7 +58,7 @@ impl Crawler {
 
         for element in fragment.select(&selector) {
             if let Some(url) = element.value().attr("href") {
-                urls.push(Url::parse(url).unwrap());
+                urls.push(url.to_string());
             }
         }
 
@@ -92,7 +99,7 @@ mod test {
 
             let expected_url = url.join("catalogue/category/books_1/index.html").unwrap();
 
-            assert!(crawler.queue.contains(&expected_url))
+            assert!(crawler.queue.contains(&expected_url));
         }
     }
 
@@ -103,7 +110,10 @@ mod test {
 
         use super::super::Crawler;
 
-        fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<Url>) {
+        fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
+            let url = Url::parse("https://does-not-exist.com").unwrap();
+            let crawler = Crawler::new(url);
+
             // CARGO_MANIFEST_DIR gets the source dir of the project
             let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("src")
@@ -116,7 +126,7 @@ mod test {
             let mut buf = String::new();
             html.read_to_string(&mut buf).unwrap();
 
-            let urls = Crawler::extract_urls_from_html(buf);
+            let urls = crawler.extract_urls_from_html(buf);
 
             assert_eq!(urls, expected_urls)
         }
@@ -124,7 +134,7 @@ mod test {
         #[test]
         fn test_single_href() {
             let filename = "extract_single_href.html";
-            let expected_urls = vec![Url::parse("https://www.wikipedia.org/").unwrap()];
+            let expected_urls = vec![String::from("https://www.wikipedia.org/")];
 
             test_and_extract_urls_from_html_file(filename, expected_urls);
         }
@@ -133,9 +143,9 @@ mod test {
         fn test_multiple_hrefs() {
             let filename = "extract_multiple_hrefs.html";
             let expected_urls = vec![
-                Url::parse("https://www.wikipedia.org/").unwrap(),
-                Url::parse("https://www.britannica.com/").unwrap(),
-                Url::parse("https://www.youtube.com/").unwrap(),
+                String::from("https://www.wikipedia.org/"),
+                String::from("https://www.britannica.com/"),
+                String::from("https://www.youtube.com/"),
             ];
 
             test_and_extract_urls_from_html_file(filename, expected_urls);
