@@ -8,6 +8,15 @@ pub struct Crawler {
 }
 
 impl Crawler {
+    pub fn new(starting_url: String) -> Self {
+        let mut queue = VecDeque::new();
+        queue.push_back(starting_url);
+
+        Crawler {
+            queue
+        }
+    }
+
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         for _ in self.queue.clone() {
             let url = self.queue.pop_back().unwrap();
