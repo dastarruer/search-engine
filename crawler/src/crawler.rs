@@ -75,6 +75,28 @@ mod test {
         }
     }
 
+    mod crawl_next_url {
+        use super::super::Crawler;
+
+        #[tokio::test]
+        async fn test_books_toscrape() {
+            let mut crawler = Crawler::new("https://books.toscrape.com/".to_string());
+
+            assert_eq!(
+                crawler.queue,
+                vec!["https://books.toscrape.com/".to_string()]
+            );
+
+            crawler.crawl_next_url().await.unwrap();
+
+            assert!(
+                crawler
+                    .queue
+                    .contains(&"catalogue/category/books_1/index.html".to_string())
+            )
+        }
+    }
+
     mod extract_urls_from_html {
         use std::{fs::File, io::Read, path::PathBuf};
 
