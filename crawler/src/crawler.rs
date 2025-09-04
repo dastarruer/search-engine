@@ -4,13 +4,29 @@ use reqwest::IntoUrl;
 use scraper::{Html, Selector};
 
 pub struct Crawler {
-    queue: VecDeque<Box<dyn IntoUrl>>,
+    queue: VecDeque<String>,
 }
 
 impl Crawler {
+    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        for _ in self.queue.clone() {
+            let url = self.queue.pop_back().unwrap();
+
+            let html = Self::make_get_request(url).await?;
+
+            let urls = Self::extract_urls_from_html(html);
+
+            for url in urls {
+                self.queue.push_front(url);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Make a get request to a specific URL.
     /// This (should) return the HTML of the URL.
-    pub async fn make_get_request(url: impl IntoUrl) -> Result<String, Box<dyn std::error::Error>> {
+    async fn make_get_request(url: impl IntoUrl) -> Result<String, Box<dyn std::error::Error>> {
         Ok(reqwest::get(url).await?.text().await?)
     }
 
