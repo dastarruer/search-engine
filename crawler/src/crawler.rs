@@ -12,27 +12,30 @@ impl Crawler {
         let mut queue = VecDeque::new();
         queue.push_back(starting_url);
 
-        Crawler {
-            queue
-        }
+        Crawler { queue }
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         for _ in self.queue.clone() {
-            let url = self.queue.pop_back().unwrap();
-
-            let html = Self::make_get_request(url).await?;
-
-            let urls = Self::extract_urls_from_html(html);
-
-            for url in urls {
-                self.queue.push_front(url);
-            }
+            self.crawl_next_url().await.unwrap();
         }
 
         Ok(())
     }
 
+    async fn crawl_next_url(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let url = self.queue.pop_back().unwrap();
+
+        let html = Self::make_get_request(url).await?;
+
+        let urls = Self::extract_urls_from_html(html);
+
+        for url in urls {
+            self.queue.push_front(url);
+        }
+
+        Ok(())
+    }
     /// Make a get request to a specific URL.
     /// This (should) return the HTML of the URL.
     async fn make_get_request(url: impl IntoUrl) -> Result<String, Box<dyn std::error::Error>> {
