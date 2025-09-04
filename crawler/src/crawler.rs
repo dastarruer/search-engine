@@ -1,14 +1,14 @@
 use std::collections::VecDeque;
 
-use reqwest::IntoUrl;
+use reqwest::{IntoUrl, Url};
 use scraper::{Html, Selector};
 
 pub struct Crawler {
-    queue: VecDeque<String>,
+    queue: VecDeque<Url>,
 }
 
 impl Crawler {
-    pub fn new(starting_url: String) -> Self {
+    pub fn new(starting_url: Url) -> Self {
         let mut queue = VecDeque::new();
         queue.push_back(starting_url);
 
@@ -31,18 +31,19 @@ impl Crawler {
         let urls = Self::extract_urls_from_html(html);
 
         for url in urls {
-            self.queue.push_front(url);
+            self.queue.push_front(Url::parse(&url.to_string()).unwrap());
         }
 
         Ok(())
     }
+
     /// Make a get request to a specific URL.
     /// This (should) return the HTML of the URL.
     async fn make_get_request(url: impl IntoUrl) -> Result<String, Box<dyn std::error::Error>> {
         Ok(reqwest::get(url).await?.text().await?)
     }
 
-    fn extract_urls_from_html(html: String) -> Vec<String> {
+    fn extract_urls_from_html(html: String) -> Vec<Url> {
         let mut urls = vec![];
 
         let fragment = Html::parse_fragment(html.as_str());
@@ -50,7 +51,7 @@ impl Crawler {
 
         for element in fragment.select(&selector) {
             if let Some(url) = element.value().attr("href") {
-                urls.push(url.to_string());
+                urls.push(Url::parse(url).unwrap());
             }
         }
 
@@ -76,33 +77,33 @@ mod test {
     }
 
     mod crawl_next_url {
+        use reqwest::Url;
+
         use super::super::Crawler;
 
         #[tokio::test]
         async fn test_books_toscrape() {
-            let mut crawler = Crawler::new("https://books.toscrape.com/".to_string());
+            let url = Url::parse("https://books.toscrape.com/").unwrap();
+            let mut crawler = Crawler::new(url.clone());
 
-            assert_eq!(
-                crawler.queue,
-                vec!["https://books.toscrape.com/".to_string()]
-            );
+            assert_eq!(crawler.queue, vec![url.clone()]);
 
             crawler.crawl_next_url().await.unwrap();
 
-            assert!(
-                crawler
-                    .queue
-                    .contains(&"catalogue/category/books_1/index.html".to_string())
-            )
+            let expected_url = url.join("catalogue/category/books_1/index.html").unwrap();
+
+            assert!(crawler.queue.contains(&expected_url))
         }
     }
 
     mod extract_urls_from_html {
         use std::{fs::File, io::Read, path::PathBuf};
 
+        use reqwest::Url;
+
         use super::super::Crawler;
 
-        fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
+        fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<Url>) {
             // CARGO_MANIFEST_DIR gets the source dir of the project
             let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("src")
@@ -123,7 +124,7 @@ mod test {
         #[test]
         fn test_single_href() {
             let filename = "extract_single_href.html";
-            let expected_urls = vec!["https://www.wikipedia.org/".to_string()];
+            let expected_urls = vec![Url::parse("https://www.wikipedia.org/").unwrap()];
 
             test_and_extract_urls_from_html_file(filename, expected_urls);
         }
@@ -132,9 +133,9 @@ mod test {
         fn test_multiple_hrefs() {
             let filename = "extract_multiple_hrefs.html";
             let expected_urls = vec![
-                "https://www.wikipedia.org/".to_string(),
-                "https://www.britannica.com/".to_string(),
-                "https://www.youtube.com/".to_string(),
+                Url::parse("https://www.wikipedia.org/").unwrap(),
+                Url::parse("https://www.britannica.com/").unwrap(),
+                Url::parse("https://www.youtube.com/").unwrap(),
             ];
 
             test_and_extract_urls_from_html_file(filename, expected_urls);
