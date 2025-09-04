@@ -6,12 +6,9 @@ use crate::crawler::Crawler;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut crawler = Crawler::new("https://docs.rs/scraper/latest/scraper".to_string());
 
-    let html = Crawler::make_get_request("https://www.rust-lang.org").await.unwrap();
+    crawler.run().await?;
 
-    println!("{html:#?}");
     Ok(())
 }
-
-
-
