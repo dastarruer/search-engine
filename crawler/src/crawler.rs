@@ -5,14 +5,17 @@ use scraper::{Html, Selector};
 
 pub struct Crawler {
     queue: VecDeque<Url>,
+    visited: VecDeque<Url>,
 }
 
 impl Crawler {
     pub fn new(starting_url: Url) -> Self {
         let mut queue = VecDeque::new();
+        let visited = VecDeque::new();
+
         queue.push_back(starting_url);
 
-        Crawler { queue }
+        Crawler { queue, visited }
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -30,15 +33,29 @@ impl Crawler {
         let base_url = url;
 
         for url in urls {
-            if url.starts_with("https://") || url.starts_with("http://") {
-                let url = Url::parse(url.as_str()).unwrap();
-                self.queue.push_front(url);
+            let url = if url.starts_with("https://") || url.starts_with("http://") {
+                Url::parse(url.as_str()).unwrap()
             } else {
-                self.queue.push_front(base_url.join(url.as_str()).unwrap());
-            }
-        }
+                base_url.join(url.as_str()).unwrap()
+            };
 
+            if self.is_url_visited(&url) {
+                continue;
+            }
+
+            self.mark_url_as_visited(url.clone());
+            self.queue.push_front(url);
+        }
+        println!("Crawled {:?}...", base_url);
         Ok(())
+    }
+
+    fn mark_url_as_visited(&mut self, url: Url) {
+        self.visited.push_front(url.clone());
+    }
+
+    fn is_url_visited(&self, url: &Url) -> bool {
+        self.visited.contains(url)
     }
 
     /// Make a get request to a specific URL.
@@ -97,6 +114,25 @@ mod test {
             let expected_url = url.join("catalogue/category/books_1/index.html").unwrap();
 
             assert!(crawler.queue.contains(&expected_url));
+        }
+
+        #[tokio::test]
+        async fn test_already_visited_url() {
+            let url = Url::parse("https://books.toscrape.com/").unwrap();
+            let mut crawler = Crawler::new(url.clone());
+
+            assert_eq!(crawler.queue, vec![url.clone()]);
+
+            // Crawl the url. This will fill up crawler.visited
+            crawler.crawl_from_url(url.clone()).await.unwrap();
+
+            crawler.queue.clear();
+
+            // After clearing the url queue, we crawl the url again.
+            // Since crawler.visited is filled, the queue should be empty after crawling the same url again
+            crawler.crawl_from_url(url.clone()).await.unwrap();
+
+            assert!(crawler.queue.is_empty());
         }
     }
 
