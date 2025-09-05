@@ -25,7 +25,8 @@
   in {
     overlays.default = final: prev: {
       rustToolchain = with inputs.fenix.packages.${prev.stdenv.hostPlatform.system};
-        combine (with stable; [
+      # 'with latest' gives us access to Rust nightly
+        combine (with latest; [
           clippy
           rustc
           cargo
@@ -49,7 +50,6 @@
         env = {
           # Required by rust-analyzer
           RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
-
         };
       };
       nativeBuildInputs = with pkgs; [pkg-config];
