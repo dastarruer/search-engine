@@ -1,7 +1,6 @@
 mod crawler;
 
 use reqwest::Url;
-use tokio;
 
 use crate::crawler::Crawler;
 
