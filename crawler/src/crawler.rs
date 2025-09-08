@@ -26,6 +26,7 @@ impl Crawler {
         Ok(())
     }
 
+    // TODO: Make this private somehow, since this needs to be public for benchmarks
     pub async fn crawl_from_url(&mut self, url: Url) -> Result<(), Box<dyn std::error::Error>> {
         let html = Self::make_get_request(url.clone()).await?;
         let urls = self.extract_urls_from_html(html);
