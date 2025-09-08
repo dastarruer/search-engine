@@ -1,9 +1,5 @@
-mod crawler;
-
+use crawler::crawler::Crawler;
 use reqwest::Url;
-use tokio;
-
-use crate::crawler::Crawler;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
