@@ -153,8 +153,9 @@ mod test {
                 .join("test-files")
                 .join(filename);
 
-            let mut html =
-                File::open(html_file).expect(format!("'{}' should exist.", filename).as_str());
+            let error_msg = format!("'{}' should exist.", filename);
+            let error_msg = error_msg.as_str();
+            let mut html = File::open(html_file).expect(error_msg);
 
             let mut buf = String::new();
             html.read_to_string(&mut buf).unwrap();
