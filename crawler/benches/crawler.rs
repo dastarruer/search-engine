@@ -1,0 +1,16 @@
+use crawler::crawler::Crawler;
+use criterion::{Criterion, criterion_group, criterion_main};
+use url::Url;
+
+fn bench_crawl_from_url(c: &mut Criterion) {
+    let url = Url::parse("https://books.toscrape.com/").unwrap();
+    c.bench_function("fib 20", |b| {
+        b.iter(async || {
+            let mut crawler = Crawler::new(url.clone());
+            crawler.crawl_from_url(url.clone()).await.unwrap();
+        })
+    });
+}
+
+criterion_group!(benches, bench_crawl_from_url);
+criterion_main!(benches);
