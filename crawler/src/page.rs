@@ -16,6 +16,11 @@ impl Page {
     pub fn new(url: Url) -> Self {
         Page { url }
     }
+
+    /// 'Visit' a Page, which turns it into a CrawledPage
+    fn visit(self) -> CrawledPage {
+        CrawledPage::new(self)
+    }
 }
 
 #[allow(unused)]
