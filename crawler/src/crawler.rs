@@ -3,13 +3,15 @@ use std::collections::VecDeque;
 use reqwest::{IntoUrl, Url};
 use scraper::{Html, Selector};
 
+use crate::page::Page;
+
 pub struct Crawler {
-    queue: VecDeque<Url>,
+    queue: VecDeque<Page>,
     visited: VecDeque<Url>,
 }
 
 impl Crawler {
-    pub fn new(starting_url: Url) -> Self {
+    pub fn new(starting_url: Page) -> Self {
         let mut queue = VecDeque::new();
         let visited = VecDeque::new();
 
@@ -19,8 +21,8 @@ impl Crawler {
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        while let Some(url) = self.queue.pop_back() {
-            self.crawl_from_url(url).await.unwrap();
+        while let Some(page) = self.queue.pop_back() {
+            self.crawl_from_url(page).await.unwrap();
         }
 
         Ok(())

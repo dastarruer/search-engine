@@ -1,12 +1,13 @@
 use url::Url;
 
-#[derive(PartialEq)]
 #[allow(unused)]
+#[derive(PartialEq, Debug)]
 pub struct Page {
-    url: Url,
+    pub url: Url,
 }
 
 #[allow(unused)]
+#[derive(PartialEq)]
 pub struct CrawledPage {
     url: Url,
     html: String,
@@ -18,8 +19,8 @@ impl Page {
         Page { url }
     }
 
-    /// 'Visit' a Page, which turns it into a CrawledPage
-    fn visit(self) -> CrawledPage {
+    /// 'Crawl' a Page, which turns it into a CrawledPage
+    pub(crate) fn crawl(self) -> CrawledPage {
         CrawledPage::new(self)
     }
 }
