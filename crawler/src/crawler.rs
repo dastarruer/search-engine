@@ -21,8 +21,8 @@ impl Crawler {
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        while let Some(url) = self.queue.pop_back() {
-            self.crawl_from_url(url).await.unwrap();
+        while let Some(page) = self.queue.pop_back() {
+            self.crawl_from_url(page).await.unwrap();
         }
 
         Ok(())
