@@ -9,6 +9,7 @@ pub struct Page {
 #[allow(unused)]
 pub struct CrawledPage {
     url: Url,
+    html: String,
 }
 
 #[allow(unused)]
@@ -26,6 +27,6 @@ impl Page {
 #[allow(unused)]
 impl CrawledPage {
     pub fn new(page: Page) -> Self {
-        CrawledPage { url: page.url }
+        CrawledPage { url: page.url, html: String::new() }
     }
 }
