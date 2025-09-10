@@ -33,6 +33,12 @@ impl Clone for Page {
     }
 }
 
+impl From<Url> for Page {
+    fn from(value: Url) -> Self {
+        Page { url: value }
+    }
+}
+
 #[allow(unused)]
 impl CrawledPage {
     pub fn new(page: Page) -> Self {
