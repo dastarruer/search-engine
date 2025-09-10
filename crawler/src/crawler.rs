@@ -33,7 +33,7 @@ impl Crawler {
         let html = Self::make_get_request(page.clone()).await?;
         let urls = self.extract_urls_from_html(html);
 
-        let base_url = page.url.clone();
+        let base_url = page.url;
 
         for url in urls {
             let page = Page::from(
@@ -51,14 +51,15 @@ impl Crawler {
             // Add the page to the queue of pages to crawl
             self.queue.push_front(page.clone());
 
-            // Mark this page as crawled, so the crawler does not crawl the same page twice
-            self.mark_page_as_crawled(page);
+            // Mark this page as queued, so the crawler does not crawl the same page twice
+            self.mark_page_as_queued(page);
         }
         println!("Crawled {:?}...", base_url);
         Ok(())
     }
 
-    fn mark_page_as_crawled(&mut self, page: Page) {
+    fn mark_page_as_queued(&mut self, page: Page) {
+        // Mark the page as 'crawled' to prevent duplicate queuing, not because the page is crawled
         let crawled_page = page.into_crawled();
         self.visited.push_front(crawled_page);
     }
