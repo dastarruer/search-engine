@@ -39,6 +39,12 @@ impl From<Url> for Page {
     }
 }
 
+impl PartialEq<CrawledPage> for Page {
+    fn eq(&self, other: &CrawledPage) -> bool {
+        self.url == other.url
+    }
+}
+
 #[allow(unused)]
 impl CrawledPage {
     pub fn new(page: Page) -> Self {
@@ -46,5 +52,11 @@ impl CrawledPage {
             url: page.url,
             html: String::new(),
         }
+    }
+}
+
+impl PartialEq<Page> for CrawledPage {
+    fn eq(&self, other: &Page) -> bool {
+        self.url == other.url
     }
 }
