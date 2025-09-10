@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use reqwest::{IntoUrl, Url};
+use reqwest::Url;
 use scraper::{Html, Selector};
 
 use crate::page::Page;
@@ -22,18 +22,18 @@ impl Crawler {
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
-            self.crawl_from_url(page).await.unwrap();
+            self.crawl_page(page).await.unwrap();
         }
 
         Ok(())
     }
 
     // TODO: Make this private somehow, since this needs to be public for benchmarks
-    pub async fn crawl_from_url(&mut self, url: Url) -> Result<(), Box<dyn std::error::Error>> {
-        let html = Self::make_get_request(url.clone()).await?;
+    pub async fn crawl_page(&mut self, page: Page) -> Result<(), Box<dyn std::error::Error>> {
+        let html = Self::make_get_request(page.clone()).await?;
         let urls = self.extract_urls_from_html(html);
 
-        let base_url = url;
+        let base_url = page.url;
 
         for url in urls {
             let url = if url.starts_with("https://") || url.starts_with("http://") {
@@ -47,7 +47,7 @@ impl Crawler {
             }
 
             self.mark_url_as_visited(url.clone());
-            self.queue.push_front(url);
+            self.queue.push_front(Page::from(url));
         }
         println!("Crawled {:?}...", base_url);
         Ok(())
@@ -63,8 +63,8 @@ impl Crawler {
 
     /// Make a get request to a specific URL.
     /// This (should) return the HTML of the URL.
-    async fn make_get_request(url: impl IntoUrl) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(reqwest::get(url).await?.text().await?)
+    async fn make_get_request(page: Page) -> Result<String, Box<dyn std::error::Error>> {
+        Ok(reqwest::get(page.url).await?.text().await?)
     }
 
     fn extract_urls_from_html(&self, html: String) -> Vec<String> {
@@ -86,15 +86,18 @@ impl Crawler {
 #[cfg(test)]
 mod test {
     mod make_get_request {
+        use url::Url;
+
+        use crate::page::Page;
+
         use super::super::Crawler;
 
         // Instead of using #[test], we use #[tokio::test] so we can test async functions
         #[tokio::test]
         async fn test_basic_site() {
-            let html =
-                Crawler::make_get_request("https://crawler-test.com/status_codes/status_200")
-                    .await
-                    .unwrap();
+            let page =
+                Page::from(Url::parse("https://crawler-test.com/status_codes/status_200").unwrap());
+            let html = Crawler::make_get_request(page).await.unwrap();
 
             assert!(html.contains("Status code 200 body"))
         }
@@ -103,37 +106,43 @@ mod test {
     mod crawl_next_url {
         use reqwest::Url;
 
+        use crate::page::Page;
+
         use super::super::Crawler;
 
         #[tokio::test]
         async fn test_books_toscrape() {
-            let url = Url::parse("https://books.toscrape.com/").unwrap();
-            let mut crawler = Crawler::new(url.clone());
+            let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
+            let mut crawler = Crawler::new(page.clone());
 
-            assert_eq!(crawler.queue, vec![url.clone()]);
+            assert_eq!(crawler.queue, vec![page.clone()]);
 
-            crawler.crawl_from_url(url.clone()).await.unwrap();
+            crawler.crawl_page(page.clone()).await.unwrap();
 
-            let expected_url = url.join("catalogue/category/books_1/index.html").unwrap();
+            let expected_url = Page::from(
+                page.url
+                    .join("catalogue/category/books_1/index.html")
+                    .unwrap(),
+            );
 
             assert!(crawler.queue.contains(&expected_url));
         }
 
         #[tokio::test]
         async fn test_already_visited_url() {
-            let url = Url::parse("https://books.toscrape.com/").unwrap();
-            let mut crawler = Crawler::new(url.clone());
+            let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
+            let mut crawler = Crawler::new(page.clone());
 
-            assert_eq!(crawler.queue, vec![url.clone()]);
+            assert_eq!(crawler.queue, vec![page.clone()]);
 
             // Crawl the url. This will fill up crawler.visited
-            crawler.crawl_from_url(url.clone()).await.unwrap();
+            crawler.crawl_page(page.clone()).await.unwrap();
 
             crawler.queue.clear();
 
             // After clearing the url queue, we crawl the url again.
             // Since crawler.visited is filled, the queue should be empty after crawling the same url again
-            crawler.crawl_from_url(url.clone()).await.unwrap();
+            crawler.crawl_page(page.clone()).await.unwrap();
 
             assert!(crawler.queue.is_empty());
         }
@@ -144,11 +153,13 @@ mod test {
 
         use reqwest::Url;
 
+        use crate::page::Page;
+
         use super::super::Crawler;
 
         fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
-            let url = Url::parse("https://does-not-exist.com").unwrap();
-            let crawler = Crawler::new(url);
+            let page = Page::from(Url::parse("https://does-not-exist.com").unwrap());
+            let crawler = Crawler::new(page);
 
             // CARGO_MANIFEST_DIR gets the source dir of the project
             let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

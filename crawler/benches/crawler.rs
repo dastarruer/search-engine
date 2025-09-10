@@ -7,7 +7,7 @@ fn bench_crawl_from_url(c: &mut Criterion) {
     c.bench_function("crawl_from_url", |b| {
         b.iter(async || {
             let mut crawler = Crawler::new(url.clone());
-            crawler.crawl_from_url(url.clone()).await.unwrap();
+            crawler.crawl_page(url.clone()).await.unwrap();
         })
     });
 }

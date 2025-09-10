@@ -1,2 +1,2 @@
 pub mod crawler;
-mod page;
+pub mod page;
