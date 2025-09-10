@@ -20,7 +20,7 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a CrawledPage
-    pub(crate) fn crawl(self) -> CrawledPage {
+    pub(crate) fn into_crawled(self) -> CrawledPage {
         CrawledPage::new(self)
     }
 }
