@@ -1,19 +1,16 @@
 use url::Url;
 
-#[allow(unused)]
 #[derive(PartialEq, Debug)]
 pub struct Page {
     pub url: Url,
 }
 
-#[allow(unused)]
 #[derive(PartialEq)]
 pub struct CrawledPage {
-    url: Url,
-    html: String,
+    pub url: Url,
+    pub html: String,
 }
 
-#[allow(unused)]
 impl Page {
     pub fn new(url: Url) -> Self {
         Page { url }
@@ -45,7 +42,6 @@ impl PartialEq<CrawledPage> for Page {
     }
 }
 
-#[allow(unused)]
 impl CrawledPage {
     pub fn new(page: Page) -> Self {
         CrawledPage {

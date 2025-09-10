@@ -3,11 +3,11 @@ use std::collections::VecDeque;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
-use crate::page::Page;
+use crate::page::{CrawledPage, Page};
 
 pub struct Crawler {
     queue: VecDeque<Page>,
-    visited: VecDeque<Url>,
+    visited: VecDeque<CrawledPage>,
 }
 
 impl Crawler {
@@ -33,32 +33,36 @@ impl Crawler {
         let html = Self::make_get_request(page.clone()).await?;
         let urls = self.extract_urls_from_html(html);
 
-        let base_url = page.url;
+        let base_url = page.url.clone();
 
         for url in urls {
-            let url = if url.starts_with("https://") || url.starts_with("http://") {
-                Url::parse(url.as_str()).unwrap()
-            } else {
-                base_url.join(url.as_str()).unwrap()
-            };
+            let page = Page::from(
+                if url.starts_with("https://") || url.starts_with("http://") {
+                    Url::parse(url.as_str()).unwrap()
+                } else {
+                    base_url.join(url.as_str()).unwrap()
+                },
+            );
 
-            if self.is_url_visited(&url) {
+            if self.is_page_visited(&page) {
                 continue;
             }
 
-            self.mark_url_as_visited(url.clone());
-            self.queue.push_front(Page::from(url));
+            // Add the url to the queue
+            self.queue.push_front(page.clone());
+            self.mark_page_as_crawled(page);
         }
         println!("Crawled {:?}...", base_url);
         Ok(())
     }
 
-    fn mark_url_as_visited(&mut self, url: Url) {
-        self.visited.push_front(url.clone());
+    fn mark_page_as_crawled(&mut self, page: Page) {
+        let crawled_page = page.into_crawled();
+        self.visited.push_front(crawled_page);
     }
 
-    fn is_url_visited(&self, url: &Url) -> bool {
-        self.visited.contains(url)
+    fn is_page_visited(&self, page: &Page) -> bool {
+        self.visited.iter().any(|crawled_page| page == crawled_page)
     }
 
     /// Make a get request to a specific URL.
