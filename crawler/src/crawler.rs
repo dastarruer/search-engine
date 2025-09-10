@@ -48,8 +48,10 @@ impl Crawler {
                 continue;
             }
 
-            // Add the url to the queue
+            // Add the page to the queue of pages to crawl
             self.queue.push_front(page.clone());
+
+            // Mark this page as crawled, so the crawler does not crawl the same page twice
             self.mark_page_as_crawled(page);
         }
         println!("Crawled {:?}...", base_url);
