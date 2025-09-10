@@ -3,21 +3,19 @@ use std::collections::VecDeque;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
-use crate::page::{CrawledPage, Page};
+use crate::page::Page;
 
 pub struct Crawler {
     queue: VecDeque<Page>,
-    visited: VecDeque<CrawledPage>,
 }
 
 impl Crawler {
     pub fn new(starting_url: Page) -> Self {
         let mut queue = VecDeque::new();
-        let visited = VecDeque::new();
 
         queue.push_back(starting_url);
 
-        Crawler { queue, visited }
+        Crawler { queue }
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -44,28 +42,20 @@ impl Crawler {
                 },
             );
 
-            if self.is_page_visited(&page) {
+            if self.is_page_queued(&page) {
                 continue;
             }
 
             // Add the page to the queue of pages to crawl
             self.queue.push_front(page.clone());
-
-            // Mark this page as queued, so the crawler does not crawl the same page twice
-            self.mark_page_as_queued(page);
         }
+
         println!("Crawled {:?}...", base_url);
         Ok(())
     }
 
-    fn mark_page_as_queued(&mut self, page: Page) {
-        // Mark the page as 'crawled' to prevent duplicate queuing, not because the page is crawled
-        let crawled_page = page.into_crawled();
-        self.visited.push_front(crawled_page);
-    }
-
-    fn is_page_visited(&self, page: &Page) -> bool {
-        self.visited.iter().any(|crawled_page| page == crawled_page)
+    fn is_page_queued(&self, page: &Page) -> bool {
+        self.queue.iter().any(|crawled_page| page == crawled_page)
     }
 
     /// Make a get request to a specific URL.
@@ -142,16 +132,15 @@ mod test {
 
             assert_eq!(crawler.queue, vec![page.clone()]);
 
-            // Crawl the url. This will fill up crawler.visited
+            // Crawl the page for the first time
             crawler.crawl_page(page.clone()).await.unwrap();
 
-            crawler.queue.clear();
+            let queue_before = crawler.queue.clone();
 
-            // After clearing the url queue, we crawl the url again.
-            // Since crawler.visited is filled, the queue should be empty after crawling the same url again
+            // Crawl the page a second time. After this, the queue should stay exactly the same.
             crawler.crawl_page(page.clone()).await.unwrap();
 
-            assert!(crawler.queue.is_empty());
+            assert_eq!(crawler.queue, queue_before)
         }
     }
 
