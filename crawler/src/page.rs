@@ -25,9 +25,20 @@ impl Page {
     }
 }
 
+impl Clone for Page {
+    fn clone(&self) -> Self {
+        Page {
+            url: self.url.clone(),
+        }
+    }
+}
+
 #[allow(unused)]
 impl CrawledPage {
     pub fn new(page: Page) -> Self {
-        CrawledPage { url: page.url, html: String::new() }
+        CrawledPage {
+            url: page.url,
+            html: String::new(),
+        }
     }
 }
