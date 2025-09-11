@@ -44,12 +44,24 @@
 
           # Required for reqwest crate
           openssl
+
+          docker-compose
+          postgresql
+
+          # Simple script to connect to postgresql database
+          (writeShellScriptBin "connect" ''
+            psql -h localhost -p 5432 -U search_db_user -d search_db
+          '')
         ];
+
+        shellHook = ''
+          # Run docker container
+          sudo docker-compose up -d
+        '';
 
         env = {
           # Required by rust-analyzer
           RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
-
         };
       };
       nativeBuildInputs = with pkgs; [pkg-config];
