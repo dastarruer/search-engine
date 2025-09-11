@@ -4,13 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-reqwest = { version = "0.12" }
+reqwest = { version = "0.12.23" }
 scraper = "0.24.0"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.47.1", features = ["full"] }
+sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls"] }
 url = "2.5.7"
 
 [dev-dependencies]
-criterion = "0.7"
+criterion = "0.7.0"
 
 [[bench]]
 name = "crawler"
