@@ -58,6 +58,9 @@
         shellHook = ''
           # Run docker container
           sudo docker-compose up -d
+
+          # Aliases
+          alias flyway="flyway -configFiles=./flyway.toml"
         '';
 
         env = {
