@@ -1,0 +1,7 @@
+[flyway]
+locations = ["filesystem:${PWD}/migrations"]
+
+[environments.default]
+url = "jdbc:postgresql://localhost:5432/search_db"
+user = "search_db_user"
+password = "123"

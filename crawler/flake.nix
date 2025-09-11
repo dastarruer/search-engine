@@ -47,6 +47,7 @@
 
           docker-compose
           postgresql
+          flyway
 
           # Simple script to connect to postgresql database
           (writeShellScriptBin "connect" ''
