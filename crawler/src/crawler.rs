@@ -3,19 +3,25 @@ use std::collections::VecDeque;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
+use sqlx::{Connection, PgConnection, Row};
+
 use crate::page::Page;
 
 pub struct Crawler {
     queue: VecDeque<Page>,
+    conn: PgConnection,
 }
 
 impl Crawler {
-    pub fn new(starting_url: Page) -> Self {
+    pub async fn new(starting_url: Page) -> Self {
         let mut queue = VecDeque::new();
+        let url = "postgres://search_db_user:123@localhost:5432/search_db";
+
+        let conn = sqlx::postgres::PgConnection::connect(url).await.unwrap();
 
         queue.push_back(starting_url);
 
-        Crawler { queue }
+        Crawler { queue, conn }
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -110,7 +116,7 @@ mod test {
         #[tokio::test]
         async fn test_books_toscrape() {
             let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
-            let mut crawler = Crawler::new(page.clone());
+            let mut crawler = Crawler::new(page.clone()).await;
 
             assert_eq!(crawler.queue, vec![page.clone()]);
 
@@ -128,7 +134,7 @@ mod test {
         #[tokio::test]
         async fn test_already_visited_url() {
             let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
-            let mut crawler = Crawler::new(page.clone());
+            let mut crawler = Crawler::new(page.clone()).await;
 
             assert_eq!(crawler.queue, vec![page.clone()]);
 
@@ -153,9 +159,9 @@ mod test {
 
         use super::super::Crawler;
 
-        fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
+        async fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
             let page = Page::from(Url::parse("https://does-not-exist.com").unwrap());
-            let crawler = Crawler::new(page);
+            let crawler = Crawler::new(page).await;
 
             // CARGO_MANIFEST_DIR gets the source dir of the project
             let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -175,16 +181,16 @@ mod test {
             assert_eq!(urls, expected_urls)
         }
 
-        #[test]
-        fn test_single_href() {
+        #[tokio::test]
+        async fn test_single_href() {
             let filename = "extract_single_href.html";
             let expected_urls = vec![String::from("https://www.wikipedia.org/")];
 
-            test_and_extract_urls_from_html_file(filename, expected_urls);
+            test_and_extract_urls_from_html_file(filename, expected_urls).await;
         }
 
-        #[test]
-        fn test_multiple_hrefs() {
+        #[tokio::test]
+        async fn test_multiple_hrefs() {
             let filename = "extract_multiple_hrefs.html";
             let expected_urls = vec![
                 String::from("https://www.wikipedia.org/"),
@@ -192,7 +198,7 @@ mod test {
                 String::from("https://www.youtube.com/"),
             ];
 
-            test_and_extract_urls_from_html_file(filename, expected_urls);
+            test_and_extract_urls_from_html_file(filename, expected_urls).await;
         }
     }
 }
