@@ -9,7 +9,7 @@ pub struct Page {
 pub struct CrawledPage {
     pub url: Url,
     pub html: String,
-    pub http_status: i8,
+    pub http_status: i16,
 }
 
 impl Page {
@@ -18,7 +18,7 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a CrawledPage
-    pub(crate) fn into_crawled(self, http_status: i8) -> CrawledPage {
+    pub(crate) fn into_crawled(self, http_status: i16) -> CrawledPage {
         CrawledPage::new(self, http_status)
     }
 }
@@ -44,7 +44,7 @@ impl PartialEq<CrawledPage> for Page {
 }
 
 impl CrawledPage {
-    pub fn new(page: Page, http_status: i8,) -> Self {
+    pub fn new(page: Page, http_status: i16) -> Self {
         CrawledPage {
             url: page.url,
             html: String::new(),
