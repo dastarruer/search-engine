@@ -3,13 +3,13 @@ use std::collections::VecDeque;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
-use sqlx::{Connection, PgConnection, Row};
+use sqlx::{PgPool};
 
-use crate::page::Page;
+use crate::page::{CrawledPage, Page};
 
 pub struct Crawler {
     queue: VecDeque<Page>,
-    conn: PgConnection,
+    pool: PgPool,
 }
 
 impl Crawler {
@@ -17,27 +17,28 @@ impl Crawler {
         let mut queue = VecDeque::new();
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
 
-        let conn = sqlx::postgres::PgConnection::connect(url).await.unwrap();
+        let conn = sqlx::postgres::PgPool::connect(url).await.unwrap();
 
         queue.push_back(starting_url);
 
-        Crawler { queue, conn }
+        Crawler { queue, pool: conn }
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
-            self.crawl_page(page).await.unwrap();
+            let crawled_page = self.crawl_page(page).await.unwrap();
+            crawled_page.add_to_db(&self.pool).await?;
         }
 
         Ok(())
     }
 
     // TODO: Make this private somehow, since this needs to be public for benchmarks
-    pub async fn crawl_page(&mut self, page: Page) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, Box<dyn std::error::Error>> {
         let html = Self::make_get_request(page.clone()).await?;
         let urls = self.extract_urls_from_html(html);
 
-        let base_url = page.url;
+        let base_url = page.url.clone();
 
         for url in urls {
             let page = Page::from(
@@ -57,7 +58,8 @@ impl Crawler {
         }
 
         println!("Crawled {:?}...", base_url);
-        Ok(())
+
+        Ok(page.into_crawled(200))
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
