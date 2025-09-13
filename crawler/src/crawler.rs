@@ -187,7 +187,7 @@ mod test {
         async fn test_basic_site() {
             let server = HttpServer::new("extract_single_href.html");
 
-            let page = Page::from(Url::parse(server.base_url().as_str()).unwrap());
+            let page = Page::from(server.base_url());
 
             let mut crawler = Crawler::new(page.clone()).await;
 
@@ -208,10 +208,15 @@ mod test {
 
         #[tokio::test]
         async fn test_already_visited_url() {
-            let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
+            let server = HttpServer::new("extract_single_href.html");
+
+            let page = Page::from(server.base_url());
             let mut crawler = Crawler::new(page.clone()).await;
 
-            assert_eq!(crawler.queue, vec![page.clone()]);
+            let mut expected_queue = VecDeque::new();
+            expected_queue.push_back(page.clone());
+
+            assert_eq!(crawler.queue, expected_queue);
 
             // Crawl the page for the first time
             crawler.crawl_page(page.clone()).await.unwrap();
