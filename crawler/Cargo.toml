@@ -12,6 +12,7 @@ url = "2.5.7"
 
 [dev-dependencies]
 criterion = "0.7.0"
+httpmock = "0.7.0-rc.1"
 
 [[bench]]
 name = "crawler"
