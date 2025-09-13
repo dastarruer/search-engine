@@ -86,6 +86,9 @@ impl Crawler {
             // Add the page to the queue of pages to crawl
             self.queue.push_front(page.clone());
             println!("{} is queued", page.url);
+
+            // Add the page to self.visited, so that it is never crawled again
+            self.visited.insert(page);
         }
 
         println!("Crawled {:?}...", base_url);
