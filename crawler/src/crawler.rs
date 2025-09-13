@@ -190,6 +190,8 @@ mod test {
             let page = Page::from(Url::parse(server.base_url().as_str()).unwrap());
 
             let mut crawler = Crawler::new(page.clone()).await;
+
+            // Reset crawler.visited, which gets loaded from the db (we don't want that)
             crawler.visited = HashSet::new();
 
             let mut expected_queue = VecDeque::new();
