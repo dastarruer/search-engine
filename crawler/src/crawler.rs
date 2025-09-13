@@ -65,7 +65,7 @@ impl Crawler {
         page: Page,
     ) -> Result<CrawledPage, Box<dyn std::error::Error>> {
         let html = Self::make_get_request(page.clone()).await?;
-        let urls = self.extract_urls_from_html(html);
+        let urls = self.extract_urls_from_html(html.clone());
 
         let base_url = page.url.clone();
 
@@ -93,7 +93,7 @@ impl Crawler {
 
         println!("Crawled {:?}...", base_url);
 
-        Ok(page.into_crawled(200))
+        Ok(page.into_crawled(html, 200))
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {

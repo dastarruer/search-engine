@@ -18,8 +18,8 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a CrawledPage
-    pub(crate) fn into_crawled(self, http_status: i16) -> CrawledPage {
-        CrawledPage::new(self, http_status)
+    pub(crate) fn into_crawled(self, html: String, http_status: i16) -> CrawledPage {
+        CrawledPage::new(self, html, http_status)
     }
 }
 
@@ -36,10 +36,10 @@ impl PartialEq<CrawledPage> for Page {
 }
 
 impl CrawledPage {
-    pub fn new(page: Page, http_status: i16) -> Self {
+    pub fn new(page: Page, html: String, http_status: i16) -> Self {
         CrawledPage {
             url: page.url,
-            html: String::new(),
+            html,
             http_status,
         }
     }
