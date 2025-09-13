@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
-use sqlx::{PgPool};
+use sqlx::PgPool;
 
 use crate::page::{CrawledPage, Page};
 
@@ -27,14 +27,20 @@ impl Crawler {
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
             let crawled_page = self.crawl_page(page).await.unwrap();
-            crawled_page.add_to_db(&self.pool).await?;
+
+            if let Err(e) = crawled_page.add_to_db(&self.pool).await {
+                eprintln!("Error: {}", e);
+            };
         }
 
         Ok(())
     }
 
     // TODO: Make this private somehow, since this needs to be public for benchmarks
-    pub async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, Box<dyn std::error::Error>> {
+    pub async fn crawl_page(
+        &mut self,
+        page: Page,
+    ) -> Result<CrawledPage, Box<dyn std::error::Error>> {
         let html = Self::make_get_request(page.clone()).await?;
         let urls = self.extract_urls_from_html(html);
 
