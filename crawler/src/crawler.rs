@@ -240,7 +240,10 @@ mod test {
         use super::super::Crawler;
 
         async fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
-            let page = Page::from(Url::parse("https://does-not-exist.com").unwrap());
+            // We don't need to send http requests in this module, so just provide a nonexistent site
+            let non_existent_site = Url::parse("https://does-not-exist.comm").unwrap();
+            let page = Page::from(non_existent_site);
+
             let crawler = Crawler::new(page).await;
 
             // CARGO_MANIFEST_DIR gets the source dir of the project
