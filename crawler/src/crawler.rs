@@ -144,7 +144,11 @@ mod test {
     }
 
     mod crawl_next_url {
-        use std::collections::{HashSet, VecDeque};
+        use httpmock::prelude::*;
+        use std::{
+            collections::{HashSet, VecDeque},
+            path::PathBuf,
+        };
 
         use reqwest::Url;
 
@@ -153,8 +157,22 @@ mod test {
         use super::super::Crawler;
 
         #[tokio::test]
-        async fn test_books_toscrape() {
-            let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
+        async fn test_basic_site() {
+            let server = MockServer::start();
+            let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("src")
+                .join("test-files")
+                .join("extract_single_href.html");
+
+            let _mock = server.mock(|when, then| {
+                when.method(GET);
+                then.status(200)
+                    .header("content-type", "text/html")
+                    .body_from_file(html_file.display().to_string());
+            });
+
+            let page = Page::from(Url::parse(server.base_url().as_str()).unwrap());
+
             let mut crawler = Crawler::new(page.clone()).await;
             crawler.visited = HashSet::new();
 
@@ -165,11 +183,7 @@ mod test {
 
             crawler.crawl_page(page.clone()).await.unwrap();
 
-            let expected_url = Page::from(
-                page.url
-                    .join("catalogue/category/books_1/index.html")
-                    .unwrap(),
-            );
+            let expected_url = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
 
             assert!(crawler.queue.contains(&expected_url));
         }
