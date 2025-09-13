@@ -65,7 +65,7 @@ impl Crawler {
         &mut self,
         page: Page,
     ) -> Result<CrawledPage, Box<dyn std::error::Error>> {
-        let html = Self::make_get_request(page.clone()).await?;
+        let html = Self::make_get_request(page.clone()).await?.text().await?;
         let urls = self.extract_urls_from_html(html.clone());
 
         let base_url = page.url.clone();
@@ -102,9 +102,9 @@ impl Crawler {
     }
 
     /// Make a get request to a specific URL.
-    /// This (should) return the HTML of the URL.
-    async fn make_get_request(page: Page) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(reqwest::get(page.url).await?.text().await?)
+    /// This returns a response, which will contain the HTML and HTTP status code of the page.
+    async fn make_get_request(page: Page) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
+        Ok(reqwest::get(page.url).await?)
     }
 
     fn extract_urls_from_html(&self, html: String) -> Vec<String> {
@@ -157,20 +157,19 @@ mod test {
         }
     }
     mod make_get_request {
-        use url::Url;
-
-        use crate::page::Page;
+        use crate::{crawler::test::HttpServer, page::Page};
 
         use super::super::Crawler;
 
         // Instead of using #[test], we use #[tokio::test] so we can test async functions
         #[tokio::test]
-        async fn test_basic_site() {
-            let page =
-                Page::from(Url::parse("https://crawler-test.com/status_codes/status_200").unwrap());
-            let html = Crawler::make_get_request(page).await.unwrap();
+        async fn test_200_status() {
+            let server = HttpServer::new("extract_single_href.html");
 
-            assert!(html.contains("Status code 200 body"))
+            let page = Page::from(server.base_url());
+            let resp = Crawler::make_get_request(page).await.unwrap();
+
+            assert_eq!(resp.status(), 200);
         }
     }
 
