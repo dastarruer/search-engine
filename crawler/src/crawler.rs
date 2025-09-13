@@ -49,13 +49,14 @@ impl Crawler {
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
-            let crawled_page = self.crawl_page(page).await.unwrap();
+            let crawled_page = self.crawl_page(page).await?;
 
             if let Err(e) = crawled_page.add_to_db(&self.pool).await {
                 eprintln!("Error: {}", e);
             };
         }
 
+        println!("All done! no more pages left");
         Ok(())
     }
 
