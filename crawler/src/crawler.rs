@@ -1,14 +1,17 @@
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use reqwest::Url;
 use scraper::{Html, Selector};
 
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 
 use crate::page::{CrawledPage, Page};
 
 pub struct Crawler {
     queue: VecDeque<Page>,
+    // Use Page instead of CrawledPage because comparing Page with CrawledPage does not work in hashsets for some reason
+    // TODO: Convert to CrawledPage
+    visited: HashSet<Page>,
     pool: PgPool,
 }
 
@@ -17,11 +20,31 @@ impl Crawler {
         let mut queue = VecDeque::new();
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
 
-        let conn = sqlx::postgres::PgPool::connect(url).await.unwrap();
+        let pool = sqlx::postgres::PgPool::connect(url).await.unwrap();
+
+        let visited_query = "SELECT * FROM public.pages WHERE http_status = 200";
+        let mut visited = HashSet::new();
+
+        let query = sqlx::query(visited_query);
+
+        query
+            .fetch_all(&pool)
+            .await
+            .expect("Database should not be empty")
+            .iter()
+            .for_each(|row| {
+                let page = Page::from(Url::parse(row.get("url")).unwrap());
+
+                visited.insert(page);
+            });
 
         queue.push_back(starting_url);
 
-        Crawler { queue, pool: conn }
+        Crawler {
+            queue,
+            visited,
+            pool,
+        }
     }
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -55,12 +78,14 @@ impl Crawler {
                 },
             );
 
-            if self.is_page_queued(&page) {
+            if self.visited.contains(&page) || self.is_page_queued(&page) {
+                println!("{} is a duplicate", page.url);
                 continue;
             }
 
             // Add the page to the queue of pages to crawl
             self.queue.push_front(page.clone());
+            println!("{} is queued", page.url);
         }
 
         println!("Crawled {:?}...", base_url);
@@ -115,6 +140,8 @@ mod test {
     }
 
     mod crawl_next_url {
+        use std::collections::{HashSet, VecDeque};
+
         use reqwest::Url;
 
         use crate::page::Page;
@@ -125,8 +152,12 @@ mod test {
         async fn test_books_toscrape() {
             let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
             let mut crawler = Crawler::new(page.clone()).await;
+            crawler.visited = HashSet::new();
 
-            assert_eq!(crawler.queue, vec![page.clone()]);
+            let mut expected_queue = VecDeque::new();
+            expected_queue.push_back(page.clone());
+
+            assert_eq!(crawler.queue, expected_queue);
 
             crawler.crawl_page(page.clone()).await.unwrap();
 

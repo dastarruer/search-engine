@@ -1,11 +1,11 @@
 use url::Url;
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Page {
     pub url: Url,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub struct CrawledPage {
     pub url: Url,
     pub html: String,
@@ -20,14 +20,6 @@ impl Page {
     /// 'Crawl' a Page, which turns it into a CrawledPage
     pub(crate) fn into_crawled(self, http_status: i16) -> CrawledPage {
         CrawledPage::new(self, http_status)
-    }
-}
-
-impl Clone for Page {
-    fn clone(&self) -> Self {
-        Page {
-            url: self.url.clone(),
-        }
     }
 }
 
@@ -48,7 +40,7 @@ impl CrawledPage {
         CrawledPage {
             url: page.url,
             html: String::new(),
-            http_status
+            http_status,
         }
     }
 
