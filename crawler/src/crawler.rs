@@ -125,6 +125,37 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
+    use std::path::PathBuf;
+
+    use httpmock::prelude::*;
+    use url::Url;
+
+    struct HttpServer {
+        server: MockServer,
+    }
+
+    impl HttpServer {
+        fn new(filename: &str) -> Self {
+            let server = MockServer::start();
+            let filepath = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("src")
+                .join("test-files")
+                .join(filename);
+
+            let _mock = server.mock(|when, then| {
+                when.method(GET);
+                then.status(200)
+                    .header("content-type", "text/html")
+                    .body_from_file(filepath.display().to_string());
+            });
+
+            HttpServer { server }
+        }
+
+        fn base_url(&self) -> Url {
+            Url::parse(self.server.base_url().as_str()).unwrap()
+        }
+    }
     mod make_get_request {
         use url::Url;
 
@@ -144,32 +175,17 @@ mod test {
     }
 
     mod crawl_next_url {
-        use httpmock::prelude::*;
-        use std::{
-            collections::{HashSet, VecDeque},
-            path::PathBuf,
-        };
+        use std::collections::{HashSet, VecDeque};
 
         use reqwest::Url;
 
-        use crate::page::Page;
+        use crate::{crawler::test::HttpServer, page::Page};
 
         use super::super::Crawler;
 
         #[tokio::test]
         async fn test_basic_site() {
-            let server = MockServer::start();
-            let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("src")
-                .join("test-files")
-                .join("extract_single_href.html");
-
-            let _mock = server.mock(|when, then| {
-                when.method(GET);
-                then.status(200)
-                    .header("content-type", "text/html")
-                    .body_from_file(html_file.display().to_string());
-            });
+            let server = HttpServer::new("extract_single_href.html");
 
             let page = Page::from(Url::parse(server.base_url().as_str()).unwrap());
 
