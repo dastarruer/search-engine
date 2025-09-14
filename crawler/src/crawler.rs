@@ -10,7 +10,7 @@ use crate::page::{CrawledPage, Page};
 #[derive(Clone)]
 pub struct Crawler {
     queue: VecDeque<Page>,
-    // Use Page instead of CrawledPage because comparing Page with CrawledPage does not work in hashsets for some reason
+    // Use `Page` instead of `CrawledPage` because comparing `Page` with `CrawledPage` does not work in hashsets for some reason
     // TODO: Convert to CrawledPage
     visited: HashSet<Page>,
     pool: PgPool,
@@ -72,7 +72,7 @@ impl Crawler {
         Ok(())
     }
 
-    /// Reset self.visited and self.queue.
+    /// Reset `self.visited` and `self.queue`.
     /// This method is meant for tests and benchmarks.
     pub fn reset(&mut self) {
         self.queue = VecDeque::new();
