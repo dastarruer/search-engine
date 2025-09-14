@@ -4,6 +4,7 @@ use reqwest::{Client, ClientBuilder, Url};
 use scraper::{Html, Selector};
 
 use sqlx::{PgPool, Row};
+use url::ParseError;
 
 use crate::page::{CrawledPage, Page};
 
@@ -77,13 +78,27 @@ impl Crawler {
         let base_url = page.url.clone();
 
         for url in urls {
-            let page = Page::from(
-                if url.starts_with("https://") || url.starts_with("http://") {
-                    Url::parse(url.as_str()).unwrap()
-                } else {
-                    base_url.join(url.as_str()).unwrap()
-                },
-            );
+            let url = if url.starts_with("https://") || url.starts_with("http://") {
+                match Url::parse(url.as_str()) {
+                    Ok(url) => Some(url),
+                    Err(ParseError::IdnaError) => {
+                        eprintln!("Error: {} is not a valid url", url);
+                        None
+                    }
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        None
+                    }
+                }
+            } else {
+                Some(base_url.join(url.as_str()).unwrap())
+            };
+
+            let page = if let Some(url) = url {
+                Page::from(url)
+            } else {
+                continue;
+            };
 
             if self.visited.contains(&page) || self.is_page_queued(&page) {
                 println!("{} is a duplicate", page.url);
@@ -125,7 +140,7 @@ impl Crawler {
         for element in fragment.select(&selector) {
             if let Some(url) = element.value().attr("href") {
                 urls.push(url.to_string());
-            }
+            };
         }
 
         urls
