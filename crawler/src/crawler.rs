@@ -7,6 +7,7 @@ use sqlx::{PgPool, Row};
 
 use crate::page::{CrawledPage, Page};
 
+#[derive(Clone)]
 pub struct Crawler {
     queue: VecDeque<Page>,
     // Use Page instead of CrawledPage because comparing Page with CrawledPage does not work in hashsets for some reason

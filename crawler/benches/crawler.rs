@@ -1,17 +1,33 @@
-use crawler::{crawler::Crawler, page::Page};
+use crawler::{crawler::Crawler, page::Page, utils::HttpServer};
 use criterion::{Criterion, criterion_group, criterion_main};
-use url::Url;
 
-fn bench_crawl_from_url(c: &mut Criterion) {
-    let page = Page::from(Url::parse("https://books.toscrape.com/").unwrap());
+/// Benchmark crawling a single page
+fn bench_crawl_from_page(c: &mut Criterion) {
+    let server = HttpServer::new("benchmarks/index.html");
 
-    c.bench_function("crawl_from_url", |b| {
-        b.iter(async || {
-            let mut crawler = Crawler::new(page.clone()).await;
+    let page = Page::from(server.base_url());
+    let mut crawler = None;
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all() // Will panic, for some reason...
+        .build()
+        .unwrap();
+
+    // A fun workaround for benching async functions in Criterion:
+    // https://stackoverflow.com/questions/77601738/adding-async-functions-in-criterion-group-macro
+    runtime.block_on(async {
+        crawler = Some(Crawler::new(page.clone()).await);
+    });
+
+    c.bench_function("crawl_from_page", |b| {
+        b.to_async(&runtime).iter(|| async {
+            let mut crawler = crawler.clone().unwrap();
+
             crawler.crawl_page(page.clone()).await.unwrap();
+            crawler.reset();
         })
     });
 }
 
-criterion_group!(benches, bench_crawl_from_url);
+criterion_group!(benches, bench_crawl_from_page);
 criterion_main!(benches);
