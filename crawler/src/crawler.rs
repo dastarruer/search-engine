@@ -6,7 +6,10 @@ use scraper::{Html, Selector};
 use sqlx::{PgPool, Row};
 use url::ParseError;
 
-use crate::{page::{CrawledPage, Page}, utils::string_to_url};
+use crate::{
+    page::{CrawledPage, Page},
+    utils::string_to_url,
+};
 
 #[derive(Clone)]
 pub struct Crawler {
@@ -71,7 +74,7 @@ impl Crawler {
         &mut self,
         page: Page,
     ) -> Result<CrawledPage, Box<dyn std::error::Error>> {
-        let html = self.make_get_request(page.clone()).await?.text().await?;
+        let html = self.extract_html_from_page(page.clone()).await?;
 
         let urls = self.extract_urls_from_html(html.clone());
 
@@ -102,6 +105,13 @@ impl Crawler {
         println!("Crawled {:?}...", base_url);
 
         Ok(page.into_crawled(html, 200))
+    }
+
+    async fn extract_html_from_page(
+        &mut self,
+        page: Page,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        Ok(self.make_get_request(page).await?.text().await?)
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
