@@ -16,10 +16,7 @@ impl HttpServer {
         let filepath = test_file_path_from_filename(filename);
 
         let _mock = server.mock(|when, then| {
-            when.method(GET).header(
-                "user-agent",
-                "SearchEngineCrawler/0.0 (https://github.com/dastarruer/search-engine/)",
-            );
+            when.method(GET).header("user-agent", crate::USER_AGENT);
             then.status(200)
                 .header("content-type", "text/html")
                 .body_from_file(filepath.display().to_string());
