@@ -61,6 +61,17 @@ impl Crawler {
         Ok(())
     }
 
+    /// Perform a test run without writing to the database.
+    /// This is meant to be used for benchmarks and tests only.
+    pub async fn test_run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        while let Some(page) = self.queue.pop_back() {
+            let _crawled_page = self.crawl_page(page).await?;
+        }
+
+        println!("All done! no more pages left");
+        Ok(())
+    }
+
     /// Reset self.visited and self.queue.
     /// This method is meant for tests and benchmarks.
     pub fn reset(&mut self) {
