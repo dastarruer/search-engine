@@ -1,10 +1,9 @@
 use std::collections::{HashSet, VecDeque};
 
-use reqwest::{Client, ClientBuilder, Url};
+use reqwest::{Client, ClientBuilder, StatusCode, Url};
 use scraper::{Html, Selector};
 
 use sqlx::{PgPool, Row};
-use url::ParseError;
 
 use crate::{
     page::{CrawledPage, Page},
@@ -74,9 +73,9 @@ impl Crawler {
         &mut self,
         page: Page,
     ) -> Result<CrawledPage, Box<dyn std::error::Error>> {
-        let html = self.extract_html_from_page(page.clone()).await?;
+        let (html, status) = self.extract_html_from_page(page.clone()).await?;
 
-        let urls = self.extract_urls_from_html(html.clone());
+        let urls = self.extract_urls_from_html(html.as_str());
 
         let base_url = page.url.clone();
 
@@ -104,14 +103,18 @@ impl Crawler {
 
         println!("Crawled {:?}...", base_url);
 
-        Ok(page.into_crawled(html, 200))
+        Ok(page.into_crawled(html, status))
     }
 
     async fn extract_html_from_page(
         &mut self,
         page: Page,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        Ok(self.make_get_request(page).await?.text().await?)
+    ) -> Result<(String, StatusCode), Box<dyn std::error::Error>> {
+        let resp = self.make_get_request(page).await?;
+        let status = resp.status();
+        let html = resp.text().await?;
+
+        Ok((html, status))
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -127,15 +130,15 @@ impl Crawler {
         Ok(self.client.get(page.url).send().await?)
     }
 
-    fn extract_urls_from_html(&self, html: String) -> Vec<String> {
+    fn extract_urls_from_html(&self, html: &str) -> Vec<String> {
         let mut urls = vec![];
 
-        let fragment = Html::parse_fragment(html.as_str());
+        let fragment = Html::parse_fragment(html);
         let selector = Selector::parse("a").unwrap();
 
         for element in fragment.select(&selector) {
             if let Some(url) = element.value().attr("href") {
-                urls.push(url.to_string());
+                urls.push(url.to_owned());
             };
         }
 
@@ -284,7 +287,7 @@ mod test {
             let mut buf = String::new();
             html.read_to_string(&mut buf).unwrap();
 
-            let urls = crawler.extract_urls_from_html(buf);
+            let urls = crawler.extract_urls_from_html(buf.as_str());
 
             assert_eq!(urls, expected_urls)
         }
