@@ -219,11 +219,11 @@ mod test {
     }
 
     mod extract_urls_from_html {
-        use std::{fs::File, io::Read, path::PathBuf};
+        use std::{fs::File, io::Read};
 
         use reqwest::Url;
 
-        use crate::page::Page;
+        use crate::{page::Page, utils::test_file_path_from_filename};
 
         use super::super::Crawler;
 
@@ -234,11 +234,7 @@ mod test {
 
             let crawler = Crawler::new(page).await;
 
-            // CARGO_MANIFEST_DIR gets the source dir of the project
-            let html_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("src")
-                .join("test-files")
-                .join(filename);
+            let html_file = test_file_path_from_filename(filename);
 
             let error_msg = format!("'{}' should exist.", filename);
             let error_msg = error_msg.as_str();

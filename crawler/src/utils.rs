@@ -13,10 +13,7 @@ pub struct HttpServer {
 impl HttpServer {
     pub fn new(filename: &str) -> Self {
         let server = MockServer::start();
-        let filepath = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("src")
-            .join("test-files")
-            .join(filename);
+        let filepath = test_file_path_from_filename(filename);
 
         let _mock = server.mock(|when, then| {
             when.method(GET);
@@ -31,4 +28,14 @@ impl HttpServer {
     pub fn base_url(&self) -> Url {
         Url::parse(self.server.base_url().as_str()).unwrap()
     }
+}
+
+/// Return the path of a file in src/test-files given just its filename.
+/// Even though this is public, this method is meant to be used for tests only.
+pub(crate) fn test_file_path_from_filename(filename: &str) -> PathBuf {
+    // CARGO_MANIFEST_DIR gets the source dir of the project
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("src")
+        .join("test-files")
+        .join(filename)
 }
