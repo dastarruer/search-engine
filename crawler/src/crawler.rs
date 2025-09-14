@@ -60,6 +60,13 @@ impl Crawler {
         Ok(())
     }
 
+    /// Reset self.visited and self.queue.
+    /// This method is meant for tests and benchmarks.
+    pub fn reset(&mut self) {
+        self.queue = VecDeque::new();
+        self.visited = HashSet::new();
+    }
+
     // TODO: Make this private somehow, since this needs to be public for benchmarks
     pub async fn crawl_page(
         &mut self,
@@ -125,39 +132,8 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
-
-    use httpmock::prelude::*;
-    use url::Url;
-
-    struct HttpServer {
-        server: MockServer,
-    }
-
-    impl HttpServer {
-        fn new(filename: &str) -> Self {
-            let server = MockServer::start();
-            let filepath = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .join("src")
-                .join("test-files")
-                .join(filename);
-
-            let _mock = server.mock(|when, then| {
-                when.method(GET);
-                then.status(200)
-                    .header("content-type", "text/html")
-                    .body_from_file(filepath.display().to_string());
-            });
-
-            HttpServer { server }
-        }
-
-        fn base_url(&self) -> Url {
-            Url::parse(self.server.base_url().as_str()).unwrap()
-        }
-    }
     mod make_get_request {
-        use crate::{crawler::test::HttpServer, page::Page};
+        use crate::{utils::HttpServer, page::Page};
 
         use super::super::Crawler;
 
@@ -178,7 +154,7 @@ mod test {
 
         use reqwest::Url;
 
-        use crate::{crawler::test::HttpServer, page::Page};
+        use crate::{utils::HttpServer, page::Page};
 
         use super::super::Crawler;
 
