@@ -62,7 +62,7 @@ impl Crawler {
     }
 
     /// Perform a test run without writing to the database.
-    /// This is meant to be used for benchmarks and tests only.
+    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn test_run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
             let _crawled_page = self.crawl_page(page).await?;
@@ -73,13 +73,14 @@ impl Crawler {
     }
 
     /// Reset `self.visited` and `self.queue`.
-    /// This method is meant for tests and benchmarks.
+    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub fn reset(&mut self) {
         self.queue = VecDeque::new();
         self.visited = HashSet::new();
     }
 
-    // TODO: Make this private somehow, since this needs to be public for benchmarks
+    /// Crawl a single page.
+    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn crawl_page(
         &mut self,
         page: Page,
@@ -145,7 +146,7 @@ impl Crawler {
 #[cfg(test)]
 mod test {
     mod make_get_request {
-        use crate::{utils::HttpServer, page::Page};
+        use crate::{page::Page, utils::HttpServer};
 
         use super::super::Crawler;
 
@@ -166,7 +167,7 @@ mod test {
 
         use reqwest::Url;
 
-        use crate::{utils::HttpServer, page::Page};
+        use crate::{page::Page, utils::HttpServer};
 
         use super::super::Crawler;
 

@@ -4,6 +4,8 @@ use std::path::PathBuf;
 use httpmock::prelude::*;
 use url::Url;
 
+/// An implementation of a mock HTTP server.
+/// Even though this is public, this method is meant to be used for benchmarks and tests only.
 pub struct HttpServer {
     server: MockServer,
 }
