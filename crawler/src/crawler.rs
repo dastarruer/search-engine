@@ -19,35 +19,11 @@ pub struct Crawler {
 
 impl Crawler {
     pub async fn new(starting_url: Page) -> Self {
-        let mut queue = VecDeque::new();
-        let url = "postgres://search_db_user:123@localhost:5432/search_db";
+        let queue = Self::init_queue(starting_url);
 
-        let pool = sqlx::postgres::PgPool::connect(url).await.unwrap();
+        let (pool, visited) = Self::init_visited().await;
 
-        let visited_query = "SELECT * FROM public.pages WHERE http_status = 200";
-        let mut visited = HashSet::new();
-
-        let query = sqlx::query(visited_query);
-
-        query
-            .fetch_all(&pool)
-            .await
-            .expect("Database should not be empty")
-            .iter()
-            .for_each(|row| {
-                let page = Page::from(Url::parse(row.get("url")).unwrap());
-
-                visited.insert(page);
-            });
-
-        queue.push_back(starting_url);
-
-        let client = ClientBuilder::new()
-            .user_agent(crate::USER_AGENT)
-            // Reduce bandwidth usage; compliant with wikimedia's robot policy: https://wikitech.wikimedia.org/wiki/Robot_policy#Generally_applicable_rules
-            .gzip(true)
-            .build()
-            .unwrap();
+        let client = Self::init_client();
 
         Crawler {
             queue,
@@ -153,6 +129,45 @@ impl Crawler {
         }
 
         urls
+    }
+
+    fn init_queue(starting_url: Page) -> VecDeque<Page> {
+        let mut queue = VecDeque::new();
+        queue.push_back(starting_url);
+        queue
+    }
+
+    async fn init_visited() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
+        let url = "postgres://search_db_user:123@localhost:5432/search_db";
+
+        let pool = sqlx::postgres::PgPool::connect(url).await.unwrap();
+
+        let visited_query = "SELECT * FROM public.pages WHERE http_status = 200";
+        let mut visited = HashSet::new();
+
+        let query = sqlx::query(visited_query);
+
+        query
+            .fetch_all(&pool)
+            .await
+            .expect("Database should not be empty")
+            .iter()
+            .for_each(|row| {
+                let page = Page::from(Url::parse(row.get("url")).unwrap());
+
+                visited.insert(page);
+            });
+
+        (pool, visited)
+    }
+
+    fn init_client() -> Client {
+        ClientBuilder::new()
+            .user_agent(crate::USER_AGENT)
+            // Reduce bandwidth usage; compliant with wikimedia's robot policy: https://wikitech.wikimedia.org/wiki/Robot_policy#Generally_applicable_rules
+            .gzip(true)
+            .build()
+            .unwrap()
     }
 }
 
