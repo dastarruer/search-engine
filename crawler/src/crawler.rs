@@ -6,7 +6,7 @@ use scraper::{Html, Selector};
 use sqlx::{PgPool, Row};
 use url::ParseError;
 
-use crate::page::{CrawledPage, Page};
+use crate::{page::{CrawledPage, Page}, utils::string_to_url};
 
 #[derive(Clone)]
 pub struct Crawler {
@@ -78,7 +78,7 @@ impl Crawler {
         let base_url = page.url.clone();
 
         for url in urls {
-            let url = Self::string_to_url(&base_url, url);
+            let url = string_to_url(&base_url, url);
 
             let page = if let Some(url) = url {
                 Page::from(url)
@@ -169,32 +169,6 @@ impl Crawler {
             .gzip(true)
             .build()
             .unwrap()
-    }
-
-    /// Converts a `String` to a `Url`.
-    /// Returns `None` if an error is encountered while parsing the `String`.
-    ///
-    /// # Parameters
-    /// - `base_url` - The URL that the original URL was extracted from.
-    /// - `url` - The `String` to be converted into a `Url`.
-    fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
-        if url.starts_with("https://") || url.starts_with("http://") {
-            match Url::parse(url.as_str()) {
-                Ok(url) => Some(url),
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    None
-                }
-            }
-        } else {
-            match base_url.join(url.as_str()) {
-                Ok(url) => Some(url),
-                Err(e) => {
-                    eprintln!("Error: {}", e);
-                    None
-                }
-            }
-        }
     }
 }
 

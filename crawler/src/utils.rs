@@ -39,3 +39,29 @@ pub(crate) fn test_file_path_from_filename(filename: &str) -> PathBuf {
         .join("test-files")
         .join(filename)
 }
+
+/// Converts a `String` to a `Url`.
+/// Returns `None` if an error is encountered while parsing the `String`.
+///
+/// # Parameters
+/// - `base_url` - The URL that the original URL was extracted from.
+/// - `url` - The `String` to be converted into a `Url`.
+pub(crate) fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
+    if url.starts_with("https://") || url.starts_with("http://") {
+        match Url::parse(url.as_str()) {
+            Ok(url) => Some(url),
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                None
+            }
+        }
+    } else {
+        match base_url.join(url.as_str()) {
+            Ok(url) => Some(url),
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                None
+            }
+        }
+    }
+}
