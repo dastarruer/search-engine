@@ -181,17 +181,19 @@ impl Crawler {
         if url.starts_with("https://") || url.starts_with("http://") {
             match Url::parse(url.as_str()) {
                 Ok(url) => Some(url),
-                Err(ParseError::IdnaError) => {
-                    eprintln!("Error: {} is not a valid url", url);
-                    None
-                }
                 Err(e) => {
                     eprintln!("Error: {}", e);
                     None
                 }
             }
         } else {
-            Some(base_url.join(url.as_str()).unwrap())
+            match base_url.join(url.as_str()) {
+                Ok(url) => Some(url),
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    None
+                }
+            }
         }
     }
 }
