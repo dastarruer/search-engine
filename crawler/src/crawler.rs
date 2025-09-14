@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 
-use reqwest::Url;
+use reqwest::{Client, ClientBuilder, Url};
 use scraper::{Html, Selector};
 
 use sqlx::{PgPool, Row};
@@ -14,6 +14,7 @@ pub struct Crawler {
     // TODO: Convert to CrawledPage
     visited: HashSet<Page>,
     pool: PgPool,
+    client: Client,
 }
 
 impl Crawler {
@@ -41,10 +42,18 @@ impl Crawler {
 
         queue.push_back(starting_url);
 
+        let client = ClientBuilder::new()
+            .user_agent(crate::USER_AGENT)
+            // Reduce bandwidth usage; compliant with wikimedia's robot policy: https://wikitech.wikimedia.org/wiki/Robot_policy#Generally_applicable_rules
+            .gzip(true)
+            .build()
+            .unwrap();
+
         Crawler {
             queue,
             visited,
             pool,
+            client,
         }
     }
 
@@ -85,7 +94,8 @@ impl Crawler {
         &mut self,
         page: Page,
     ) -> Result<CrawledPage, Box<dyn std::error::Error>> {
-        let html = Self::make_get_request(page.clone()).await?.text().await?;
+        let html = self.make_get_request(page.clone()).await?.text().await?;
+
         let urls = self.extract_urls_from_html(html.clone());
 
         let base_url = page.url.clone();
@@ -123,8 +133,11 @@ impl Crawler {
 
     /// Make a get request to a specific URL.
     /// This returns a response, which will contain the HTML and HTTP status code of the page.
-    async fn make_get_request(page: Page) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
-        Ok(reqwest::get(page.url).await?)
+    async fn make_get_request(
+        &self,
+        page: Page,
+    ) -> Result<reqwest::Response, Box<dyn std::error::Error>> {
+        Ok(self.client.get(page.url).send().await?)
     }
 
     fn extract_urls_from_html(&self, html: String) -> Vec<String> {
@@ -156,7 +169,9 @@ mod test {
             let server = HttpServer::new("extract_single_href.html");
 
             let page = Page::from(server.base_url());
-            let resp = Crawler::make_get_request(page).await.unwrap();
+            let crawler = Crawler::new(page.clone()).await;
+
+            let resp = crawler.make_get_request(page).await.unwrap();
 
             assert_eq!(resp.status(), 200);
         }
