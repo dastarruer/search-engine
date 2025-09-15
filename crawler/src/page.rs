@@ -1,4 +1,3 @@
-use reqwest::StatusCode;
 use url::Url;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -10,7 +9,6 @@ pub struct Page {
 pub struct CrawledPage {
     pub url: Url,
     pub html: String,
-    pub http_status: StatusCode,
 }
 
 impl Page {
@@ -19,8 +17,8 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a CrawledPage
-    pub(crate) fn into_crawled(self, html: String, http_status: StatusCode) -> CrawledPage {
-        CrawledPage::new(self, html, http_status)
+    pub(crate) fn into_crawled(self, html: String) -> CrawledPage {
+        CrawledPage::new(self, html)
     }
 }
 
@@ -37,23 +35,21 @@ impl PartialEq<CrawledPage> for Page {
 }
 
 impl CrawledPage {
-    pub fn new(page: Page, html: String, http_status: StatusCode) -> Self {
+    pub fn new(page: Page, html: String) -> Self {
         CrawledPage {
             url: page.url,
             html,
-            http_status,
         }
     }
 
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
         let query =
-            "INSERT INTO public.pages (url, html, is_indexed, http_status) VALUES ($1, $2, $3, $4)";
+            "INSERT INTO public.pages (url, html, is_indexed) VALUES ($1, $2, $3)";
 
         sqlx::query(query)
             .bind(self.url.to_string())
             .bind(self.html.as_str())
             .bind(false)
-            .bind(self.http_status.as_u16() as i16)
             .execute(pool)
             .await?;
 
