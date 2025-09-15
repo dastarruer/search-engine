@@ -24,7 +24,7 @@ impl Crawler {
     pub async fn new(starting_url: Page) -> Self {
         let queue = Self::init_queue(starting_url);
 
-        let (pool, visited) = Self::init_visited().await;
+        let (pool, visited) = Self::init_visited_and_pool().await;
 
         let client = Self::init_client();
 
@@ -151,7 +151,9 @@ impl Crawler {
         queue
     }
 
-    async fn init_visited() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
+    /// Initialize the hashset of visited `Page`'s and the Postgres pool.
+    /// Will return an empty hashset if the database is empty.
+    async fn init_visited_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
 
         let pool = sqlx::postgres::PgPool::connect(url).await.unwrap();
@@ -161,16 +163,17 @@ impl Crawler {
 
         let query = sqlx::query(visited_query);
 
-        query
-            .fetch_all(&pool)
-            .await
-            .expect("Database should not be empty")
-            .iter()
-            .for_each(|row| {
-                let page = Page::from(Url::parse(row.get("url")).unwrap());
+        let rows = (query.fetch_all(&pool).await).ok();
 
-                visited.insert(page);
-            });
+        if rows.is_none() {
+            return (pool, visited);
+        }
+
+        rows.unwrap().iter().for_each(|row| {
+            let page = Page::from(Url::parse(row.get("url")).unwrap());
+
+            visited.insert(page);
+        });
 
         (pool, visited)
     }
