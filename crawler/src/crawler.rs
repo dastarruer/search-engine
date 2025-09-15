@@ -40,7 +40,9 @@ impl Crawler {
         while let Some(page) = self.queue.pop_back() {
             let crawled_page = self.crawl_page(page).await?;
 
-            if let Err(e) = crawled_page.add_to_db(&self.pool).await {
+            if let Some(crawled_page) = crawled_page
+                && let Err(e) = crawled_page.add_to_db(&self.pool).await
+            {
                 eprintln!("Error: {}", e);
             };
         }
@@ -68,12 +70,20 @@ impl Crawler {
     }
 
     /// Crawl a single page.
+    /// Returns None if the `Page`'s html could not be crawled due to a fatal HTTP status code.
+    /// Returns an error if there is an edge case that has not been tested yet.
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn crawl_page(
         &mut self,
         page: Page,
-    ) -> Result<CrawledPage, Box<dyn std::error::Error>> {
-        let (html, status) = self.extract_html_from_page(page.clone()).await?;
+    ) -> Result<Option<CrawledPage>, Box<dyn std::error::Error>> {
+        let html = self.extract_html_from_page(page.clone()).await?;
+
+        if html.is_none() {
+            return Ok(None);
+        }
+
+        let html = html.unwrap();
 
         let urls = self.extract_urls_from_html(html.as_str());
 
@@ -103,18 +113,28 @@ impl Crawler {
 
         println!("Crawled {:?}...", base_url);
 
-        Ok(page.into_crawled(html, status))
+        Ok(Some(page.into_crawled(html)))
     }
 
+    /// Extracts the html from a `Page`.
+    /// Returns None if the `Page` returns a fatal HTTP status code, or the request times out.
     async fn extract_html_from_page(
-        &mut self,
+        &self,
         page: Page,
-    ) -> Result<(String, StatusCode), Box<dyn std::error::Error>> {
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
         let resp = self.make_get_request(page).await?;
         let status = resp.status();
-        let html = resp.text().await?;
-
-        Ok((html, status))
+        match status {
+            StatusCode::OK => {
+                let html = resp.text().await;
+                if let Err(e) = html {
+                    Err(Box::new(e))
+                } else {
+                    Ok(Some(html.unwrap()))
+                }
+            }
+            _ => todo!(),
+        }
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -190,7 +210,7 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    mod make_get_request {
+    mod extract_html_from_page {
         use crate::{page::Page, utils::HttpServer};
 
         use super::super::Crawler;
@@ -203,9 +223,12 @@ mod test {
             let page = Page::from(server.base_url());
             let crawler = Crawler::new(page.clone()).await;
 
-            let resp = crawler.make_get_request(page).await.unwrap();
+            let html = crawler.extract_html_from_page(page).await.unwrap();
 
-            assert_eq!(resp.status(), 200);
+            assert_eq!(
+                html.unwrap().strip_suffix("\n").unwrap(),
+                String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
+            );
         }
     }
 
