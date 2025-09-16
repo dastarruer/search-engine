@@ -2,6 +2,7 @@
 use std::path::PathBuf;
 
 use httpmock::prelude::*;
+use reqwest::StatusCode;
 use url::Url;
 
 /// An implementation of a mock HTTP server.
@@ -17,7 +18,7 @@ impl HttpServer {
 
         let _mock = server.mock(|when, then| {
             when.method(GET).header("user-agent", crate::USER_AGENT);
-            then.status(200)
+            then.status(StatusCode::OK.as_u16())
                 .header("content-type", "text/html")
                 .body_from_file(filepath.display().to_string());
         });

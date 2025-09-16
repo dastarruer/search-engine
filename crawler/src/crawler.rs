@@ -126,6 +126,7 @@ impl Crawler {
         page: Page,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
         let mut resp = self.make_get_request(page.clone()).await?;
+
         let status = resp.status();
         match status {
             StatusCode::OK => {
@@ -145,7 +146,16 @@ impl Crawler {
                 let retry_after = resp.headers().get(RETRY_AFTER);
 
                 if let Some(delay_secs) = retry_after {
-                    let delay_secs: u64 = delay_secs.to_str().unwrap().parse().unwrap();
+                    let delay_secs: Result<u64, _> =
+                        delay_secs.to_str().unwrap().parse();
+
+                    // If
+                    if delay_secs.is_err() {
+                        return Ok(None);
+                    }
+
+                    let delay_secs = delay_secs.unwrap();
+
                     let delay = Duration::from_secs(delay_secs);
 
                     if delay > MAX_DELAY {
@@ -160,13 +170,15 @@ impl Crawler {
                     }
 
                     let html = resp.text().await;
+
                     if let Err(e) = html {
                         Err(Box::new(e))
                     } else {
                         Ok(Some(html.unwrap()))
                     }
                 } else {
-                    todo!()
+                    // just give up. it's not worth it.
+                    Ok(None)
                 }
             }
             _ => todo!(),
@@ -270,6 +282,7 @@ mod test {
 
         mod status_429 {
             use httpmock::Method::GET;
+            use reqwest::StatusCode;
             use tokio::time::Instant;
 
             use crate::{
@@ -285,7 +298,7 @@ mod test {
 
                 let server = HttpServer::new_with_mock(|when, then| {
                     when.method(GET).header("user-agent", crate::USER_AGENT);
-                    then.status(429)
+                    then.status(StatusCode::TOO_MANY_REQUESTS.as_u16())
                         .header("content-type", "text/html")
                         .header("retry-after", TRY_AFTER_SECS.to_string())
                         .body_from_file(filepath.display().to_string());
@@ -317,9 +330,28 @@ mod test {
 
                 let server = HttpServer::new_with_mock(|when, then| {
                     when.method(GET).header("user-agent", crate::USER_AGENT);
-                    then.status(429)
+                    then.status(StatusCode::TOO_MANY_REQUESTS.as_u16())
                         .header("content-type", "text/html")
                         .header("retry-after", TRY_AFTER_SECS.to_string())
+                        .body_from_file(filepath.display().to_string());
+                });
+
+                let page = Page::from(server.base_url());
+                let crawler = Crawler::new(page.clone()).await;
+
+                let html = crawler.extract_html_from_page(page).await.unwrap();
+
+                assert!(html.is_none());
+            }
+
+            #[tokio::test]
+            async fn test_429_status_with_no_header() {
+                let filepath = test_file_path_from_filename("extract_single_href.html");
+
+                let server = HttpServer::new_with_mock(|when, then| {
+                    when.method(GET).header("user-agent", crate::USER_AGENT);
+                    then.status(429)
+                        .header("content-type", "text/html")
                         .body_from_file(filepath.display().to_string());
                 });
 
