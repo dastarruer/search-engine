@@ -42,6 +42,9 @@ impl CrawledPage {
         }
     }
 
+    /// Add a `CrawledPage` to the database.
+    /// # Returns
+    /// - Returns `Err` if the `CrawledPage` is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
         let query =
             "INSERT INTO public.pages (url, html, is_indexed) VALUES ($1, $2, $3)";
