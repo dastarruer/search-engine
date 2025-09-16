@@ -3,7 +3,7 @@ use criterion::{Criterion, criterion_group, criterion_main};
 
 /// Benchmark crawling a single page
 fn bench_crawl_from_page(c: &mut Criterion) {
-    let server = HttpServer::new("benchmarks/index.html");
+    let server = HttpServer::new_with_filename("benchmarks/index.html");
 
     let page = Page::from(server.base_url());
     let mut crawler = None;
@@ -31,7 +31,7 @@ fn bench_crawl_from_page(c: &mut Criterion) {
 
 /// Benchmark crawling an entire site
 fn bench_test_run(c: &mut Criterion) {
-    let server = HttpServer::new("benchmarks/index.html");
+    let server = HttpServer::new_with_filename("benchmarks/index.html");
 
     let page = Page::from(server.base_url());
     let mut crawler = None;
