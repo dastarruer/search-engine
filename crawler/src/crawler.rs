@@ -138,6 +138,8 @@ impl Crawler {
             }
             StatusCode::TOO_MANY_REQUESTS => {
                 const MAX_ATTEMPTS: u8 = 10;
+                const MAX_DELAY: Duration = Duration::from_secs(60);
+
                 let mut attempts = 0;
 
                 let retry_after = resp.headers().get(RETRY_AFTER);
@@ -145,6 +147,10 @@ impl Crawler {
                 if let Some(delay_secs) = retry_after {
                     let delay_secs: u64 = delay_secs.to_str().unwrap().parse().unwrap();
                     let delay = Duration::from_secs(delay_secs);
+
+                    if delay > MAX_DELAY {
+                        return Ok(None);
+                    }
 
                     tokio::time::sleep(delay).await;
 
@@ -266,7 +272,11 @@ mod test {
             use httpmock::Method::GET;
             use tokio::time::Instant;
 
-            use crate::{crawler::Crawler, page::Page, utils::{test_file_path_from_filename, HttpServer}};
+            use crate::{
+                crawler::Crawler,
+                page::Page,
+                utils::{HttpServer, test_file_path_from_filename},
+            };
 
             #[tokio::test]
             async fn test_429_status() {
@@ -297,6 +307,28 @@ mod test {
                     html.unwrap().strip_suffix("\n").unwrap(),
                     String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
                 );
+            }
+
+            #[tokio::test]
+            async fn test_429_status_with_large_retry_after() {
+                // After 60 seconds, just don't bother
+                const TRY_AFTER_SECS: u64 = 61;
+                let filepath = test_file_path_from_filename("extract_single_href.html");
+
+                let server = HttpServer::new_with_mock(|when, then| {
+                    when.method(GET).header("user-agent", crate::USER_AGENT);
+                    then.status(429)
+                        .header("content-type", "text/html")
+                        .header("retry-after", TRY_AFTER_SECS.to_string())
+                        .body_from_file(filepath.display().to_string());
+                });
+
+                let page = Page::from(server.base_url());
+                let crawler = Crawler::new(page.clone()).await;
+
+                let html = crawler.extract_html_from_page(page).await.unwrap();
+
+                assert!(html.is_none());
             }
         }
     }
