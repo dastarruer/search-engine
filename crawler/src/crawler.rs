@@ -1,6 +1,9 @@
-use std::collections::{HashSet, VecDeque};
+use std::{
+    collections::{HashSet, VecDeque},
+    time::Duration,
+};
 
-use reqwest::{Client, ClientBuilder, StatusCode, Url};
+use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use scraper::{Html, Selector};
 
 use sqlx::{PgPool, Row};
@@ -211,19 +214,56 @@ impl Crawler {
 #[cfg(test)]
 mod test {
     mod extract_html_from_page {
-        use crate::{page::Page, utils::HttpServer};
+        use std::time::Duration;
+
+        use httpmock::Method::GET;
+        use tokio::time::Instant;
+
+        use crate::{
+            page::Page,
+            utils::{HttpServer, test_file_path_from_filename},
+        };
 
         use super::super::Crawler;
 
         // Instead of using #[test], we use #[tokio::test] so we can test async functions
         #[tokio::test]
         async fn test_200_status() {
-            let server = HttpServer::new("extract_single_href.html");
+            let server = HttpServer::new_with_filename("extract_single_href.html");
 
             let page = Page::from(server.base_url());
             let crawler = Crawler::new(page.clone()).await;
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
+
+            assert_eq!(
+                html.unwrap().strip_suffix("\n").unwrap(),
+                String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
+            );
+        }
+
+        #[tokio::test]
+        async fn test_429_status() {
+            const TRY_AFTER_SECS: u64 = 2;
+            let filepath = test_file_path_from_filename("extract_single_href.html");
+
+            let server = HttpServer::new_with_mock(|when, then| {
+                when.method(GET).header("user-agent", crate::USER_AGENT);
+                then.status(429)
+                    .header("content-type", "text/html")
+                    .header("retry-after", TRY_AFTER_SECS.to_string())
+                    .body_from_file(filepath.display().to_string());
+            });
+
+            let page = Page::from(server.base_url());
+            let crawler = Crawler::new(page.clone()).await;
+
+            let start = Instant::now();
+            let html = crawler.extract_html_from_page(page).await.unwrap();
+            let end = Instant::now();
+
+            // Fail the test if the retry-after header is not respected
+            assert_eq!(end - start, Duration::from_secs(TRY_AFTER_SECS));
 
             assert_eq!(
                 html.unwrap().strip_suffix("\n").unwrap(),
@@ -243,7 +283,7 @@ mod test {
 
         #[tokio::test]
         async fn test_basic_site() {
-            let server = HttpServer::new("extract_single_href.html");
+            let server = HttpServer::new_with_filename("extract_single_href.html");
 
             let page = Page::from(server.base_url());
 
@@ -266,7 +306,7 @@ mod test {
 
         #[tokio::test]
         async fn test_already_visited_url() {
-            let server = HttpServer::new("extract_single_href.html");
+            let server = HttpServer::new_with_filename("extract_single_href.html");
 
             let page = Page::from(server.base_url());
             let mut crawler = Crawler::new(page.clone()).await;
