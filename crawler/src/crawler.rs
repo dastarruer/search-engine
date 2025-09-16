@@ -18,7 +18,7 @@ pub struct Crawler {
     queue: VecDeque<Page>,
     // Use `Page` instead of `CrawledPage` because comparing `Page` with `CrawledPage` does not work in hashsets for some reason
     // TODO: Convert to CrawledPage
-    visited: HashSet<Page>,
+    crawled: HashSet<Page>,
     pool: PgPool,
     client: Client,
 }
@@ -27,13 +27,13 @@ impl Crawler {
     pub async fn new(starting_url: Page) -> Self {
         let queue = Self::init_queue(starting_url);
 
-        let (pool, visited) = Self::init_visited_and_pool().await;
+        let (pool, crawled) = Self::init_crawled_and_pool().await;
 
         let client = Self::init_client();
 
         Crawler {
             queue,
-            visited,
+            crawled,
             pool,
             client,
         }
@@ -69,11 +69,11 @@ impl Crawler {
         Ok(())
     }
 
-    /// Reset `self.visited` and `self.queue`.
+    /// Reset `self.crawled` and `self.queue`.
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub fn reset(&mut self) {
         self.queue = VecDeque::new();
-        self.visited = HashSet::new();
+        self.crawled = HashSet::new();
     }
 
     /// Crawl a single page.
@@ -108,7 +108,7 @@ impl Crawler {
                 continue;
             };
 
-            if self.visited.contains(&page) || self.is_page_queued(&page) {
+            if self.crawled.contains(&page) || self.is_page_queued(&page) {
                 println!("{} is a duplicate", page.url);
                 continue;
             }
@@ -117,8 +117,8 @@ impl Crawler {
             self.queue.push_front(page.clone());
             println!("{} is queued", page.url);
 
-            // Add the page to self.visited, so that it is never crawled again
-            self.visited.insert(page);
+            // Add the page to self.crawled, so that it is never crawled again
+            self.crawled.insert(page);
         }
 
         println!("Crawled {:?}...", base_url);
@@ -237,7 +237,7 @@ impl Crawler {
 
     /// Initialize the hashset of visited `Page`'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
-    async fn init_visited_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
+    async fn init_crawled_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
 
         let pool = sqlx::postgres::PgPool::connect(url).await.unwrap();
@@ -411,7 +411,7 @@ mod test {
             let mut crawler = Crawler::new(page.clone()).await;
 
             // Reset crawler.visited, which gets loaded from the db (we don't want that)
-            crawler.visited = HashSet::new();
+            crawler.crawled = HashSet::new();
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
