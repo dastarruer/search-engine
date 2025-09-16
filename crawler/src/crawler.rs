@@ -241,15 +241,8 @@ impl Crawler {
 #[cfg(test)]
 mod test {
     mod extract_html_from_page {
-        use std::time::Duration;
 
-        use httpmock::Method::GET;
-        use tokio::time::Instant;
-
-        use crate::{
-            page::Page,
-            utils::{HttpServer, test_file_path_from_filename},
-        };
+        use crate::{page::Page, utils::HttpServer};
 
         use super::super::Crawler;
 
@@ -269,35 +262,42 @@ mod test {
             );
         }
 
-        #[tokio::test]
-        async fn test_429_status() {
-            const TRY_AFTER_SECS: u64 = 1;
-            let filepath = test_file_path_from_filename("extract_single_href.html");
+        mod status_429 {
+            use httpmock::Method::GET;
+            use tokio::time::Instant;
 
-            let server = HttpServer::new_with_mock(|when, then| {
-                when.method(GET).header("user-agent", crate::USER_AGENT);
-                then.status(429)
-                    .header("content-type", "text/html")
-                    .header("retry-after", TRY_AFTER_SECS.to_string())
-                    .body_from_file(filepath.display().to_string());
-            });
+            use crate::{crawler::Crawler, page::Page, utils::{test_file_path_from_filename, HttpServer}};
 
-            let page = Page::from(server.base_url());
-            let crawler = Crawler::new(page.clone()).await;
+            #[tokio::test]
+            async fn test_429_status() {
+                const TRY_AFTER_SECS: u64 = 1;
+                let filepath = test_file_path_from_filename("extract_single_href.html");
 
-            let start = Instant::now();
-            let html = crawler.extract_html_from_page(page).await.unwrap();
-            let end = Instant::now();
+                let server = HttpServer::new_with_mock(|when, then| {
+                    when.method(GET).header("user-agent", crate::USER_AGENT);
+                    then.status(429)
+                        .header("content-type", "text/html")
+                        .header("retry-after", TRY_AFTER_SECS.to_string())
+                        .body_from_file(filepath.display().to_string());
+                });
 
-            let elapsed = (end - start).as_secs();
+                let page = Page::from(server.base_url());
+                let crawler = Crawler::new(page.clone()).await;
 
-            // Fail the test if the retry-after header is not respected
-            assert_eq!(elapsed, TRY_AFTER_SECS);
+                let start = Instant::now();
+                let html = crawler.extract_html_from_page(page).await.unwrap();
+                let end = Instant::now();
 
-            assert_eq!(
-                html.unwrap().strip_suffix("\n").unwrap(),
-                String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
-            );
+                let elapsed = (end - start).as_secs();
+
+                // Fail the test if the retry-after header is not respected
+                assert_eq!(elapsed, TRY_AFTER_SECS);
+
+                assert_eq!(
+                    html.unwrap().strip_suffix("\n").unwrap(),
+                    String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
+                );
+            }
         }
     }
 
