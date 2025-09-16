@@ -1,4 +1,5 @@
 use std::{
+    clone,
     collections::{HashSet, VecDeque},
     time::Duration,
 };
@@ -41,12 +42,16 @@ impl Crawler {
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
-            let crawled_page = self.crawl_page(page).await?;
+            let crawled_page = self.crawl_page(page.clone()).await;
 
-            if let Some(crawled_page) = crawled_page
-                && let Err(e) = crawled_page.add_to_db(&self.pool).await
+            if let Ok(crawled_page) = crawled_page
+                && let Some(crawled_page) = crawled_page
             {
-                eprintln!("Error: {}", e);
+                if let Err(e) = crawled_page.add_to_db(&self.pool).await {
+                    eprintln!("Error: {}", e);
+                }
+            } else {
+                println!("{} is unreachable", page.url);
             };
         }
 
@@ -73,8 +78,11 @@ impl Crawler {
     }
 
     /// Crawl a single page.
-    /// Returns None if the `Page`'s html could not be crawled due to a fatal HTTP status code.
-    /// Returns an error if there is an edge case that has not been tested yet.
+    /// # Returns
+    /// - Returns `Ok(None)` if the `Page`'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
+    /// - Returns `Err` if there is an edge case that has not been tested yet.
+    ///
+    /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn crawl_page(
         &mut self,
@@ -120,7 +128,9 @@ impl Crawler {
     }
 
     /// Extracts the html from a `Page`.
-    /// Returns None if the `Page` returns a fatal HTTP status code, or the request times out.
+    /// # Returns
+    /// - Returns `None` if the response contains a fatal HTTP status code, or the request times out.
+    /// - Returns `Err` if sending the request results in an error.
     async fn extract_html_from_page(
         &self,
         page: Page,
@@ -146,8 +156,7 @@ impl Crawler {
                 let retry_after = resp.headers().get(RETRY_AFTER);
 
                 if let Some(delay_secs) = retry_after {
-                    let delay_secs: Result<u64, _> =
-                        delay_secs.to_str().unwrap().parse();
+                    let delay_secs: Result<u64, _> = delay_secs.to_str().unwrap().parse();
 
                     // If
                     if delay_secs.is_err() {
@@ -190,7 +199,8 @@ impl Crawler {
     }
 
     /// Make a get request to a specific URL.
-    /// This returns a response, which will contain the HTML and HTTP status code of the page.
+    /// # Returns
+    /// - A `Response`, which contains the HTML and HTTP status code of the request
     async fn make_get_request(
         &self,
         page: Page,
