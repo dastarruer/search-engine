@@ -1,5 +1,4 @@
 use std::{
-    clone,
     collections::{HashSet, VecDeque},
     time::Duration,
 };
@@ -127,8 +126,9 @@ impl Crawler {
         Ok(Some(page.into_crawled(html)))
     }
 
-    /// Extracts the html from a `Page`.
+    /// Extracts the HTML from a `Page`.
     /// # Returns
+    /// - Returns `None` if the `Page` is empty (has no HTML).
     /// - Returns `None` if the response contains a fatal HTTP status code, or the request times out.
     /// - Returns `Err` if sending the request results in an error.
     async fn extract_html_from_page(
@@ -144,7 +144,13 @@ impl Crawler {
                 if let Err(e) = html {
                     Err(Box::new(e))
                 } else {
-                    Ok(Some(html.unwrap()))
+                    let html = html.unwrap();
+
+                    if html.is_empty() {
+                        Ok(None)
+                    } else {
+                        Ok(Some(html))
+                    }
                 }
             }
             StatusCode::TOO_MANY_REQUESTS => {
@@ -288,6 +294,18 @@ mod test {
                 html.unwrap().strip_suffix("\n").unwrap(),
                 String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
             );
+        }
+
+        #[tokio::test]
+        async fn test_empty_page() {
+            let server: HttpServer = HttpServer::new_with_filename("empty.html");
+
+            let page = Page::from(server.base_url());
+            let crawler = Crawler::new(page.clone()).await;
+
+            let html = crawler.extract_html_from_page(page).await.unwrap();
+
+            assert!(html.is_none());
         }
 
         mod status_429 {
