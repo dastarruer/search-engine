@@ -11,7 +11,7 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(filename: &str) -> Self {
+    pub fn new_with_filename(filename: &str) -> Self {
         let server = MockServer::start();
         let filepath = test_file_path_from_filename(filename);
 
@@ -21,6 +21,14 @@ impl HttpServer {
                 .header("content-type", "text/html")
                 .body_from_file(filepath.display().to_string());
         });
+
+        HttpServer { server }
+    }
+
+    pub fn new_with_mock(mock: impl FnOnce(httpmock::When, httpmock::Then)) -> Self {
+        let server = MockServer::start();
+
+        let _mock = server.mock(mock);
 
         HttpServer { server }
     }
