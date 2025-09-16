@@ -125,7 +125,7 @@ impl Crawler {
         &self,
         page: Page,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        let resp = self.make_get_request(page).await?;
+        let mut resp = self.make_get_request(page.clone()).await?;
         let status = resp.status();
         match status {
             StatusCode::OK => {
@@ -134,6 +134,33 @@ impl Crawler {
                     Err(Box::new(e))
                 } else {
                     Ok(Some(html.unwrap()))
+                }
+            }
+            StatusCode::TOO_MANY_REQUESTS => {
+                const MAX_ATTEMPTS: u8 = 10;
+                let mut attempts = 0;
+
+                let retry_after = resp.headers().get(RETRY_AFTER);
+
+                if let Some(delay_secs) = retry_after {
+                    let delay_secs: u64 = delay_secs.to_str().unwrap().parse().unwrap();
+                    let delay = Duration::from_secs(delay_secs);
+
+                    tokio::time::sleep(delay).await;
+
+                    while attempts <= MAX_ATTEMPTS && resp.status() != StatusCode::OK {
+                        resp = self.make_get_request(page.clone()).await?;
+                        attempts += 1;
+                    }
+
+                    let html = resp.text().await;
+                    if let Err(e) = html {
+                        Err(Box::new(e))
+                    } else {
+                        Ok(Some(html.unwrap()))
+                    }
+                } else {
+                    todo!()
                 }
             }
             _ => todo!(),
@@ -244,7 +271,7 @@ mod test {
 
         #[tokio::test]
         async fn test_429_status() {
-            const TRY_AFTER_SECS: u64 = 2;
+            const TRY_AFTER_SECS: u64 = 1;
             let filepath = test_file_path_from_filename("extract_single_href.html");
 
             let server = HttpServer::new_with_mock(|when, then| {
@@ -262,8 +289,10 @@ mod test {
             let html = crawler.extract_html_from_page(page).await.unwrap();
             let end = Instant::now();
 
+            let elapsed = (end - start).as_secs();
+
             // Fail the test if the retry-after header is not respected
-            assert_eq!(end - start, Duration::from_secs(TRY_AFTER_SECS));
+            assert_eq!(elapsed, TRY_AFTER_SECS);
 
             assert_eq!(
                 html.unwrap().strip_suffix("\n").unwrap(),
