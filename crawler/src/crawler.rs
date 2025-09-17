@@ -129,7 +129,7 @@ impl Crawler {
     /// Extracts the HTML from a `Page`.
     /// # Returns
     /// - Returns `None` if the `Page` is empty (has no HTML).
-    /// - Returns `None` if the response contains a fatal HTTP status code, or the request times out.
+    /// - Returns `None` if the response contains a non 200 or 429 HTTP status code, or the request times out.
     /// - Returns `Err` if sending the request results in an error.
     /// - Returns `Err` if decoding the HTML from the `Response` throws an error, such as UTF 8 errors.
     async fn extract_html_from_page(
@@ -184,7 +184,8 @@ impl Crawler {
                     Ok(None)
                 }
             }
-            _ => todo!(),
+            // just give up. it's not worth it.
+            _ => Ok(None),
         }
     }
 
@@ -286,7 +287,13 @@ impl Crawler {
 mod test {
     mod extract_html_from_page {
 
-        use crate::{page::Page, utils::HttpServer};
+        use httpmock::Method::GET;
+        use reqwest::StatusCode;
+
+        use crate::{
+            page::Page,
+            utils::{HttpServer, test_file_path_from_filename},
+        };
 
         use super::super::Crawler;
 
@@ -304,6 +311,25 @@ mod test {
                 html.unwrap().strip_suffix("\n").unwrap(),
                 String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
             );
+        }
+
+        #[tokio::test]
+        async fn test_malformed_status() {
+            let filepath = test_file_path_from_filename("extract_single_href.html");
+
+            let server = HttpServer::new_with_mock(|when, then| {
+                when.method(GET).header("user-agent", crate::USER_AGENT);
+                then.status(StatusCode::NOT_FOUND.as_u16())
+                    .header("content-type", "text/html")
+                    .body_from_file(filepath.display().to_string());
+            });
+
+            let page = Page::from(server.base_url());
+            let crawler = Crawler::new(page.clone()).await;
+
+            let html = crawler.extract_html_from_page(page).await.unwrap();
+
+            assert!(html.is_none());
         }
 
         #[tokio::test]
