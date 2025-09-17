@@ -131,6 +131,7 @@ impl Crawler {
     /// - Returns `None` if the `Page` is empty (has no HTML).
     /// - Returns `None` if the response contains a fatal HTTP status code, or the request times out.
     /// - Returns `Err` if sending the request results in an error.
+    /// - Returns `Err` if decoding the HTML from the `Response` throws an error, such as UTF 8 errors.
     async fn extract_html_from_page(
         &self,
         page: Page,
@@ -171,13 +172,13 @@ impl Crawler {
                         attempts += 1;
                     }
 
-                    let html = resp.text().await;
+                    let html = Self::extract_html_from_resp(resp).await?;
 
-                    if let Err(e) = html {
-                        Err(Box::new(e))
-                    } else {
-                        Ok(Some(html.unwrap()))
+                    if html.is_none() {
+                        return Ok(None);
                     }
+
+                    Ok(Some(html.unwrap()))
                 } else {
                     // just give up. it's not worth it.
                     Ok(None)
@@ -257,10 +258,16 @@ impl Crawler {
             .unwrap()
     }
 
+    /// Extracts the HTML from a `Response`.
+    ///
+    /// # Returns
+    /// - Returns `None` if the `Response` has no HTML content.
+    /// - Returns `Err` if decoding the HTML from the `Response` throws an error, such as UTF 8 errors.
     async fn extract_html_from_resp(
         resp: reqwest::Response,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
         let html = resp.text().await;
+
         if let Err(e) = html {
             Err(Box::new(e))
         } else {
