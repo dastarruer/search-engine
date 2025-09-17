@@ -93,9 +93,9 @@ impl Crawler {
             return Ok(None);
         }
 
-        let html = html.unwrap();
+        let html = Html::parse_fragment(html.unwrap().as_str());
 
-        let urls = self.extract_urls_from_html(html.as_str());
+        let urls = self.extract_urls_from_html(html.clone());
 
         let base_url = page.url.clone();
 
@@ -123,7 +123,7 @@ impl Crawler {
 
         println!("Crawled {:?}...", base_url);
 
-        Ok(Some(page.into_crawled(html)))
+        Ok(Some(page.into_crawled(html.html())))
     }
 
     /// Extracts the HTML from a `Page`.
@@ -139,20 +139,7 @@ impl Crawler {
 
         let status = resp.status();
         match status {
-            StatusCode::OK => {
-                let html = resp.text().await;
-                if let Err(e) = html {
-                    Err(Box::new(e))
-                } else {
-                    let html = html.unwrap();
-
-                    if html.is_empty() {
-                        Ok(None)
-                    } else {
-                        Ok(Some(html))
-                    }
-                }
-            }
+            StatusCode::OK => Self::extract_html_from_resp(resp).await,
             StatusCode::TOO_MANY_REQUESTS => {
                 const MAX_ATTEMPTS: u8 = 10;
                 const MAX_DELAY: Duration = Duration::from_secs(60);
@@ -214,13 +201,12 @@ impl Crawler {
         Ok(self.client.get(page.url).send().await?)
     }
 
-    fn extract_urls_from_html(&self, html: &str) -> Vec<String> {
+    fn extract_urls_from_html(&self, html: Html) -> Vec<String> {
         let mut urls = vec![];
 
-        let fragment = Html::parse_fragment(html);
         let selector = Selector::parse("a").unwrap();
 
-        for element in fragment.select(&selector) {
+        for element in html.select(&selector) {
             if let Some(url) = element.value().attr("href") {
                 urls.push(url.to_owned());
             };
@@ -269,6 +255,23 @@ impl Crawler {
             .gzip(true)
             .build()
             .unwrap()
+    }
+
+    async fn extract_html_from_resp(
+        resp: reqwest::Response,
+    ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        let html = resp.text().await;
+        if let Err(e) = html {
+            Err(Box::new(e))
+        } else {
+            let html = html.unwrap();
+
+            if html.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(html))
+            }
+        }
     }
 }
 
@@ -453,6 +456,7 @@ mod test {
         use std::{fs::File, io::Read};
 
         use reqwest::Url;
+        use scraper::Html;
 
         use crate::{page::Page, utils::test_file_path_from_filename};
 
@@ -473,8 +477,9 @@ mod test {
 
             let mut buf = String::new();
             html.read_to_string(&mut buf).unwrap();
+            let buf = Html::parse_fragment(buf.as_str());
 
-            let urls = crawler.extract_urls_from_html(buf.as_str());
+            let urls = crawler.extract_urls_from_html(buf);
 
             assert_eq!(urls, expected_urls)
         }

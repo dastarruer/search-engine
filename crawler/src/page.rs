@@ -8,6 +8,8 @@ pub struct Page {
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub struct CrawledPage {
     pub url: Url,
+
+    // This is a `String` instead of `Html` because `Html` does not implement the `sqlx::Encode` trait
     pub html: String,
 }
 
