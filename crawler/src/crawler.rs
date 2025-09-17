@@ -41,11 +41,9 @@ impl Crawler {
 
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
-            let crawled_page = self.crawl_page(page.clone()).await;
+            let crawled_page = self.crawl_page(page.clone()).await?;
 
-            if let Ok(crawled_page) = crawled_page
-                && let Some(crawled_page) = crawled_page
-            {
+            if let Some(crawled_page) = crawled_page {
                 if let Err(e) = crawled_page.add_to_db(&self.pool).await {
                     eprintln!("Error: {}", e);
                 }
@@ -174,7 +172,7 @@ impl Crawler {
                 if let Some(delay_secs) = retry_after {
                     let delay_secs: Result<u64, _> = delay_secs.to_str().unwrap().parse();
 
-                    // If
+                    // If delay_secs is not a valid value in seconds
                     if delay_secs.is_err() {
                         return Ok(None);
                     }
@@ -289,18 +287,12 @@ impl Crawler {
     async fn extract_html_from_resp(
         resp: reqwest::Response,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-        let html = resp.text().await;
+        let html = resp.text().await?;
 
-        if let Err(e) = html {
-            Err(Box::new(e))
+        if html.is_empty() {
+            Ok(None)
         } else {
-            let html = html.unwrap();
-
-            if html.is_empty() {
-                Ok(None)
-            } else {
-                Ok(Some(html))
-            }
+            Ok(Some(html))
         }
     }
 }
