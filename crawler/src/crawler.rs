@@ -59,6 +59,8 @@ impl Crawler {
     }
 
     /// Perform a test run without writing to the database.
+    /// 
+    /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn test_run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
@@ -70,6 +72,8 @@ impl Crawler {
     }
 
     /// Reset `self.crawled` and `self.queue`.
+    ///
+    /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub fn reset(&mut self) {
         self.queue = VecDeque::new();

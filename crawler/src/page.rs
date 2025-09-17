@@ -18,7 +18,7 @@ impl Page {
         Page { url }
     }
 
-    /// 'Crawl' a Page, which turns it into a CrawledPage
+    /// 'Crawl' a Page, which turns it into a `CrawledPage`.
     pub(crate) fn into_crawled(self, html: String) -> CrawledPage {
         CrawledPage::new(self, html)
     }
@@ -45,6 +45,7 @@ impl CrawledPage {
     }
 
     /// Add a `CrawledPage` to the database.
+    ///
     /// # Returns
     /// - Returns `Err` if the `CrawledPage` is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
