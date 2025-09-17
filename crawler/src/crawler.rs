@@ -59,7 +59,7 @@ impl Crawler {
     }
 
     /// Perform a test run without writing to the database.
-    /// 
+    ///
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn test_run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -83,6 +83,7 @@ impl Crawler {
     /// Crawl a single page.
     /// # Returns
     /// - Returns `Ok(None)` if the `Page`'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
+    /// - Returns `Ok(None)` if the `Page` is not in English.
     /// - Returns `Err` if there is an edge case that has not been tested yet.
     ///
     /// # Note
@@ -98,6 +99,10 @@ impl Crawler {
         }
 
         let html = Html::parse_fragment(html.unwrap().as_str());
+
+        if !Self::is_english(html.clone()) {
+            return Ok(None);
+        }
 
         let urls = self.extract_urls_from_html(html.clone());
 
@@ -128,6 +133,19 @@ impl Crawler {
         println!("Crawled {:?}...", base_url);
 
         Ok(Some(page.into_crawled(html.html())))
+    }
+
+    fn is_english(html: Html) -> bool {
+        let selector = Selector::parse("html").unwrap();
+
+        for element in html.select(&selector) {
+            if let Some(lang) = element.value().attr("lang")
+                && lang.starts_with("en")
+            {
+                return true;
+            }
+        }
+        false
     }
 
     /// Extracts the HTML from a `Page`.
@@ -289,6 +307,26 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
+    mod is_english {
+        use scraper::Html;
+
+        use crate::{crawler::Crawler, page::Page, utils::HttpServer};
+
+        #[tokio::test]
+        async fn test_non_english_page() {
+            let server = HttpServer::new_with_filename("non_english_page.html");
+
+            let page = Page::from(server.base_url());
+            let crawler = Crawler::new(page.clone()).await;
+
+            let html = crawler.extract_html_from_page(page).await.unwrap().unwrap();
+
+            let html = Html::parse_fragment(html.as_str());
+
+            assert!(!Crawler::is_english(html));
+        }
+    }
+
     mod extract_html_from_page {
 
         use httpmock::Method::GET;
@@ -311,9 +349,9 @@ mod test {
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
 
-            assert_eq!(
-                html.unwrap().strip_suffix("\n").unwrap(),
-                String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
+            assert!(
+                html.unwrap()
+                    .contains(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
             );
         }
 
@@ -384,9 +422,9 @@ mod test {
                 // Fail the test if the retry-after header is not respected
                 assert_eq!(elapsed, TRY_AFTER_SECS);
 
-                assert_eq!(
-                    html.unwrap().strip_suffix("\n").unwrap(),
-                    String::from(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
+                assert!(
+                    html.unwrap()
+                        .contains(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
                 );
             }
 
