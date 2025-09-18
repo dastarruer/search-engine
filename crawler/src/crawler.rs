@@ -39,6 +39,28 @@ impl Crawler {
         }
     }
 
+    /// Create a test instance of a `Crawler`, which uses an empty `HashSet` for `crawled`, making new instances much faster to create.
+    /// Also uses `PgPool::connect_lazy` to create a connection, which is much faster and lightweight.
+    /// # Note
+    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
+    pub fn test_new(starting_url: Page) -> Self {
+        let queue = Self::init_queue(starting_url);
+
+        let url = "postgres://search_db_user:123@localhost:5432/search_db";
+        let pool = sqlx::postgres::PgPool::connect_lazy(url).unwrap();
+
+        let crawled = HashSet::new();
+
+        let client = Self::init_client();
+
+        Crawler {
+            queue,
+            crawled,
+            pool,
+            client,
+        }
+    }
+
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
             let crawled_page = self.crawl_page(page.clone()).await?;
