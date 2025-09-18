@@ -45,14 +45,14 @@ impl Crawler {
 
             if let Some(crawled_page) = crawled_page {
                 if let Err(e) = crawled_page.add_to_db(&self.pool).await {
-                    eprintln!("Error: {}", e);
+                    log::error!("Error: {}", e);
                 }
             } else {
-                println!("{} is unreachable", page.url);
+                log::warn!("{} is unreachable", page.url);
             };
         }
 
-        println!("All done! no more pages left");
+        log::info!("All done! no more pages left");
         Ok(())
     }
 
@@ -65,7 +65,7 @@ impl Crawler {
             let _crawled_page = self.crawl_page(page).await?;
         }
 
-        println!("All done! no more pages left");
+        log::info!("All done! no more pages left");
         Ok(())
     }
 
@@ -116,19 +116,19 @@ impl Crawler {
             };
 
             if self.crawled.contains(&page) || self.is_page_queued(&page) {
-                println!("{} is a duplicate", page.url);
+                log::warn!("{} is a duplicate", page.url);
                 continue;
             }
 
             // Add the page to the queue of pages to crawl
             self.queue.push_front(page.clone());
-            println!("{} is queued", page.url);
+            log::info!("{} is queued", page.url);
 
             // Add the page to self.crawled, so that it is never crawled again
             self.crawled.insert(page);
         }
 
-        println!("Crawled {:?}...", base_url);
+        log::info!("Crawled {:?}...", base_url);
 
         Ok(Some(page.into_crawled(html.html())))
     }
