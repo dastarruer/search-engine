@@ -11,6 +11,7 @@ sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls"] }
 url = "2.5.7"
 httpmock = "0.7.0-rc.1"
 ftail = "0.3.0"
+log = "0.4.28"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["async_tokio"] }
