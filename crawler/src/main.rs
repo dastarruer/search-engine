@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use crawler::crawler::Crawler;
 use crawler::page::Page;
-use ftail::Ftail;
-use log::LevelFilter;
+use fast_log::Config;
 use reqwest::Url;
 use tokio::fs;
 
@@ -32,10 +31,12 @@ async fn set_up_logging() -> Result<(), Box<dyn std::error::Error>> {
 
     let error_log_path = log_dir.join("errors.log");
 
-    Ftail::new()
-        .formatted_console(LevelFilter::Info)
-        .single_file(&error_log_path, true, LevelFilter::Error)
-        .init()?;
+    fast_log::init(
+        Config::new()
+            .file(error_log_path.to_str().unwrap())
+            .console()
+    )
+    .unwrap();
 
     Ok(())
 }
