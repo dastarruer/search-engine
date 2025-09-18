@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crawler::crawler::Crawler;
 use crawler::page::Page;
-use fast_log::Config;
+use flexi_logger::{Duplicate, FileSpec, Logger, WriteMode};
 use reqwest::Url;
 use tokio::fs;
 
@@ -29,14 +29,19 @@ async fn set_up_logging() -> Result<(), Box<dyn std::error::Error>> {
         fs::create_dir(log_dir.clone()).await?;
     }
 
-    let error_log_path = log_dir.join("errors.log");
+    let error_log_basename = "errors";
 
-    fast_log::init(
-        Config::new()
-            .file(error_log_path.to_str().unwrap())
-            .console()
-    )
-    .unwrap();
+    let _logger = Logger::try_with_str("info")?
+        .log_to_file(
+            FileSpec::default()
+                .directory("logs")
+                .basename(error_log_basename)
+                .suppress_timestamp()
+                .suffix("log"),
+        )
+        .duplicate_to_stdout(Duplicate::Info)
+        .write_mode(WriteMode::BufferAndFlush)
+        .start()?;
 
     Ok(())
 }
