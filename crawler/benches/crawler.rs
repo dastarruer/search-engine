@@ -41,5 +41,15 @@ fn bench_test_run(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_crawl_from_page, bench_test_run);
+criterion_group! {
+    name = benches;
+    // Sacrifice time for more consistent benchmarks
+    config = Criterion::default()
+        .sample_size(150)
+        .measurement_time(std::time::Duration::from_secs(15))
+        .warm_up_time(std::time::Duration::from_secs(5))
+        .nresamples(200_000);
+    targets = bench_crawl_from_page, bench_test_run
+}
+
 criterion_main!(benches);
