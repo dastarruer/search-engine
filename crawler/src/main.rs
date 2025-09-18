@@ -25,6 +25,8 @@ async fn set_up_logging() -> Result<(), Box<dyn std::error::Error>> {
     let log_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("logs");
 
     if !log_dir.exists() {
+        // Use println instead of log since logger is uninitialized
+        println!("WARNING: logs/ directory does not exist, initializing...");
         fs::create_dir(log_dir.clone()).await?;
     }
 
