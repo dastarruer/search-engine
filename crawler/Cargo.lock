@@ -548,6 +548,7 @@ dependencies = [
  "reqwest",
  "scraper",
  "sqlx",
+ "thiserror 2.0.16",
  "tokio",
  "url",
 ]
