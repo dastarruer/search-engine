@@ -226,7 +226,7 @@ impl Crawler {
                 }
             }
             // just give up. it's not worth it.
-            _ => Ok(None),
+            _ => Err(Box::new(CrawlerError::MalformedHttpStatus { page, status })),
         }
     }
 
@@ -371,11 +371,12 @@ mod test {
 
         #[tokio::test]
         async fn test_malformed_status() {
+            const EXPECTED_STATUS: StatusCode = StatusCode::NOT_FOUND;
             let filepath = test_file_path_from_filename("extract_single_href.html");
 
             let server = HttpServer::new_with_mock(|when, then| {
                 when.method(GET).header("user-agent", crate::USER_AGENT);
-                then.status(StatusCode::NOT_FOUND.as_u16())
+                then.status(EXPECTED_STATUS.as_u16())
                     .header("content-type", "text/html")
                     .body_from_file(filepath.display().to_string());
             });
@@ -383,9 +384,20 @@ mod test {
             let page = Page::from(server.base_url());
             let crawler = Crawler::test_new(page.clone());
 
-            let html = crawler.extract_html_from_page(page).await.unwrap();
+            let result = crawler
+                .extract_html_from_page(page.clone())
+                .await
+                .unwrap_err();
 
-            assert!(html.is_none());
+            let error = result.downcast_ref::<CrawlerError>().unwrap();
+
+            assert_eq!(
+                error,
+                &CrawlerError::MalformedHttpStatus {
+                    page,
+                    status: EXPECTED_STATUS
+                }
+            )
         }
 
         #[tokio::test]
