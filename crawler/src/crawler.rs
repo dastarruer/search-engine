@@ -198,7 +198,7 @@ impl Crawler {
                     if delay_secs.is_err() {
                         return Err(Box::new(CrawlerError::InvalidRetryByHeader {
                             page,
-                            header: retry_after.to_owned(),
+                            header: Some(retry_after.to_owned()),
                         }));
                     }
 
@@ -226,7 +226,10 @@ impl Crawler {
                     Ok(Some(html.unwrap()))
                 } else {
                     // just give up. it's not worth it.
-                    Ok(None)
+                    Err(Box::new(CrawlerError::InvalidRetryByHeader {
+                        page,
+                        header: None,
+                    }))
                 }
             }
             // just give up. it's not worth it.
@@ -507,9 +510,17 @@ mod test {
                 let page = Page::from(server.base_url());
                 let crawler = Crawler::test_new(page.clone());
 
-                let html = crawler.extract_html_from_page(page).await.unwrap();
+                let result = crawler
+                    .extract_html_from_page(page.clone())
+                    .await
+                    .unwrap_err();
 
-                assert!(html.is_none());
+                let error = result.downcast_ref::<CrawlerError>().unwrap();
+
+                assert_eq!(
+                    error,
+                    &CrawlerError::InvalidRetryByHeader { page, header: None }
+                )
             }
         }
     }
