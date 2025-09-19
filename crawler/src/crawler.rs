@@ -217,6 +217,10 @@ impl Crawler {
                         attempts += 1;
                     }
 
+                    if resp.status() != StatusCode::OK {
+                        return Err(Box::new(CrawlerError::RequestTimeout(page)));
+                    }
+
                     let html = Self::extract_html_from_resp(resp).await?;
 
                     Ok(Some(html.unwrap()))
@@ -424,6 +428,7 @@ mod test {
 
             use crate::{
                 crawler::Crawler,
+                error::CrawlerError,
                 page::Page,
                 utils::{HttpServer, test_file_path_from_filename},
             };
@@ -445,7 +450,10 @@ mod test {
                 let crawler = Crawler::test_new(page.clone());
 
                 let start = Instant::now();
-                let html = crawler.extract_html_from_page(page).await.unwrap();
+                let result = crawler
+                    .extract_html_from_page(page.clone())
+                    .await
+                    .unwrap_err();
                 let end = Instant::now();
 
                 let elapsed = (end - start).as_secs();
@@ -453,10 +461,9 @@ mod test {
                 // Fail the test if the retry-after header is not respected
                 assert_eq!(elapsed, TRY_AFTER_SECS);
 
-                assert!(
-                    html.unwrap()
-                        .contains(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
-                );
+                let error = result.downcast_ref::<CrawlerError>().unwrap();
+
+                assert_eq!(error, &CrawlerError::RequestTimeout(page))
             }
 
             #[tokio::test]

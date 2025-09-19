@@ -11,4 +11,6 @@ pub enum CrawlerError {
     InvalidRetryByHeader { page: Page, header: HeaderValue },
     #[error("{url} returned {status} status code.", url = page.url)]
     MalformedHttpStatus { page: Page, status: StatusCode },
+    #[error("Request to {url} timed out.", url = .0.url)]
+    RequestTimeout(Page)
 }
