@@ -207,7 +207,7 @@ impl Crawler {
                     let delay = Duration::from_secs(delay_secs);
 
                     if delay > MAX_DELAY {
-                        return Ok(None);
+                        return Err(Box::new(CrawlerError::RequestTimeout(page)));
                     }
 
                     tokio::time::sleep(delay).await;
@@ -483,9 +483,14 @@ mod test {
                 let page = Page::from(server.base_url());
                 let crawler = Crawler::test_new(page.clone());
 
-                let html = crawler.extract_html_from_page(page).await.unwrap();
+                let result = crawler
+                    .extract_html_from_page(page.clone())
+                    .await
+                    .unwrap_err();
 
-                assert!(html.is_none());
+                let error = result.downcast_ref::<CrawlerError>().unwrap();
+
+                assert_eq!(error, &CrawlerError::RequestTimeout(page))
             }
 
             #[tokio::test]
