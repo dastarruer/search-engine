@@ -62,6 +62,11 @@ impl Crawler {
         }
     }
 
+    /// Run the main loop of the Crawler.
+    /// 
+    /// # Returns
+    /// - Returns `Ok` if no errors happen.
+    /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         while let Some(page) = self.queue.pop_back() {
             let crawled_page = self.crawl_page(page.clone()).await?;
@@ -81,6 +86,10 @@ impl Crawler {
 
     /// Perform a test run without writing to the database.
     ///
+    /// # Returns
+    /// - Returns `Ok` if no errors happen.
+    /// - Returns `Err` if an untested fatal error happens.
+    ///
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn test_run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -93,6 +102,7 @@ impl Crawler {
     }
 
     /// Crawl a single page.
+    ///
     /// # Returns
     /// - Returns `Ok(None)` if the `Page`'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - Returns `Ok(None)` if the `Page` is not in English.
@@ -161,6 +171,7 @@ impl Crawler {
     }
 
     /// Extracts the HTML from a `Page`.
+    ///
     /// # Returns
     /// - Returns `None` if the `Page` is empty (has no HTML).
     /// - Returns `None` if the response contains a non 200 or 429 HTTP status code, or the request times out.
@@ -242,8 +253,12 @@ impl Crawler {
     }
 
     /// Make a get request to a specific URL.
+    ///
     /// # Returns
     /// - A `Response`, which contains the HTML and HTTP status code of the request
+    /// - An `Err` if there was an error while sending the request.
+    /// - An 'Err if a redirect loop was detected.
+    /// - An `Err` if the redirect limit was exhausted.
     async fn make_get_request(
         &self,
         page: Page,
