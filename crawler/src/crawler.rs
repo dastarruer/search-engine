@@ -9,6 +9,7 @@ use scraper::{Html, Selector};
 use sqlx::{PgPool, Row};
 
 use crate::{
+    error::CrawlerError,
     page::{CrawledPage, Page},
     utils::string_to_url,
 };
@@ -173,7 +174,15 @@ impl Crawler {
 
         let status = resp.status();
         match status {
-            StatusCode::OK => Self::extract_html_from_resp(resp).await,
+            StatusCode::OK => {
+                let html = Self::extract_html_from_resp(resp).await?;
+
+                if html.is_none() {
+                    return Err(Box::new(CrawlerError::EmptyPage(page)));
+                }
+
+                Ok(Some(html.unwrap()))
+            }
             StatusCode::TOO_MANY_REQUESTS => {
                 const MAX_ATTEMPTS: u8 = 10;
                 const MAX_DELAY: Duration = Duration::from_secs(60);
@@ -206,10 +215,6 @@ impl Crawler {
                     }
 
                     let html = Self::extract_html_from_resp(resp).await?;
-
-                    if html.is_none() {
-                        return Ok(None);
-                    }
 
                     Ok(Some(html.unwrap()))
                 } else {
@@ -338,6 +343,7 @@ mod test {
         use reqwest::StatusCode;
 
         use crate::{
+            error::CrawlerError,
             page::Page,
             utils::{HttpServer, test_file_path_from_filename},
         };
@@ -386,9 +392,14 @@ mod test {
             let page = Page::from(server.base_url());
             let crawler = Crawler::test_new(page.clone());
 
-            let html = crawler.extract_html_from_page(page).await.unwrap();
+            let result = crawler
+                .extract_html_from_page(page.clone())
+                .await
+                .unwrap_err();
 
-            assert!(html.is_none());
+            let error = result.downcast_ref::<CrawlerError>().unwrap();
+
+            assert_eq!(error, &CrawlerError::EmptyPage(page))
         }
 
         mod status_429 {
@@ -477,7 +488,7 @@ mod test {
     }
 
     mod crawl_next_url {
-        use std::collections::{VecDeque};
+        use std::collections::VecDeque;
 
         use reqwest::Url;
 

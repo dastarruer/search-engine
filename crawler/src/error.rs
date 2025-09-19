@@ -1,4 +1,9 @@
 use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum CrawlerError {}
+use crate::page::Page;
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum CrawlerError {
+    #[error("{url} is an empty page with no HTML content.", url = .0.url)]
+    EmptyPage(Page),
+}
