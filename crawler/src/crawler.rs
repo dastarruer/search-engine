@@ -191,12 +191,15 @@ impl Crawler {
 
                 let retry_after = resp.headers().get(RETRY_AFTER);
 
-                if let Some(delay_secs) = retry_after {
-                    let delay_secs: Result<u64, _> = delay_secs.to_str().unwrap().parse();
+                if let Some(retry_after) = retry_after {
+                    let delay_secs: Result<u64, _> = retry_after.to_str().unwrap().parse();
 
                     // If delay_secs is not a valid value in seconds
                     if delay_secs.is_err() {
-                        return Ok(None);
+                        return Err(Box::new(CrawlerError::InvalidRetryByHeader {
+                            page,
+                            header: retry_after.to_owned(),
+                        }));
                     }
 
                     let delay_secs = delay_secs.unwrap();
