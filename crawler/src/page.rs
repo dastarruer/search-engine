@@ -19,7 +19,7 @@ impl Page {
         Page { url }
     }
 
-    /// 'Crawl' a Page, which turns it into a `CrawledPage`.
+    /// 'Crawl' a Page, which turns it into a [`CrawledPage`].
     pub(crate) fn into_crawled(self, title: Option<String>, html: String) -> CrawledPage {
         CrawledPage::new(self, title, html)
     }
@@ -46,10 +46,11 @@ impl CrawledPage {
         }
     }
 
-    /// Add a `CrawledPage` to the database.
+    /// Add a [`CrawledPage`] to the database.
     ///
-    /// # Returns
-    /// - Returns `Err` if the `CrawledPage` is already in the database.
+    /// # Errors
+    /// This function returns an error if:
+    /// - The [`CrawledPage`] is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
         let query = "INSERT INTO public.pages (url, html, is_indexed, title) VALUES ($1, $2, $3, $4)";
 
