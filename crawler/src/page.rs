@@ -8,6 +8,7 @@ pub struct Page {
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub struct CrawledPage {
     pub url: Url,
+    pub title: String,
 
     // This is a `String` instead of `Html` because `Html` does not implement the `sqlx::Encode` trait
     pub html: String,
@@ -19,8 +20,8 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a `CrawledPage`.
-    pub(crate) fn into_crawled(self, html: String) -> CrawledPage {
-        CrawledPage::new(self, html)
+    pub(crate) fn into_crawled(self, title: String, html: String) -> CrawledPage {
+        CrawledPage::new(self, title, html)
     }
 }
 
@@ -37,9 +38,10 @@ impl PartialEq<CrawledPage> for Page {
 }
 
 impl CrawledPage {
-    pub fn new(page: Page, html: String) -> Self {
+    pub fn new(page: Page, title: String, html: String) -> Self {
         CrawledPage {
             url: page.url,
+            title,
             html,
         }
     }
@@ -49,8 +51,7 @@ impl CrawledPage {
     /// # Returns
     /// - Returns `Err` if the `CrawledPage` is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
-        let query =
-            "INSERT INTO public.pages (url, html, is_indexed) VALUES ($1, $2, $3)";
+        let query = "INSERT INTO public.pages (url, html, is_indexed) VALUES ($1, $2, $3)";
 
         sqlx::query(query)
             .bind(self.url.to_string())
