@@ -8,7 +8,7 @@ pub struct Page {
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub struct CrawledPage {
     pub url: Url,
-    pub title: String,
+    pub title: Option<String>,
 
     // This is a `String` instead of `Html` because `Html` does not implement the `sqlx::Encode` trait
     pub html: String,
@@ -20,7 +20,7 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a `CrawledPage`.
-    pub(crate) fn into_crawled(self, title: String, html: String) -> CrawledPage {
+    pub(crate) fn into_crawled(self, title: Option<String>, html: String) -> CrawledPage {
         CrawledPage::new(self, title, html)
     }
 }
@@ -38,7 +38,7 @@ impl PartialEq<CrawledPage> for Page {
 }
 
 impl CrawledPage {
-    pub fn new(page: Page, title: String, html: String) -> Self {
+    pub fn new(page: Page, title: Option<String>, html: String) -> Self {
         CrawledPage {
             url: page.url,
             title,

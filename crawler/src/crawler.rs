@@ -156,16 +156,12 @@ impl Crawler {
         Ok(page.into_crawled(title, html.html()))
     }
 
-    fn extract_title_from_html(html: Html) -> String {
+    fn extract_title_from_html(html: Html) -> Option<String> {
         let selector = Selector::parse("title").unwrap();
 
         let element = html.select(&selector).next();
 
-        if let Some(element) = element {
-            element.text().collect::<String>()
-        } else {
-            todo!()
-        }
+        element.map(|element| element.text().collect::<String>())
     }
 
     fn is_english(html: Html) -> bool {
@@ -560,9 +556,24 @@ mod test {
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
-            let title = Crawler::extract_title_from_html(html);
+            let title = Crawler::extract_title_from_html(html).unwrap();
 
             assert!(title.contains("a page with a title"))
+        }
+
+        #[tokio::test]
+        async fn test_page_without_title() {
+            let server = HttpServer::new_with_filename("non_english_page.html");
+
+            let page = Page::from(server.base_url());
+
+            let crawler = Crawler::test_new(page.clone());
+
+            let html =
+                Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
+            let title = Crawler::extract_title_from_html(html);
+
+            assert!(title.is_none())
         }
     }
 
