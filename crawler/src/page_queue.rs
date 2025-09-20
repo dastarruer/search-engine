@@ -21,10 +21,14 @@ impl PageQueue {
     }
 
     pub fn pop(&mut self) -> Option<Page> {
-        let page = self.queue.back().unwrap();
+        let page = self.queue.back();
 
-        self.hashset.remove(page);
-        self.queue.pop_back()
+        if let Some(page) = page {
+            self.hashset.remove(page);
+            self.queue.pop_back()
+        } else {
+            None
+        }
     }
 
     pub fn contains_page(&self, page: &Page) -> bool {
