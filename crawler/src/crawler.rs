@@ -124,6 +124,7 @@ impl Crawler {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
+        let title = Self::extract_title_from_html(html.clone());
         let urls = self.extract_urls_from_html(html.clone());
 
         let base_url = page.url.clone();
@@ -152,7 +153,19 @@ impl Crawler {
 
         log::info!("Crawled {:?}...", base_url);
 
-        Ok(page.into_crawled(html.html()))
+        Ok(page.into_crawled(title, html.html()))
+    }
+
+    fn extract_title_from_html(html: Html) -> String {
+        let selector = Selector::parse("title").unwrap();
+
+        let element = html.select(&selector).next();
+
+        if let Some(element) = element {
+            element.text().collect::<String>()
+        } else {
+            todo!()
+        }
     }
 
     fn is_english(html: Html) -> bool {
@@ -529,6 +542,27 @@ mod test {
                     CrawlerError::InvalidRetryByHeader { page, header: None }
                 )
             }
+        }
+    }
+
+    mod extract_title_from_html {
+        use scraper::Html;
+
+        use crate::{crawler::Crawler, page::Page, utils::HttpServer};
+
+        #[tokio::test]
+        async fn test_page_with_title() {
+            let server = HttpServer::new_with_filename("page_with_title.html");
+
+            let page = Page::from(server.base_url());
+
+            let crawler = Crawler::test_new(page.clone());
+
+            let html =
+                Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
+            let title = Crawler::extract_title_from_html(html);
+
+            assert!(title.contains("a page with a title"))
         }
     }
 
