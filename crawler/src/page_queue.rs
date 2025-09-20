@@ -26,5 +26,9 @@ impl PageQueue {
         self.hashset.remove(page);
         self.queue.pop_back()
     }
+
+    pub fn contains_page(&self, page: &Page) -> bool {
+        self.hashset.contains(page)
+    }
 }
 
