@@ -69,15 +69,17 @@ impl Crawler {
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), CrawlerError> {
         while let Some(page) = self.queue.pop_back() {
-            let crawled_page = self.crawl_page(page.clone()).await?;
+            let crawled_page = self.crawl_page(page.clone()).await;
 
-            if let Some(crawled_page) = crawled_page {
-                if let Err(e) = crawled_page.add_to_db(&self.pool).await {
-                    log::error!("Error: {}", e);
+            match crawled_page {
+                Ok(Some(crawled_page)) => {
+                    if let Err(e) = crawled_page.add_to_db(&self.pool).await {
+                        log::error!("Error: {}", e);
+                    }
                 }
-            } else {
-                log::warn!("{} is unreachable", page.url);
-            };
+                Ok(None) => log::warn!("{} is unreachable", page.url),
+                Err(e) => log::warn!("{}", e),
+            }
         }
 
         log::info!("All done! no more pages left");
