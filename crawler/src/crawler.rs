@@ -17,7 +17,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Crawler {
     queue: VecDeque<Page>,
-    // Use `Page` instead of `CrawledPage` because comparing `Page` with `CrawledPage` does not work in hashsets for some reason
+    // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
     // TODO: Convert to CrawledPage
     crawled: HashSet<Page>,
     pool: PgPool,
@@ -40,8 +40,9 @@ impl Crawler {
         }
     }
 
-    /// Create a test instance of a `Crawler`, which uses an empty `HashSet` for `crawled`, making new instances much faster to create.
-    /// Also uses `PgPool::connect_lazy` to create a connection, which is much faster and lightweight.
+    /// Create a test instance of a [`Crawler`], which uses an empty [`HashSet`] for `crawled`, making new instances much faster to create.
+    /// Also uses [`PgPool::connect_lazy`] to create a connection, which is much faster and lightweight.
+    ///
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub fn test_new(starting_url: Page) -> Self {
@@ -65,7 +66,7 @@ impl Crawler {
     /// Run the main loop of the Crawler.
     ///
     /// # Returns
-    /// - Returns `Ok` if no errors happen.
+    /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), CrawlerError> {
         while let Some(page) = self.queue.pop_back() {
@@ -106,10 +107,11 @@ impl Crawler {
 
     /// Crawl a single page.
     ///
-    /// # Returns
-    /// - Returns `Err` if the `Page`'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
-    /// - Returns `Err` if the `Page` is not in English.
-    /// - Returns `Err` in case that [`extract_html_from_page`] fails.
+    /// # Errors
+    /// This function returns a [`CrawlerError`] if:
+    /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
+    /// - The [`Page`] is not in English.
+    /// - [`Crawler::extract_html_from_page`] fails.
     ///
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
@@ -166,13 +168,14 @@ impl Crawler {
         false
     }
 
-    /// Extracts the HTML from a `Page`.
+    /// Extracts the HTML from a [`Page`].
     ///
-    /// # Returns
-    /// - Returns `None` if the `Page` is empty (has no HTML).
-    /// - Returns `None` if the response contains a non 200 or 429 HTTP status code, or the request times out.
-    /// - Returns `Err` if sending the request results in an error.
-    /// - Returns `Err` if decoding the HTML from the `Response` throws an error, such as UTF 8 errors.
+    /// # Errors
+    /// This function returns a [`CrawlerError`] if:
+    /// - The [`Page`] is empty (has no HTML).
+    /// - The response contains a non-200 or non-429 HTTP status code, or the request times out.
+    /// - Sending the request results in an error.
+    /// - Decoding the HTML from the [`reqwest::Response`] throws an error, such as UTF-8 errors.
     async fn extract_html_from_page(&self, page: Page) -> Result<String, CrawlerError> {
         let mut resp = self.make_get_request(page.clone()).await?;
 
@@ -242,13 +245,13 @@ impl Crawler {
         self.queue.iter().any(|crawled_page| page == crawled_page)
     }
 
-    /// Make a get request to a specific URL.
+    /// Make a get request to a specific URL, and return the [`reqwest::Response`].
     ///
-    /// # Returns
-    /// - A `Response`, which contains the HTML and HTTP status code of the request
-    /// - An `Err` if there was an error while sending the request.
-    /// - An 'Err if a redirect loop was detected.
-    /// - An `Err` if the redirect limit was exhausted.
+    /// # Errors
+    /// This function returns a [`CrawlerError`] if:
+    /// - There was an error while sending the request.
+    /// - The redirect loop was detected.
+    /// - The redirect limit was exhausted.
     async fn make_get_request(&self, page: Page) -> Result<reqwest::Response, CrawlerError> {
         self.client
             .get(page.url.clone())
@@ -280,7 +283,7 @@ impl Crawler {
         queue
     }
 
-    /// Initialize the hashset of visited `Page`'s and the Postgres pool.
+    /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
     async fn init_crawled_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
@@ -316,11 +319,11 @@ impl Crawler {
             .unwrap()
     }
 
-    /// Extracts the HTML from a `Response`.
+    /// Extracts the HTML from a [`reqwest::Response`].
     ///
     /// # Returns
-    /// - Returns `None` if the `Response` has no HTML content.
-    /// - Returns `Err` if decoding the HTML from the `Response` throws an error, such as UTF 8 errors.
+    /// - Returns `None` if the [`reqwest::Response`] has no HTML content.
+    /// - Returns `Err` if decoding the HTML from the [`reqwest::Response`] throws an error, such as UTF 8 errors.
     async fn extract_html_from_resp(
         resp: reqwest::Response,
     ) -> Result<Option<String>, CrawlerError> {
