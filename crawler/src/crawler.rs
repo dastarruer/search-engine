@@ -72,13 +72,14 @@ impl Crawler {
             let crawled_page = self.crawl_page(page.clone()).await;
 
             match crawled_page {
-                Ok(Some(crawled_page)) => {
+                Ok(crawled_page) => {
                     if let Err(e) = crawled_page.add_to_db(&self.pool).await {
-                        log::error!("Error: {}", e);
+                        log::error!("Error inserting into DB: {}", e);
                     }
                 }
-                Ok(None) => log::warn!("{} is unreachable", page.url),
-                Err(e) => log::warn!("{}", e),
+                Err(e) => {
+                    log::warn!("Crawl failed: {}", e);
+                }
             }
         }
 
@@ -106,23 +107,19 @@ impl Crawler {
     /// Crawl a single page.
     ///
     /// # Returns
-    /// - Returns `Ok(None)` if the `Page`'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
-    /// - Returns `Ok(None)` if the `Page` is not in English.
-    /// - Returns `Err` if there is an edge case that has not been tested yet.
+    /// - Returns `Err` if the `Page`'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
+    /// - Returns `Err` if the `Page` is not in English.
+    /// - Returns `Err` in case that [`extract_html_from_page`] fails.
     ///
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub async fn crawl_page(&mut self, page: Page) -> Result<Option<CrawledPage>, CrawlerError> {
+    pub async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
-        if html.is_none() {
-            return Ok(None);
-        }
-
-        let html = Html::parse_fragment(html.unwrap().as_str());
+        let html = Html::parse_fragment(html.as_str());
 
         if !Self::is_english(html.clone()) {
-            return Ok(None);
+            return Err(CrawlerError::NonEnglishPage(page));
         }
 
         let urls = self.extract_urls_from_html(html.clone());
@@ -153,7 +150,7 @@ impl Crawler {
 
         log::info!("Crawled {:?}...", base_url);
 
-        Ok(Some(page.into_crawled(html.html())))
+        Ok(page.into_crawled(html.html()))
     }
 
     fn is_english(html: Html) -> bool {
@@ -176,7 +173,7 @@ impl Crawler {
     /// - Returns `None` if the response contains a non 200 or 429 HTTP status code, or the request times out.
     /// - Returns `Err` if sending the request results in an error.
     /// - Returns `Err` if decoding the HTML from the `Response` throws an error, such as UTF 8 errors.
-    async fn extract_html_from_page(&self, page: Page) -> Result<Option<String>, CrawlerError> {
+    async fn extract_html_from_page(&self, page: Page) -> Result<String, CrawlerError> {
         let mut resp = self.make_get_request(page.clone()).await?;
 
         let status = resp.status();
@@ -188,7 +185,7 @@ impl Crawler {
                     return Err(CrawlerError::EmptyPage(page));
                 }
 
-                Ok(Some(html.unwrap()))
+                Ok(html.unwrap())
             }
             StatusCode::TOO_MANY_REQUESTS => {
                 const MAX_ATTEMPTS: u8 = 10;
@@ -230,7 +227,7 @@ impl Crawler {
 
                     let html = Self::extract_html_from_resp(resp).await?;
 
-                    Ok(Some(html.unwrap()))
+                    Ok(html.unwrap())
                 } else {
                     // just give up. it's not worth it.
                     Err(CrawlerError::InvalidRetryByHeader { page, header: None })
@@ -359,7 +356,7 @@ mod test {
             let page = Page::from(server.base_url());
             let crawler = Crawler::test_new(page.clone());
 
-            let html = crawler.extract_html_from_page(page).await.unwrap().unwrap();
+            let html = crawler.extract_html_from_page(page).await.unwrap();
 
             let html = Html::parse_fragment(html.as_str());
 
@@ -390,10 +387,7 @@ mod test {
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
 
-            assert!(
-                html.unwrap()
-                    .contains(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#)
-            );
+            assert!(html.contains(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#));
         }
 
         #[tokio::test]

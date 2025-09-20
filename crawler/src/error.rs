@@ -26,4 +26,7 @@ pub enum CrawlerError {
 
     #[error("HTML decoding error from {url}: {error_str}.")]
     HtmlDecodingError{url: Url, error_str: String},
+
+    #[error("{url} is a non-English site.", url = .0.url)]
+    NonEnglishPage(Page)
 }
