@@ -1,7 +1,7 @@
+use crate::page::Page;
 use std::collections::{HashSet, VecDeque};
 
-use crate::page::Page;
-
+#[derive(Clone)]
 pub struct PageQueue {
     queue: VecDeque<Page>,
     hashset: HashSet<Page>,
@@ -14,4 +14,17 @@ impl PageQueue {
 
         PageQueue { queue, hashset }
     }
+
+    pub fn push(&mut self, page: Page) {
+        self.queue.push_back(page.clone());
+        self.hashset.insert(page);
+    }
+
+    pub fn pop(&mut self) -> Option<Page> {
+        let page = self.queue.back().unwrap();
+
+        self.hashset.remove(page);
+        self.queue.pop_back()
+    }
 }
+
