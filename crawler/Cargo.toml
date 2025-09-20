@@ -12,7 +12,7 @@ url = "2.5.7"
 httpmock = "0.7.0-rc.1"
 log = "0.4.28"
 flexi_logger = "0.31.2"
-thiserror = "1"
+thiserror = "2.0.16"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["async_tokio"] }
