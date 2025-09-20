@@ -251,15 +251,14 @@ impl Crawler {
     /// - An 'Err if a redirect loop was detected.
     /// - An `Err` if the redirect limit was exhausted.
     async fn make_get_request(&self, page: Page) -> Result<reqwest::Response, CrawlerError> {
-        self.client.get(page.url).send().await.map_or_else(
-            |e| {
-                Err(CrawlerError::FailedRequest(format!(
-                    "Request failed: {}",
-                    e
-                )))
-            },
-            Ok,
-        )
+        self.client
+            .get(page.url.clone())
+            .send()
+            .await
+            .map_err(|e| CrawlerError::FailedRequest {
+                page,
+                error_str: e.to_string(),
+            })
     }
 
     fn extract_urls_from_html(&self, html: Html) -> Vec<String> {
@@ -328,21 +327,19 @@ impl Crawler {
     ) -> Result<Option<String>, CrawlerError> {
         let url = resp.url().clone();
 
-        resp.text().await.map_or_else(
-            |_| {
-                Err(CrawlerError::HtmlDecodingError(format!(
-                    "HTML content of url is invalid: {:?}",
-                    url
-                )))
-            },
-            |html| {
-                if html.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(html))
-                }
-            },
-        )
+        let html = resp
+            .text()
+            .await
+            .map_err(|e| CrawlerError::HtmlDecodingError {
+                url,
+                error_str: e.to_string(),
+            })?;
+
+        if html.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(html))
+        }
     }
 }
 
