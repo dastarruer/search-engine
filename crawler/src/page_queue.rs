@@ -1,7 +1,7 @@
 use crate::page::Page;
 use std::collections::{HashSet, VecDeque};
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PageQueue {
     queue: VecDeque<Page>,
     hashset: HashSet<Page>,
@@ -32,3 +32,8 @@ impl PageQueue {
     }
 }
 
+impl PartialEq<VecDeque<Page>> for PageQueue {
+    fn eq(&self, other: &VecDeque<Page>) -> bool {
+        self.queue == *other
+    }
+}

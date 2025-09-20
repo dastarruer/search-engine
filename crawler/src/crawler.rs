@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{HashSet},
     time::Duration,
 };
 
@@ -9,14 +9,12 @@ use scraper::{Html, Selector};
 use sqlx::{PgPool, Row};
 
 use crate::{
-    error::CrawlerError,
-    page::{CrawledPage, Page},
-    utils::string_to_url,
+    error::CrawlerError, page::{CrawledPage, Page}, page_queue::PageQueue, utils::string_to_url
 };
 
 #[derive(Clone)]
 pub struct Crawler {
-    queue: VecDeque<Page>,
+    queue: PageQueue,
     // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
     // TODO: Convert to CrawledPage
     crawled: HashSet<Page>,
@@ -69,7 +67,7 @@ impl Crawler {
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), CrawlerError> {
-        while let Some(page) = self.queue.pop_back() {
+        while let Some(page) = self.queue.pop() {
             let crawled_page = self.crawl_page(page.clone()).await;
 
             match crawled_page {
@@ -97,7 +95,7 @@ impl Crawler {
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn test_run(&mut self) -> Result<(), CrawlerError> {
-        while let Some(page) = self.queue.pop_back() {
+        while let Some(page) = self.queue.pop() {
             let _crawled_page = self.crawl_page(page).await?;
         }
 
@@ -144,7 +142,7 @@ impl Crawler {
             }
 
             // Add the page to the queue of pages to crawl
-            self.queue.push_front(page.clone());
+            self.queue.push(page.clone());
             log::info!("{} is queued", page.url);
 
             // Add the page to self.crawled, so that it is never crawled again
@@ -251,7 +249,7 @@ impl Crawler {
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
-        self.queue.iter().any(|crawled_page| page == crawled_page)
+        self.queue.contains_page(page)
     }
 
     /// Make a get request to a specific URL, and return the [`reqwest::Response`].
@@ -286,9 +284,9 @@ impl Crawler {
         urls
     }
 
-    fn init_queue(starting_url: Page) -> VecDeque<Page> {
-        let mut queue = VecDeque::new();
-        queue.push_back(starting_url);
+    fn init_queue(starting_url: Page) -> PageQueue {
+        let mut queue = PageQueue::new();
+        queue.push(starting_url);
         queue
     }
 
@@ -601,9 +599,9 @@ mod test {
 
             crawler.crawl_page(page.clone()).await.unwrap();
 
-            let expected_url = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
+            let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
 
-            assert!(crawler.queue.contains(&expected_url));
+            assert!(crawler.queue.contains_page(&expected_page));
         }
 
         #[tokio::test]
