@@ -21,11 +21,11 @@ impl PageQueue {
     }
 
     pub fn pop(&mut self) -> Option<Page> {
-        let page = self.queue.back();
+        let page = self.queue.front();
 
         if let Some(page) = page {
             self.hashset.remove(page);
-            self.queue.pop_back()
+            self.queue.pop_front()
         } else {
             None
         }
