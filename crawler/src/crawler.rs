@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashSet},
-    time::Duration,
-};
+use std::{collections::HashSet, time::Duration};
 
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use scraper::{Html, Selector};
@@ -9,7 +6,10 @@ use scraper::{Html, Selector};
 use sqlx::{PgPool, Row};
 
 use crate::{
-    error::CrawlerError, page::{CrawledPage, Page}, page_queue::PageQueue, utils::string_to_url
+    error::CrawlerError,
+    page::{CrawledPage, Page},
+    page_queue::PageQueue,
+    utils::string_to_url,
 };
 
 #[derive(Clone)]
@@ -23,8 +23,8 @@ pub struct Crawler {
 }
 
 impl Crawler {
-    pub async fn new(starting_url: Page) -> Self {
-        let queue = Self::init_queue(starting_url);
+    pub async fn new(starting_urls: Vec<Page>) -> Self {
+        let queue = Self::init_queue(starting_urls);
 
         let (pool, crawled) = Self::init_crawled_and_pool().await;
 
@@ -44,7 +44,7 @@ impl Crawler {
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub fn test_new(starting_url: Page) -> Self {
-        let queue = Self::init_queue(starting_url);
+        let queue = Self::init_queue(vec![starting_url]);
 
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
         let pool = sqlx::postgres::PgPool::connect_lazy(url).unwrap();
@@ -284,9 +284,12 @@ impl Crawler {
         urls
     }
 
-    fn init_queue(starting_url: Page) -> PageQueue {
+    fn init_queue(starting_urls: Vec<Page>) -> PageQueue {
         let mut queue = PageQueue::new();
-        queue.push(starting_url);
+
+        for url in starting_urls {
+            queue.push(url);
+        }
         queue
     }
 

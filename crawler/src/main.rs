@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
 use crawler::crawler::Crawler;
 use crawler::page::Page;
@@ -9,10 +9,7 @@ use reqwest::Url;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_up_logging().await?;
 
-    let mut crawler = Crawler::new(Page::from(
-        Url::parse("https://en.wikipedia.org/wiki/Poland").unwrap(),
-    ))
-    .await;
+    let mut crawler = Crawler::new(get_start_urls()).await;
 
     crawler.run().await?;
 
@@ -34,4 +31,14 @@ async fn set_up_logging() -> Result<(), Box<dyn std::error::Error>> {
         .start()?;
 
     Ok(())
+}
+
+fn get_start_urls() -> Vec<Page> {
+    let sites_txt_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sites.txt");
+
+    fs::read_to_string(sites_txt_path)
+        .unwrap()
+        .lines()
+        .map(|url| Page::from(Url::parse(url).unwrap()))
+        .collect()
 }
