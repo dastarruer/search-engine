@@ -7,8 +7,7 @@ use sqlx::{PgPool, Row};
 
 use crate::{
     error::CrawlerError,
-    page::{CrawledPage, Page},
-    page_queue::PageQueue,
+    page::{CrawledPage, Page, PageQueue},
     utils::string_to_url,
 };
 

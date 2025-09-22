@@ -1,3 +1,4 @@
+use std::collections::{HashSet, VecDeque};
 use url::Url;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
@@ -52,7 +53,8 @@ impl CrawledPage {
     /// This function returns an error if:
     /// - The [`CrawledPage`] is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
-        let query = "INSERT INTO public.pages (url, html, is_indexed, title) VALUES ($1, $2, $3, $4)";
+        let query =
+            "INSERT INTO public.pages (url, html, is_indexed, title) VALUES ($1, $2, $3, $4)";
 
         sqlx::query(query)
             .bind(self.url.to_string())
@@ -69,5 +71,46 @@ impl CrawledPage {
 impl PartialEq<Page> for CrawledPage {
     fn eq(&self, other: &Page) -> bool {
         self.url == other.url
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PageQueue {
+    queue: VecDeque<Page>,
+    hashset: HashSet<Page>,
+}
+
+impl PageQueue {
+    pub fn new() -> Self {
+        let queue = VecDeque::new();
+        let hashset = HashSet::new();
+
+        PageQueue { queue, hashset }
+    }
+
+    pub fn push(&mut self, page: Page) {
+        self.queue.push_back(page.clone());
+        self.hashset.insert(page);
+    }
+
+    pub fn pop(&mut self) -> Option<Page> {
+        let page = self.queue.front();
+
+        if let Some(page) = page {
+            self.hashset.remove(page);
+            self.queue.pop_front()
+        } else {
+            None
+        }
+    }
+
+    pub fn contains_page(&self, page: &Page) -> bool {
+        self.hashset.contains(page)
+    }
+}
+
+impl PartialEq<VecDeque<Page>> for PageQueue {
+    fn eq(&self, other: &VecDeque<Page>) -> bool {
+        self.queue == *other
     }
 }
