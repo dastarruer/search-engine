@@ -324,6 +324,7 @@ impl Crawler {
             .user_agent(crate::USER_AGENT)
             // Reduce bandwidth usage; compliant with wikimedia's robot policy: https://wikitech.wikimedia.org/wiki/Robot_policy#Generally_applicable_rules
             .gzip(true)
+            .timeout(Duration::from_secs(15))
             .build()
             .unwrap()
     }
