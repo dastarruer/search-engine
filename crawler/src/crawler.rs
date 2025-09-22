@@ -284,7 +284,7 @@ impl Crawler {
     }
 
     fn init_queue(starting_urls: Vec<Page>) -> PageQueue {
-        let mut queue = PageQueue::new();
+        let mut queue = PageQueue::default();
 
         for url in starting_urls {
             queue.push(url);
