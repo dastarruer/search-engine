@@ -118,7 +118,27 @@ impl PageQueue {
         PageQueue { queue, hashset }
     }
 
-    pub fn push(&mut self, page: Page) {
+    /// Pushes a [`Page`] into the [`PageQueue`], and adds it to the database.
+    ///
+    /// # Errors
+    /// This function returns an error if:
+    /// - The [`Page`] is already in the database.
+    pub async fn queue_page(
+        &mut self,
+        page: Page,
+        pool: &sqlx::PgPool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        page.add_to_db(pool).await?;
+
+        self.queue.push_back(page.clone());
+        self.hashset.insert(page);
+
+        Ok(())
+    }
+
+    /// Pushes a [`Page`] into the [`PageQueue`].
+    #[cfg(test)]
+    pub fn queue_page_test(&mut self, page: Page) {
         self.queue.push_back(page.clone());
         self.hashset.insert(page);
     }
