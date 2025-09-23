@@ -24,6 +24,23 @@ impl Page {
     pub(crate) fn into_crawled(self, title: Option<String>, html: String) -> CrawledPage {
         CrawledPage::new(self, title, html)
     }
+
+    /// Add a [`Page`] to the database.
+    ///
+    /// # Errors
+    /// This function returns an error if:
+    /// - The [`Page`] is already in the database.
+    pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
+        let query =
+            "INSERT INTO public.pages (url, is_crawled, is_indexed) VALUES ($1, FALSE, FALSE)";
+
+        sqlx::query(query)
+            .bind(self.url.to_string())
+            .execute(pool)
+            .await?;
+
+        Ok(())
+    }
 }
 
 impl From<Url> for Page {
@@ -47,20 +64,27 @@ impl CrawledPage {
         }
     }
 
-    /// Add a [`CrawledPage`] to the database.
+    /// Update the database entry for this [`CrawledPage`].
+    ///
+    /// This will update the row in the `pages` table that matches the
+    /// [`CrawledPage`]'s URL, setting its `html`, `title`, and marking
+    /// `is_crawled` as `TRUE`.
     ///
     /// # Errors
     /// This function returns an error if:
     /// - The [`CrawledPage`] is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
-        let query =
-            "INSERT INTO public.pages (url, html, is_indexed, title) VALUES ($1, $2, $3, $4)";
+        let query = r#"
+            UPDATE public.pages
+                SET html = $1,
+                title = $2,
+                is_crawled = TRUE
+            WHERE url = $3"#;
 
         sqlx::query(query)
-            .bind(self.url.to_string())
-            .bind(self.html.as_str())
-            .bind(false)
             .bind(self.title.clone())
+            .bind(self.html.as_str())
+            .bind(self.url.to_string())
             .execute(pool)
             .await?;
 
