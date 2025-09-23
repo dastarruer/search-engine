@@ -137,7 +137,9 @@ impl PageQueue {
     }
 
     /// Pushes a [`Page`] into the [`PageQueue`].
-    #[cfg(test)]
+    ///
+    /// # Note
+    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub fn queue_page_test(&mut self, page: Page) {
         self.queue.push_back(page.clone());
         self.hashset.insert(page);
