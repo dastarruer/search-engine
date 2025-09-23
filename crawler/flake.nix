@@ -45,23 +45,11 @@
           # Required for reqwest crate
           openssl
 
-          docker-compose
-          postgresql
-          flyway
-
           # Simple script to connect to postgresql database
           (writeShellScriptBin "connect" ''
             psql -h localhost -p 5432 -U search_db_user -d search_db
           '')
         ];
-
-        shellHook = ''
-          # Run docker container
-          sudo docker-compose up -d
-
-          # Aliases
-          alias flyway="flyway -configFiles=./flyway.toml"
-        '';
 
         env = {
           # Required by rust-analyzer
