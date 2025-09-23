@@ -1,7 +1,0 @@
-[flyway]
-locations = ["filesystem:migrations"]
-
-[environments.default]
-url = "jdbc:postgresql://db:5432/postgres"
-user = "search_db_user"
-password = "123"
