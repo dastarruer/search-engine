@@ -1,0 +1,18 @@
+services:
+  crawler:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://postgres:123@db:5432/postgres
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_PASSWORD: 123
+    # Tells docker how to connect to the db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+# Tells docker to create a volume
+# A folder on our computer which stores data that can be accessed by other docker containers
+volumes:
+  postgres_data:

@@ -313,9 +313,13 @@ impl Crawler {
     /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
     async fn init_crawled_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
-        let url = "postgres://search_db_user:123@localhost:5432/search_db";
+        let url = std::env::var("DATABASE_URL")
+            .expect("DATABASE_URL environment variable should be defined.");
+        let url = url.as_str();
 
-        let pool = sqlx::postgres::PgPool::connect(url).await.unwrap();
+        let pool = sqlx::postgres::PgPool::connect(url)
+            .await
+            .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
 
         let visited_query = "SELECT * FROM public.pages WHERE http_status = 200";
         let mut visited = HashSet::new();
