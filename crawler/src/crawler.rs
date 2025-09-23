@@ -1,5 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
+use futures::stream::FuturesUnordered;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use scraper::{Html, Selector};
 
@@ -66,9 +67,13 @@ impl Crawler {
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), CrawlerError> {
-        while let Some(page) = self.queue.pop() {
-            let crawled_page = self.crawl_page(page.clone()).await;
+        let futures = FuturesUnordered::new();
 
+        while let Some(page) = self.queue.pop() {
+            futures.push(self.crawl_page(page.clone()).await);
+        }
+
+        for crawled_page in futures.iter() {
             match crawled_page {
                 Ok(crawled_page) => {
                     if let Err(e) = crawled_page.add_to_db(&self.pool).await {
