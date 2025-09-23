@@ -99,8 +99,21 @@ impl Crawler {
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn test_run(&mut self) -> Result<(), CrawlerError> {
+        let futures = FuturesUnordered::new();
+
         while let Some(page) = self.queue.pop() {
-            let _crawled_page = self.crawl_page(page).await?;
+            futures.push(self.crawl_page(page.clone()).await);
+        }
+
+        for crawled_page in futures.iter() {
+            match crawled_page {
+                Ok(_) => {
+                    log::info!("Crawl successful.");
+                }
+                Err(e) => {
+                    log::warn!("Crawl failed: {}", e);
+                }
+            }
         }
 
         log::info!("All done! no more pages left");
