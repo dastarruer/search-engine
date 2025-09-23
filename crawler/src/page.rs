@@ -80,6 +80,12 @@ pub struct PageQueue {
     hashset: HashSet<Page>,
 }
 
+impl Default for PageQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PageQueue {
     pub fn new() -> Self {
         let queue = VecDeque::new();

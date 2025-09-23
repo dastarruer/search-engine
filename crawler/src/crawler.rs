@@ -289,7 +289,7 @@ impl Crawler {
     }
 
     fn init_queue(starting_urls: Vec<Page>) -> PageQueue {
-        let mut queue = PageQueue::new();
+        let mut queue = PageQueue::default();
 
         for url in starting_urls {
             queue.push(url);
@@ -329,6 +329,7 @@ impl Crawler {
             .user_agent(crate::USER_AGENT)
             // Reduce bandwidth usage; compliant with wikimedia's robot policy: https://wikitech.wikimedia.org/wiki/Robot_policy#Generally_applicable_rules
             .gzip(true)
+            .timeout(Duration::from_secs(15))
             .build()
             .unwrap()
     }
