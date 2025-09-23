@@ -2,6 +2,6 @@
 locations = ["filesystem:migrations"]
 
 [environments.default]
-url = "jdbc:postgresql://localhost:5432/search_db"
+url = "jdbc:postgresql://db:5432/postgres"
 user = "search_db_user"
 password = "123"
