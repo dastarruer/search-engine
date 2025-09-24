@@ -47,7 +47,7 @@ impl Crawler {
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
         let pool = sqlx::postgres::PgPool::connect_lazy(url).unwrap();
 
-        let queue = Self::init_queue(vec![starting_url], &pool).await;
+        let queue = Self::init_queue_test(vec![starting_url]);
 
         let crawled = HashSet::new();
 
@@ -163,6 +163,58 @@ impl Crawler {
                 log::warn!("Error with queueing page: {}", e);
                 continue;
             };
+
+            log::info!("{} is queued", page.url);
+
+            // Add the page to self.crawled, so that it is never crawled again
+            self.crawled.insert(page);
+        }
+
+        log::info!("Crawled {:?}...", base_url);
+
+        Ok(page.into_crawled(title, html.html()))
+    }
+
+    /// Crawl a single page without writing to the database.
+    ///
+    /// # Errors
+    /// This function returns a [`CrawlerError`] if:
+    /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
+    /// - The [`Page`] is not in English.
+    /// - [`Crawler::extract_html_from_page`] fails.
+    ///
+    /// # Note
+    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
+    pub async fn crawl_page_test(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
+        let html = self.extract_html_from_page(page.clone()).await?;
+
+        let html = Html::parse_fragment(html.as_str());
+
+        if !Self::is_english(html.clone()) {
+            return Err(CrawlerError::NonEnglishPage(page));
+        }
+
+        let title = Self::extract_title_from_html(html.clone());
+        let urls = self.extract_urls_from_html(html.clone());
+
+        let base_url = page.url.clone();
+
+        for url in urls {
+            let url = string_to_url(&base_url, url);
+
+            let page = if let Some(url) = url {
+                Page::from(url)
+            } else {
+                continue;
+            };
+
+            if self.crawled.contains(&page) || self.is_page_queued(&page) {
+                log::warn!("{} is a duplicate", page.url);
+                continue;
+            }
+
+            // Add the page to the queue of pages to crawl
+            self.queue.queue_page_test(page.clone());
 
             log::info!("{} is queued", page.url);
 
@@ -314,6 +366,16 @@ impl Crawler {
                 continue;
             };
         }
+        queue
+    }
+
+    fn init_queue_test(starting_urls: Vec<Page>) -> PageQueue {
+        let mut queue = PageQueue::default();
+
+        for url in starting_urls {
+            queue.queue_page_test(url);
+        }
+
         queue
     }
 
@@ -629,7 +691,7 @@ mod test {
 
             assert_eq!(crawler.queue, expected_queue);
 
-            crawler.crawl_page(page.clone()).await.unwrap();
+            crawler.crawl_page_test(page.clone()).await.unwrap();
 
             let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
 
@@ -649,12 +711,12 @@ mod test {
             assert_eq!(crawler.queue, expected_queue);
 
             // Crawl the page for the first time
-            crawler.crawl_page(page.clone()).await.unwrap();
+            crawler.crawl_page_test(page.clone()).await.unwrap();
 
             let queue_before = crawler.queue.clone();
 
             // Crawl the page a second time. After this, the queue should stay exactly the same.
-            crawler.crawl_page(page.clone()).await.unwrap();
+            crawler.crawl_page_test(page.clone()).await.unwrap();
 
             assert_eq!(crawler.queue, queue_before)
         }
