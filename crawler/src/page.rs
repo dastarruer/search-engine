@@ -78,15 +78,14 @@ impl CrawledPage {
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
         let query = r#"
             UPDATE pages
-                SET html = $1,
+            SET html = $1,
                 title = $2,
                 is_crawled = TRUE
-            WHERE url = $3
-            ON CONFLICT (url) DO NOTHING"#;
+            WHERE url = $3"#;
 
         sqlx::query(query)
-            .bind(self.title.clone())
             .bind(self.html.as_str())
+            .bind(self.title.clone())
             .bind(self.url.to_string())
             .execute(pool)
             .await?;
