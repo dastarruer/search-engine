@@ -357,8 +357,29 @@ impl Crawler {
         urls
     }
 
-    async fn init_queue(starting_urls: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
+    async fn init_queue(mut starting_urls: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
         let mut queue = PageQueue::default();
+
+        let queued_pages_query = r#"
+            SELECT url FROM public.pages
+            WHERE is_crawled = FALSE;"#;
+
+        // Query the database for all the queued urls
+        let mut rows: Vec<Page> = sqlx::query(queued_pages_query)
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .map(|row| {
+                let url: String = row.get("url");
+                Page::new(
+                    Url::parse(url.as_str())
+                        .unwrap_or_else(|_| panic!("Url {} should be a valid url.", url)),
+                )
+            })
+            .collect();
+
+        starting_urls.append(&mut rows);
 
         for url in starting_urls {
             if queue.queue_page(url, pool).await.is_err() {
