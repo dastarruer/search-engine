@@ -31,8 +31,7 @@ impl Page {
     /// This function returns an error if:
     /// - The [`Page`] is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
-        let query =
-            "INSERT INTO public.pages (url, is_crawled, is_indexed) VALUES ($1, FALSE, FALSE)";
+        let query = "INSERT INTO pages (url, is_crawled, is_indexed) VALUES ($1, FALSE, FALSE)";
 
         sqlx::query(query)
             .bind(self.url.to_string())
@@ -75,7 +74,7 @@ impl CrawledPage {
     /// - The [`CrawledPage`] is already in the database.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
         let query = r#"
-            UPDATE public.pages
+            UPDATE pages
                 SET html = $1,
                 title = $2,
                 is_crawled = TRUE
