@@ -54,6 +54,9 @@
         env = {
           # Required by rust-analyzer
           RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
+
+          # Required by the program to connect to the db
+          DATABASE_URL = "postgresql://postgres:123@localhost:5432/postgres";
         };
       };
       nativeBuildInputs = with pkgs; [pkg-config];
