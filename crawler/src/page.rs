@@ -29,9 +29,12 @@ impl Page {
     ///
     /// # Errors
     /// This function returns an error if:
-    /// - The [`Page`] is already in the database.
+    /// - There is an edgecase that has not been tested yet.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
-        let query = "INSERT INTO pages (url, is_crawled, is_indexed) VALUES ($1, FALSE, FALSE)";
+        let query = r#"
+            INSERT INTO pages (url, is_crawled, is_indexed)
+            VALUES ($1, FALSE, FALSE)
+            ON CONFLICT (url) DO NOTHING"#;
 
         sqlx::query(query)
             .bind(self.url.to_string())
@@ -71,14 +74,15 @@ impl CrawledPage {
     ///
     /// # Errors
     /// This function returns an error if:
-    /// - The [`CrawledPage`] is already in the database.
+    /// - There is an edgecase that has not been tested yet.
     pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
         let query = r#"
             UPDATE pages
                 SET html = $1,
                 title = $2,
                 is_crawled = TRUE
-            WHERE url = $3"#;
+            WHERE url = $3
+            ON CONFLICT (url) DO NOTHING"#;
 
         sqlx::query(query)
             .bind(self.title.clone())

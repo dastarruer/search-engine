@@ -382,9 +382,9 @@ impl Crawler {
         starting_urls.append(&mut rows);
 
         for url in starting_urls {
-            if queue.queue_page(url, pool).await.is_err() {
-                // We can assume that if queuing this page throws an error, it is just a duplicate page, and we can skip it
-                continue;
+            if let Err(e) = queue.queue_page(url, pool).await {
+                // There should never be an error, but if there is, log it
+                log::warn!("Error initializing page queue: {}", e);
             };
         }
         queue
