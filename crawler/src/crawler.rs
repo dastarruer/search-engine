@@ -1,6 +1,6 @@
 use std::{collections::HashSet, time::Duration};
 
-use futures::stream::FuturesUnordered;
+use futures::{StreamExt, stream::FuturesUnordered};
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use scraper::{Html, Selector};
 
@@ -67,16 +67,39 @@ impl Crawler {
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), CrawlerError> {
-        let futures = FuturesUnordered::new();
+        let mut futures = FuturesUnordered::new();
+        let pool = &self.pool.clone();
 
-        while let Some(page) = self.queue.pop() {
-            futures.push(self.crawl_page(page.clone()).await);
+        loop {
+            let queue = &mut self.queue.clone();
+
+            match queue.pop() {
+                Some(page) => {
+                    let mut crawler = self.clone();
+                    futures.push(async move { crawler.crawl_page(page.clone()).await })
+                }
+                None => break,
+            }
+
+            while let Some(crawled_page) = futures.next().await {
+                match crawled_page {
+                    Ok(crawled_page) => {
+                        if let Err(e) = crawled_page.add_to_db(pool).await {
+                            log::warn!("Error inserting into DB: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Crawl failed: {}", e);
+                    }
+                }
+            }
         }
 
-        for crawled_page in futures.iter() {
+        // Crawl the rest of the pages
+        while let Some(crawled_page) = futures.next().await {
             match crawled_page {
                 Ok(crawled_page) => {
-                    if let Err(e) = crawled_page.add_to_db(&self.pool).await {
+                    if let Err(e) = crawled_page.add_to_db(pool).await {
                         log::error!("Error inserting into DB: {}", e);
                     }
                 }
@@ -99,20 +122,28 @@ impl Crawler {
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
     pub async fn test_run(&mut self) -> Result<(), CrawlerError> {
-        let futures = FuturesUnordered::new();
+        let mut futures = FuturesUnordered::new();
 
-        while let Some(page) = self.queue.pop() {
-            futures.push(self.crawl_page(page.clone()).await);
-        }
+        loop {
+            while let Some(crawled_page) = futures.next().await {
+                match crawled_page {
+                    Ok(_) => {
+                        log::info!("Crawl successful.");
+                    }
+                    Err(e) => {
+                        log::warn!("Crawl failed: {}", e);
+                    }
+                }
+            }
 
-        for crawled_page in futures.iter() {
-            match crawled_page {
-                Ok(_) => {
-                    log::info!("Crawl successful.");
+            let queue = &mut self.queue.clone();
+
+            match queue.pop() {
+                Some(page) => {
+                    let mut crawler = self.clone();
+                    futures.push(async move { crawler.crawl_page_test(page.clone()).await })
                 }
-                Err(e) => {
-                    log::warn!("Crawl failed: {}", e);
-                }
+                None => break,
             }
         }
 
