@@ -3,6 +3,9 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql://postgres:123@db:5432/postgres
+    # Build this image after db migrations
+    depends_on:
+      - flyway
 
   flyway:
     image: flyway/flyway
