@@ -14,7 +14,7 @@ fn bench_crawl_from_page(c: &mut Criterion) {
 
             let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(page.clone());
+            let mut crawler = Crawler::test_new(page.clone()).await;
 
             crawler.crawl_page(page.clone()).await.unwrap();
         })
@@ -34,7 +34,7 @@ fn bench_test_run(c: &mut Criterion) {
 
             let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(page.clone());
+            let mut crawler = Crawler::test_new(page.clone()).await;
 
             crawler.test_run().await.unwrap();
         })

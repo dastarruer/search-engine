@@ -24,9 +24,9 @@ pub struct Crawler {
 
 impl Crawler {
     pub async fn new(starting_urls: Vec<Page>) -> Self {
-        let queue = Self::init_queue(starting_urls);
-
         let (pool, crawled) = Self::init_crawled_and_pool().await;
+
+        let queue = Self::init_queue(starting_urls, &pool).await;
 
         let client = Self::init_client();
 
@@ -43,11 +43,11 @@ impl Crawler {
     ///
     /// # Note
     /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub fn test_new(starting_url: Page) -> Self {
-        let queue = Self::init_queue(vec![starting_url]);
-
+    pub async fn test_new(starting_url: Page) -> Self {
         let url = "postgres://search_db_user:123@localhost:5432/search_db";
         let pool = sqlx::postgres::PgPool::connect_lazy(url).unwrap();
+
+        let queue = Self::init_queue(vec![starting_url], &pool).await;
 
         let crawled = HashSet::new();
 
@@ -159,7 +159,11 @@ impl Crawler {
             }
 
             // Add the page to the queue of pages to crawl
-            self.queue.push(page.clone());
+            if let Err(e) = self.queue.queue_page(page.clone(), &self.pool).await {
+                log::warn!("Error with queueing page: {}", e);
+                continue;
+            };
+
             log::info!("{} is queued", page.url);
 
             // Add the page to self.crawled, so that it is never crawled again
@@ -301,11 +305,14 @@ impl Crawler {
         urls
     }
 
-    fn init_queue(starting_urls: Vec<Page>) -> PageQueue {
+    async fn init_queue(starting_urls: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
         let mut queue = PageQueue::default();
 
         for url in starting_urls {
-            queue.push(url);
+            if queue.queue_page(url, pool).await.is_err() {
+                // We can assume that if queuing this page throws an error, it is just a duplicate page, and we can skip it
+                continue;
+            };
         }
         queue
     }
@@ -389,7 +396,7 @@ mod test {
             let server = HttpServer::new_with_filename("non_english_page.html");
 
             let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone());
+            let crawler = Crawler::test_new(page.clone()).await;
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
 
@@ -418,7 +425,7 @@ mod test {
             let server = HttpServer::new_with_filename("extract_single_href.html");
 
             let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone());
+            let crawler = Crawler::test_new(page.clone()).await;
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
 
@@ -438,7 +445,7 @@ mod test {
             });
 
             let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone());
+            let crawler = Crawler::test_new(page.clone()).await;
 
             let error = crawler
                 .extract_html_from_page(page.clone())
@@ -459,7 +466,7 @@ mod test {
             let server: HttpServer = HttpServer::new_with_filename("empty.html");
 
             let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone());
+            let crawler = Crawler::test_new(page.clone()).await;
 
             let error = crawler
                 .extract_html_from_page(page.clone())
@@ -495,7 +502,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::test_new(page.clone());
+                let crawler = Crawler::test_new(page.clone()).await;
 
                 let start = Instant::now();
                 let error = crawler
@@ -527,7 +534,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::test_new(page.clone());
+                let crawler = Crawler::test_new(page.clone()).await;
 
                 let error = crawler
                     .extract_html_from_page(page.clone())
@@ -549,7 +556,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::test_new(page.clone());
+                let crawler = Crawler::test_new(page.clone()).await;
 
                 let error = crawler
                     .extract_html_from_page(page.clone())
@@ -575,7 +582,7 @@ mod test {
 
             let page = Page::from(server.base_url());
 
-            let crawler = Crawler::test_new(page.clone());
+            let crawler = Crawler::test_new(page.clone()).await;
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
@@ -590,7 +597,7 @@ mod test {
 
             let page = Page::from(server.base_url());
 
-            let crawler = Crawler::test_new(page.clone());
+            let crawler = Crawler::test_new(page.clone()).await;
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
@@ -615,7 +622,7 @@ mod test {
 
             let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(page.clone());
+            let mut crawler = Crawler::test_new(page.clone()).await;
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
@@ -634,7 +641,7 @@ mod test {
             let server = HttpServer::new_with_filename("extract_single_href.html");
 
             let page = Page::from(server.base_url());
-            let mut crawler = Crawler::test_new(page.clone());
+            let mut crawler = Crawler::test_new(page.clone()).await;
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
@@ -668,7 +675,7 @@ mod test {
             let non_existent_site = Url::parse("https://does-not-exist.comm").unwrap();
             let page = Page::from(non_existent_site);
 
-            let crawler = Crawler::test_new(page);
+            let crawler = Crawler::test_new(page).await;
 
             let html_file = test_file_path_from_filename(filename);
 
