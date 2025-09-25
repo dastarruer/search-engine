@@ -398,7 +398,7 @@ impl Crawler {
             .await
             .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
 
-        let visited_query = "SELECT * FROM pages WHERE http_status = 200";
+        let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE;";
         let mut visited = HashSet::new();
 
         let query = sqlx::query(visited_query);
