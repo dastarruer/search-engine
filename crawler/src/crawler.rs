@@ -73,12 +73,9 @@ impl Crawler {
         loop {
             let queue = &mut self.queue.clone();
 
-            match queue.pop() {
-                Some(page) => {
-                    let mut crawler = self.clone();
-                    futures.push(async move { crawler.crawl_page(page.clone()).await })
-                }
-                None => break,
+            while let Some(page) = queue.pop() {
+                let mut crawler = self.clone();
+                futures.push(async move { crawler.crawl_page(page.clone()).await })
             }
 
             while let Some(crawled_page) = futures.next().await {
@@ -91,20 +88,6 @@ impl Crawler {
                     Err(e) => {
                         log::warn!("Crawl failed: {}", e);
                     }
-                }
-            }
-        }
-
-        // Crawl the rest of the pages
-        while let Some(crawled_page) = futures.next().await {
-            match crawled_page {
-                Ok(crawled_page) => {
-                    if let Err(e) = crawled_page.add_to_db(pool).await {
-                        log::error!("Error inserting into DB: {}", e);
-                    }
-                }
-                Err(e) => {
-                    log::warn!("Crawl failed: {}", e);
                 }
             }
         }
