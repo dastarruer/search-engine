@@ -2,14 +2,14 @@ services:
   crawler:
     build: .
     environment:
-      DATABASE_URL: postgresql://postgres:123@db:5432/postgres
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_ENDPOINT}:${DB_PORT}/${DB_NAME}
     # Build this image after db migrations
     depends_on:
       - flyway
 
   flyway:
     image: flyway/flyway
-    command: -url=jdbc:postgresql://db:5432/postgres -schemas=public -user=postgres -password=123 -connectRetries=60 migrate
+    command: -url=jdbc:postgresql://${DB_ENDPOINT}:${DB_PORT}/${DB_NAME} -schemas=public -user=${DB_USER} -password=${DB_PASSWORD} -connectRetries=60 migrate
     volumes:
       - .:/flyway/sql
     depends_on:
@@ -18,12 +18,12 @@ services:
   db:
     image: postgres:latest
     environment:
-      POSTGRES_PASSWORD: 123
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     # Tells docker how to connect to the db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${DB_PORT}:${DB_PORT}"
 
 # Tells docker to create a volume
 # A folder on our computer which stores data that can be accessed by other docker containers
