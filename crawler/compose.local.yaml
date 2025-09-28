@@ -1,0 +1,18 @@
+services:
+  crawler:
+    build: .
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_ENDPOINT: ${DB_ENDPOINT}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+    # Build this image after db migrations
+    depends_on:
+      - flyway
+
+  flyway:
+    image: flyway/flyway
+    command: -url=jdbc:postgresql://${DB_ENDPOINT}:${DB_PORT}/${DB_NAME} -schemas=public -user=${DB_USER} -password=${DB_PASSWORD} -connectRetries=60 migrate
+    volumes:
+      - .:/flyway/sql
