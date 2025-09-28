@@ -85,6 +85,10 @@ impl Crawler {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
+        if Self::is_adult_page(&page) {
+            return Err(CrawlerError::AdultSite(page));
+        }
+
         let title = Self::extract_title_from_html(html.clone());
         let urls = self.extract_urls_from_html(html.clone());
 
@@ -213,6 +217,14 @@ impl Crawler {
             // just give up. it's not worth it.
             _ => Err(CrawlerError::MalformedHttpStatus { page, status }),
         }
+    }
+
+    /// Checks URL domain against a list of blocked keywords relating to adult content.
+    fn is_adult_page(page: &Page) -> bool {
+        let blocked_words = ["porn", "xxx", "sex", "adult"];
+        let domain = page.url.as_str().to_lowercase();
+
+        blocked_words.iter().any(|s| domain.contains(s))
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -486,6 +498,24 @@ mod test {
             let html = Html::parse_fragment(html.as_str());
 
             assert!(!Crawler::is_english(html));
+        }
+    }
+
+    mod is_adult {
+        use url::Url;
+
+        use super::*;
+
+        #[tokio::test]
+        async fn test_adult_page() {
+            let page = Page::from(Url::parse("https://porn.xxx").unwrap());
+            assert!(Crawler::is_adult_page(&page));
+        }
+
+        #[tokio::test]
+        async fn test_safe_page() {
+            let page = Page::from(Url::parse("https://safe.com").unwrap());
+            assert!(!Crawler::is_adult_page(&page));
         }
     }
 

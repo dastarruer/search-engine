@@ -78,6 +78,7 @@ pub(crate) fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
 /// - DB_ENDPOINT
 /// - DB_PORT
 /// - DB_NAME
+// TODO: Use URL methods instead of url crate to construct url
 pub(crate) fn construct_postgres_url() -> String {
     let endpoint = std::env::var("DB_ENDPOINT").expect("DB_ENDPOINT must be set.");
     let port = std::env::var("DB_PORT").expect("DB_PORT must be set.");

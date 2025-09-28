@@ -28,5 +28,8 @@ pub enum CrawlerError {
     HtmlDecodingError{url: Url, error_str: String},
 
     #[error("{url} is a non-English site.", url = .0.url)]
-    NonEnglishPage(Page)
+    NonEnglishPage(Page),
+
+    #[error("{url} is an adult site.", url = .0.url)]
+    AdultSite(Page)
 }
