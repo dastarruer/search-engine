@@ -456,25 +456,30 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    mod is_english {
-        use scraper::Html;
+    use crate::{
+        crawler::Crawler,
+        page::Page,
+        utils::{HttpServer, test_file_path_from_filepath},
+    };
 
-        use crate::{
-            crawler::Crawler,
-            page::Page,
-            utils::{HttpServer, test_file_path_from_filepath},
-        };
+    async fn create_crawler(starting_filename: &str) -> (Crawler, Page) {
+        let filepath = test_file_path_from_filepath(starting_filename);
+        let server = HttpServer::new_with_filepath(filepath);
+
+        let page = Page::from(server.base_url());
+
+        (Crawler::test_new(page.clone()).await, page)
+    }
+
+    mod is_english {
+        use super::*;
+        use scraper::Html;
 
         #[tokio::test]
         async fn test_non_english_page() {
-            let filepath = test_file_path_from_filepath("non_english_page.html");
-            let server = HttpServer::new_with_filepath(filepath);
-
-            let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone()).await;
+            let (crawler, page) = create_crawler("non_english_page.html").await;
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
-
             let html = Html::parse_fragment(html.as_str());
 
             assert!(!Crawler::is_english(html));
@@ -482,34 +487,23 @@ mod test {
     }
 
     mod extract_html_from_page {
-
+        use super::*;
+        use crate::error::CrawlerError;
         use httpmock::Method::GET;
         use reqwest::StatusCode;
-
-        use crate::{
-            error::CrawlerError,
-            page::Page,
-            utils::{HttpServer, test_file_path_from_filepath},
-        };
-
-        use super::super::Crawler;
 
         // Instead of using #[test], we use #[tokio::test] so we can test async functions
         #[tokio::test]
         async fn test_200_status() {
-            let filepath = test_file_path_from_filepath("extract_single_href.html");
-            let server = HttpServer::new_with_filepath(filepath);
-
-            let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone()).await;
+            let (crawler, page) = create_crawler("extract_single_href.html").await;
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
-
             assert!(html.contains(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#));
         }
 
         #[tokio::test]
         async fn test_malformed_status() {
+            // special setup (mock server), keep as is
             const EXPECTED_STATUS: StatusCode = StatusCode::NOT_FOUND;
             let filepath = test_file_path_from_filepath("extract_single_href.html");
 
@@ -539,34 +533,29 @@ mod test {
 
         #[tokio::test]
         async fn test_empty_page() {
-            let filepath = test_file_path_from_filepath("empty.html");
-            let server: HttpServer = HttpServer::new_with_filepath(filepath);
-
-            let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone()).await;
+            let (crawler, page) = create_crawler("empty.html").await;
 
             let error = crawler
                 .extract_html_from_page(page.clone())
                 .await
                 .unwrap_err();
-
             assert_eq!(error, CrawlerError::EmptyPage(page))
         }
 
         mod status_429 {
-            use httpmock::Method::GET;
-            use reqwest::StatusCode;
-            use tokio::time::Instant;
-
             use crate::{
                 crawler::Crawler,
                 error::CrawlerError,
                 page::Page,
                 utils::{HttpServer, test_file_path_from_filepath},
             };
+            use httpmock::Method::GET;
+            use reqwest::StatusCode;
+            use tokio::time::Instant;
 
             #[tokio::test]
             async fn test_429_status() {
+                // special setup (retry-after), keep as is
                 const TRY_AFTER_SECS: u64 = 1;
                 let filepath = test_file_path_from_filepath("extract_single_href.html");
 
@@ -589,16 +578,13 @@ mod test {
                 let end = Instant::now();
 
                 let elapsed = (end - start).as_secs();
-
-                // Fail the test if the retry-after header is not respected
                 assert_eq!(elapsed, TRY_AFTER_SECS);
-
                 assert_eq!(error, CrawlerError::RequestTimeout(page))
             }
 
             #[tokio::test]
             async fn test_429_status_with_large_retry_after() {
-                // After 60 seconds, just don't bother
+                // special setup (retry-after too long), keep as is
                 const TRY_AFTER_SECS: u64 = 61;
                 let filepath = test_file_path_from_filepath("extract_single_href.html");
 
@@ -617,12 +603,12 @@ mod test {
                     .extract_html_from_page(page.clone())
                     .await
                     .unwrap_err();
-
                 assert_eq!(error, CrawlerError::RequestTimeout(page))
             }
 
             #[tokio::test]
             async fn test_429_status_with_no_header() {
+                // special setup (missing retry-after header), keep as is
                 let filepath = test_file_path_from_filepath("extract_single_href.html");
 
                 let server = HttpServer::new_with_mock(|when, then| {
@@ -649,22 +635,12 @@ mod test {
     }
 
     mod extract_title_from_html {
+        use super::*;
         use scraper::Html;
-
-        use crate::{
-            crawler::Crawler,
-            page::Page,
-            utils::{HttpServer, test_file_path_from_filepath},
-        };
 
         #[tokio::test]
         async fn test_page_with_title() {
-            let filepath = test_file_path_from_filepath("page_with_title.html");
-            let server = HttpServer::new_with_filepath(filepath);
-
-            let page = Page::from(server.base_url());
-
-            let crawler = Crawler::test_new(page.clone()).await;
+            let (crawler, page) = create_crawler("page_with_title.html").await;
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
@@ -675,12 +651,7 @@ mod test {
 
         #[tokio::test]
         async fn test_page_without_title() {
-            let filepath = test_file_path_from_filepath("non_english_page.html");
-            let server = HttpServer::new_with_filepath(filepath);
-
-            let page = Page::from(server.base_url());
-
-            let crawler = Crawler::test_new(page.clone()).await;
+            let (crawler, page) = create_crawler("non_english_page.html").await;
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
@@ -691,78 +662,51 @@ mod test {
     }
 
     mod crawl_next_url {
-        use std::collections::VecDeque;
-
+        use super::*;
         use reqwest::Url;
-
-        use crate::{
-            page::Page,
-            utils::{HttpServer, test_file_path_from_filepath},
-        };
-
-        use super::super::Crawler;
+        use std::collections::VecDeque;
 
         #[tokio::test]
         async fn test_basic_site() {
-            let filepath = test_file_path_from_filepath("extract_single_href.html");
-            let server = HttpServer::new_with_filepath(filepath);
-
-            let page = Page::from(server.base_url());
-
-            let mut crawler = Crawler::test_new(page.clone()).await;
+            let (mut crawler, page) = create_crawler("extract_single_href.html").await;
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
-
             assert_eq!(crawler.queue, expected_queue);
 
             crawler.crawl_page_test(page.clone()).await.unwrap();
 
             let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
-
             assert!(crawler.queue.contains_page(&expected_page));
         }
 
         #[tokio::test]
         async fn test_already_visited_url() {
-            let filepath = test_file_path_from_filepath("extract_single_href.html");
-            let server = HttpServer::new_with_filepath(filepath);
-
-            let page = Page::from(server.base_url());
-            let mut crawler = Crawler::test_new(page.clone()).await;
+            let (mut crawler, page) = create_crawler("extract_single_href.html").await;
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
-
             assert_eq!(crawler.queue, expected_queue);
 
-            // Crawl the page for the first time
             crawler.crawl_page_test(page.clone()).await.unwrap();
-
             let queue_before = crawler.queue.clone();
 
-            // Crawl the page a second time. After this, the queue should stay exactly the same.
             crawler.crawl_page_test(page.clone()).await.unwrap();
-
             assert_eq!(crawler.queue, queue_before)
         }
     }
 
     mod extract_urls_from_html {
-        use std::{fs::File, io::Read};
-
+        use super::super::Crawler;
+        use crate::utils::test_file_path_from_filepath;
         use reqwest::Url;
         use scraper::Html;
-
-        use crate::{page::Page, utils::test_file_path_from_filepath};
-
-        use super::super::Crawler;
+        use std::{fs::File, io::Read};
 
         async fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
             // We don't need to send http requests in this module, so just provide a nonexistent site
             let non_existent_site = Url::parse("https://does-not-exist.comm").unwrap();
-            let page = Page::from(non_existent_site);
-
+            let page = crate::page::Page::from(non_existent_site);
             let crawler = Crawler::test_new(page).await;
 
             let html_file = test_file_path_from_filepath(filename);
@@ -776,7 +720,6 @@ mod test {
             let buf = Html::parse_fragment(buf.as_str());
 
             let urls = crawler.extract_urls_from_html(buf);
-
             assert_eq!(urls, expected_urls)
         }
 
@@ -784,7 +727,6 @@ mod test {
         async fn test_single_href() {
             let filename = "extract_single_href.html";
             let expected_urls = vec![String::from("https://www.wikipedia.org/")];
-
             test_and_extract_urls_from_html_file(filename, expected_urls).await;
         }
 
@@ -796,7 +738,6 @@ mod test {
                 String::from("https://www.britannica.com/"),
                 String::from("https://www.youtube.com/"),
             ];
-
             test_and_extract_urls_from_html_file(filename, expected_urls).await;
         }
     }
