@@ -8,7 +8,7 @@ use sqlx::{PgPool, Row};
 use crate::{
     error::CrawlerError,
     page::{CrawledPage, Page, PageQueue},
-    utils::string_to_url,
+    utils::{construct_postgres_url, string_to_url},
 };
 
 #[derive(Clone)]
@@ -287,8 +287,7 @@ impl Crawler {
     /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
     async fn init_crawled_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
-        let url = std::env::var("DATABASE_URL")
-            .expect("DATABASE_URL environment variable should be defined.");
+        let url = construct_postgres_url();
         let url = url.as_str();
 
         let pool = sqlx::postgres::PgPool::connect(url)

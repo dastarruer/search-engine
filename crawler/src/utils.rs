@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use httpmock::prelude::*;
 use reqwest::StatusCode;
-use url::Url;
+use url::{Url, form_urlencoded};
 
 /// An implementation of a mock HTTP server.
 #[cfg(any(test, feature = "bench"))]
@@ -70,4 +70,28 @@ pub(crate) fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
             }
         }
     }
+}
+
+/// Construct a URL to connect to a PostGreSql instance from the following set of environment variables:
+/// - DB_USER
+/// - DB_PASSWORD
+/// - DB_ENDPOINT
+/// - DB_PORT
+/// - DB_NAME
+pub(crate) fn construct_postgres_url() -> String {
+    let endpoint = std::env::var("DB_ENDPOINT").expect("DB_ENDPOINT must be set.");
+    let port = std::env::var("DB_PORT").expect("DB_PORT must be set.");
+    let dbname = std::env::var("DB_NAME").expect("DB_NAME must be set.");
+    let user = std::env::var("DB_USER").expect("DB_USER must be set.");
+    let password = std::env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.");
+
+    // If the password has special characters like '@' or '#' this will convert
+    // them into a URL friendly format
+    let encoded_password: String = form_urlencoded::byte_serialize(password.as_bytes()).collect();
+    let encoded_user: String = form_urlencoded::byte_serialize(user.as_bytes()).collect();
+
+    format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        encoded_user, encoded_password, endpoint, port, dbname
+    )
 }
