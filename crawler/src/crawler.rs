@@ -66,7 +66,7 @@ impl Crawler {
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), CrawlerError> {
-        while let Some(page) = self.queue.pop() {
+        while let Some(page) = self.next_page() {
             match self.crawl_page(page.clone()).await {
                 Ok(crawled_page) => {
                     if let Err(e) = crawled_page.add_to_db(&self.pool).await {
@@ -83,28 +83,13 @@ impl Crawler {
         Ok(())
     }
 
-    /// Perform a test run without writing to the database.
+    /// Returns the next [`Page`] in the queue.
     ///
     /// # Returns
-    /// - Returns `Ok` if no errors happen.
-    /// - Returns `Err` if an untested fatal error happens.
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub async fn test_run(&mut self) -> Result<(), CrawlerError> {
-        while let Some(page) = self.queue.pop() {
-            match self.crawl_page_test(page.clone()).await {
-                Ok(_) => {
-                    log::info!("Crawl successful.");
-                }
-                Err(e) => {
-                    log::warn!("Crawl failed: {}", e);
-                }
-            }
-        }
-
-        log::info!("All done! no more pages left");
-        Ok(())
+    /// - Return `Some(Page)` if a [`Page`] exists in the queue.
+    /// - Returns `None` if the queue is empty.
+    pub fn next_page(&mut self) -> Option<Page> {
+        self.queue.pop()
     }
 
     /// Crawl a single page.
