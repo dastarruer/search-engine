@@ -14,9 +14,8 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new_with_filename(filename: &str) -> Self {
+    pub fn new_with_filepath(filepath: PathBuf) -> Self {
         let server = MockServer::start();
-        let filepath = test_file_path_from_filename(filename);
 
         let _mock = server.mock(|when, then| {
             when.method(GET).header("user-agent", crate::USER_AGENT);
@@ -42,10 +41,8 @@ impl HttpServer {
 }
 
 /// Return the path of a file in src/test-files given just its filename.
-///
-/// # Note
-/// Even though this is public, this method is meant to be used for tests only.
-pub(crate) fn test_file_path_from_filename(filename: &str) -> PathBuf {
+#[cfg(test)]
+pub fn test_file_path_from_filepath(filename: &str) -> PathBuf {
     // CARGO_MANIFEST_DIR gets the source dir of the project
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")

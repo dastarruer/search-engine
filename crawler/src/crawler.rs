@@ -459,11 +459,16 @@ mod test {
     mod is_english {
         use scraper::Html;
 
-        use crate::{crawler::Crawler, page::Page, utils::HttpServer};
+        use crate::{
+            crawler::Crawler,
+            page::Page,
+            utils::{HttpServer, test_file_path_from_filepath},
+        };
 
         #[tokio::test]
         async fn test_non_english_page() {
-            let server = HttpServer::new_with_filename("non_english_page.html");
+            let filepath = test_file_path_from_filepath("non_english_page.html");
+            let server = HttpServer::new_with_filepath(filepath);
 
             let page = Page::from(server.base_url());
             let crawler = Crawler::test_new(page.clone()).await;
@@ -484,7 +489,7 @@ mod test {
         use crate::{
             error::CrawlerError,
             page::Page,
-            utils::{HttpServer, test_file_path_from_filename},
+            utils::{HttpServer, test_file_path_from_filepath},
         };
 
         use super::super::Crawler;
@@ -492,7 +497,8 @@ mod test {
         // Instead of using #[test], we use #[tokio::test] so we can test async functions
         #[tokio::test]
         async fn test_200_status() {
-            let server = HttpServer::new_with_filename("extract_single_href.html");
+            let filepath = test_file_path_from_filepath("extract_single_href.html");
+            let server = HttpServer::new_with_filepath(filepath);
 
             let page = Page::from(server.base_url());
             let crawler = Crawler::test_new(page.clone()).await;
@@ -505,7 +511,7 @@ mod test {
         #[tokio::test]
         async fn test_malformed_status() {
             const EXPECTED_STATUS: StatusCode = StatusCode::NOT_FOUND;
-            let filepath = test_file_path_from_filename("extract_single_href.html");
+            let filepath = test_file_path_from_filepath("extract_single_href.html");
 
             let server = HttpServer::new_with_mock(|when, then| {
                 when.method(GET).header("user-agent", crate::USER_AGENT);
@@ -533,7 +539,8 @@ mod test {
 
         #[tokio::test]
         async fn test_empty_page() {
-            let server: HttpServer = HttpServer::new_with_filename("empty.html");
+            let filepath = test_file_path_from_filepath("empty.html");
+            let server: HttpServer = HttpServer::new_with_filepath(filepath);
 
             let page = Page::from(server.base_url());
             let crawler = Crawler::test_new(page.clone()).await;
@@ -555,13 +562,13 @@ mod test {
                 crawler::Crawler,
                 error::CrawlerError,
                 page::Page,
-                utils::{HttpServer, test_file_path_from_filename},
+                utils::{HttpServer, test_file_path_from_filepath},
             };
 
             #[tokio::test]
             async fn test_429_status() {
                 const TRY_AFTER_SECS: u64 = 1;
-                let filepath = test_file_path_from_filename("extract_single_href.html");
+                let filepath = test_file_path_from_filepath("extract_single_href.html");
 
                 let server = HttpServer::new_with_mock(|when, then| {
                     when.method(GET).header("user-agent", crate::USER_AGENT);
@@ -593,7 +600,7 @@ mod test {
             async fn test_429_status_with_large_retry_after() {
                 // After 60 seconds, just don't bother
                 const TRY_AFTER_SECS: u64 = 61;
-                let filepath = test_file_path_from_filename("extract_single_href.html");
+                let filepath = test_file_path_from_filepath("extract_single_href.html");
 
                 let server = HttpServer::new_with_mock(|when, then| {
                     when.method(GET).header("user-agent", crate::USER_AGENT);
@@ -616,7 +623,7 @@ mod test {
 
             #[tokio::test]
             async fn test_429_status_with_no_header() {
-                let filepath = test_file_path_from_filename("extract_single_href.html");
+                let filepath = test_file_path_from_filepath("extract_single_href.html");
 
                 let server = HttpServer::new_with_mock(|when, then| {
                     when.method(GET).header("user-agent", crate::USER_AGENT);
@@ -644,11 +651,16 @@ mod test {
     mod extract_title_from_html {
         use scraper::Html;
 
-        use crate::{crawler::Crawler, page::Page, utils::HttpServer};
+        use crate::{
+            crawler::Crawler,
+            page::Page,
+            utils::{HttpServer, test_file_path_from_filepath},
+        };
 
         #[tokio::test]
         async fn test_page_with_title() {
-            let server = HttpServer::new_with_filename("page_with_title.html");
+            let filepath = test_file_path_from_filepath("page_with_title.html");
+            let server = HttpServer::new_with_filepath(filepath);
 
             let page = Page::from(server.base_url());
 
@@ -663,7 +675,8 @@ mod test {
 
         #[tokio::test]
         async fn test_page_without_title() {
-            let server = HttpServer::new_with_filename("non_english_page.html");
+            let filepath = test_file_path_from_filepath("non_english_page.html");
+            let server = HttpServer::new_with_filepath(filepath);
 
             let page = Page::from(server.base_url());
 
@@ -682,13 +695,17 @@ mod test {
 
         use reqwest::Url;
 
-        use crate::{page::Page, utils::HttpServer};
+        use crate::{
+            page::Page,
+            utils::{HttpServer, test_file_path_from_filepath},
+        };
 
         use super::super::Crawler;
 
         #[tokio::test]
         async fn test_basic_site() {
-            let server = HttpServer::new_with_filename("extract_single_href.html");
+            let filepath = test_file_path_from_filepath("extract_single_href.html");
+            let server = HttpServer::new_with_filepath(filepath);
 
             let page = Page::from(server.base_url());
 
@@ -708,7 +725,8 @@ mod test {
 
         #[tokio::test]
         async fn test_already_visited_url() {
-            let server = HttpServer::new_with_filename("extract_single_href.html");
+            let filepath = test_file_path_from_filepath("extract_single_href.html");
+            let server = HttpServer::new_with_filepath(filepath);
 
             let page = Page::from(server.base_url());
             let mut crawler = Crawler::test_new(page.clone()).await;
@@ -736,7 +754,7 @@ mod test {
         use reqwest::Url;
         use scraper::Html;
 
-        use crate::{page::Page, utils::test_file_path_from_filename};
+        use crate::{page::Page, utils::test_file_path_from_filepath};
 
         use super::super::Crawler;
 
@@ -747,7 +765,7 @@ mod test {
 
             let crawler = Crawler::test_new(page).await;
 
-            let html_file = test_file_path_from_filename(filename);
+            let html_file = test_file_path_from_filepath(filename);
 
             let error_msg = format!("'{}' should exist.", filename);
             let error_msg = error_msg.as_str();

@@ -8,9 +8,14 @@ fn bench_crawl_from_page(c: &mut Criterion) {
         .build()
         .unwrap();
 
+    let index = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("benches")
+        .join("files")
+        .join("index.html");
+
     c.bench_function("crawl_from_page", |b| {
         b.to_async(&runtime).iter(|| async {
-            let server = HttpServer::new_with_filename("benchmarks/index.html");
+            let server = HttpServer::new_with_filepath(index.clone());
 
             let page = Page::from(server.base_url());
 
@@ -28,9 +33,14 @@ fn bench_test_run(c: &mut Criterion) {
         .build()
         .unwrap();
 
+    let index = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("benches")
+        .join("files")
+        .join("index.html");
+
     c.bench_function("test_run", |b| {
         b.to_async(&runtime).iter(|| async {
-            let server = HttpServer::new_with_filename("benchmarks/index.html");
+            let server = HttpServer::new_with_filepath(index.clone());
 
             let page = Page::from(server.base_url());
 
