@@ -1,6 +1,6 @@
 services:
   crawler:
-    build: .
+    build: ./crawler
     environment:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
@@ -23,13 +23,3 @@ services:
     image: postgres:latest
     environment:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-    # Tells docker how to connect to the db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${DB_PORT}:${DB_PORT}"
-
-# Tells docker to create a volume
-# A folder on our computer which stores data that can be accessed by other docker containers
-volumes:
-  postgres_data:
