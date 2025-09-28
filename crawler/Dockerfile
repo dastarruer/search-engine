@@ -1,5 +1,5 @@
 # Use rust base image
-FROM rust:1.89
+FROM rust:latest
 
 # Cd into src
 WORKDIR /usr/src/crawler
