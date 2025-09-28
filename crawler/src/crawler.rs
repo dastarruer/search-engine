@@ -268,7 +268,8 @@ impl Crawler {
 
         let queued_pages_query = r#"
             SELECT url FROM pages
-            WHERE is_crawled = FALSE;"#;
+            WHERE is_crawled = FALSE
+            LIMIT 100;"#;
 
         // Query the database for all the queued urls
         let mut rows: Vec<Page> = sqlx::query(queued_pages_query)
