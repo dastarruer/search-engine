@@ -1,4 +1,3 @@
-// TODO: Figure out how to mark this as tests/benchmarks only, so httpmock becomes a dev-dependency
 use std::path::PathBuf;
 
 use httpmock::prelude::*;
@@ -11,6 +10,7 @@ pub struct HttpServer {
     server: MockServer,
 }
 
+#[cfg(any(test, feature = "bench"))]
 impl HttpServer {
     pub fn new_with_filepath(filepath: PathBuf) -> Self {
         let server = MockServer::start();
