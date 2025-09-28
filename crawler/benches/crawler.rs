@@ -1,26 +1,6 @@
 use crawler::{crawler::Crawler, page::Page, utils::HttpServer};
 use criterion::{Criterion, criterion_group, criterion_main};
 
-/// Perform a test run without writing to the database.
-///
-/// # Returns
-/// - Returns `Ok` if no errors happen.
-/// - Returns `Err` if an untested fatal error happens.
-async fn test_run(crawler: &mut Crawler) {
-    while let Some(page) = crawler.next_page() {
-        match crawler.crawl_page_test(page.clone()).await {
-            Ok(_) => {
-                log::info!("Crawl successful.");
-            }
-            Err(e) => {
-                log::warn!("Crawl failed: {}", e);
-            }
-        }
-    }
-
-    log::info!("All done! no more pages left");
-}
-
 /// Benchmark crawling a single page
 fn bench_crawl_from_page(c: &mut Criterion) {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -66,7 +46,7 @@ fn bench_test_run(c: &mut Criterion) {
 
             let mut crawler = Crawler::test_new(page.clone()).await;
 
-            test_run(&mut crawler).await;
+            crawler.test_run().await;
         })
     });
 }

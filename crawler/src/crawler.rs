@@ -37,29 +37,6 @@ impl Crawler {
         }
     }
 
-    /// Create a test instance of a [`Crawler`], which uses an empty [`HashSet`] for `crawled`, making new instances much faster to create.
-    /// Also uses [`PgPool::connect_lazy`] to create a connection, which is much faster and lightweight.
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub async fn test_new(starting_url: Page) -> Self {
-        let url = "postgres://search_db_user:123@localhost:5432/search_db";
-        let pool = sqlx::postgres::PgPool::connect_lazy(url).unwrap();
-
-        let queue = Self::init_queue_test(vec![starting_url]);
-
-        let crawled = HashSet::new();
-
-        let client = Self::init_client();
-
-        Crawler {
-            queue,
-            crawled,
-            pool,
-            client,
-        }
-    }
-
     /// Run the main loop of the Crawler.
     ///
     /// # Returns
@@ -99,10 +76,7 @@ impl Crawler {
     /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - The [`Page`] is not in English.
     /// - [`Crawler::extract_html_from_page`] fails.
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
+    pub(crate) async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
         let html = Html::parse_fragment(html.as_str());
@@ -135,58 +109,6 @@ impl Crawler {
                 log::warn!("Error with queueing page: {}", e);
                 continue;
             };
-
-            log::info!("{} is queued", page.url);
-
-            // Add the page to self.crawled, so that it is never crawled again
-            self.crawled.insert(page);
-        }
-
-        log::info!("Crawled {:?}...", base_url);
-
-        Ok(page.into_crawled(title, html.html()))
-    }
-
-    /// Crawl a single page without writing to the database.
-    ///
-    /// # Errors
-    /// This function returns a [`CrawlerError`] if:
-    /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
-    /// - The [`Page`] is not in English.
-    /// - [`Crawler::extract_html_from_page`] fails.
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub async fn crawl_page_test(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
-        let html = self.extract_html_from_page(page.clone()).await?;
-
-        let html = Html::parse_fragment(html.as_str());
-
-        if !Self::is_english(html.clone()) {
-            return Err(CrawlerError::NonEnglishPage(page));
-        }
-
-        let title = Self::extract_title_from_html(html.clone());
-        let urls = self.extract_urls_from_html(html.clone());
-
-        let base_url = page.url.clone();
-
-        for url in urls {
-            let url = string_to_url(&base_url, url);
-
-            let page = if let Some(url) = url {
-                Page::from(url)
-            } else {
-                continue;
-            };
-
-            if self.crawled.contains(&page) || self.is_page_queued(&page) {
-                log::warn!("{} is a duplicate", page.url);
-                continue;
-            }
-
-            // Add the page to the queue of pages to crawl
-            self.queue.queue_page_test(page.clone());
 
             log::info!("{} is queued", page.url);
 
@@ -362,16 +284,6 @@ impl Crawler {
         queue
     }
 
-    fn init_queue_test(starting_urls: Vec<Page>) -> PageQueue {
-        let mut queue = PageQueue::default();
-
-        for url in starting_urls {
-            queue.queue_page_test(url);
-        }
-
-        queue
-    }
-
     /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
     async fn init_crawled_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
@@ -436,6 +348,113 @@ impl Crawler {
         } else {
             Ok(Some(html))
         }
+    }
+}
+
+// Methods for benchmarks
+#[cfg(feature = "bench")]
+impl Crawler {
+    fn init_queue_test(starting_urls: Vec<Page>) -> PageQueue {
+        let mut queue = PageQueue::default();
+
+        for url in starting_urls {
+            queue.queue_page_test(url);
+        }
+
+        queue
+    }
+
+    /// Perform a test run without writing to the database.
+    ///
+    /// # Returns
+    /// - Returns `Ok` if no errors happen.
+    /// - Returns `Err` if an untested fatal error happens.
+    pub async fn test_run(&mut self) {
+        while let Some(page) = self.next_page() {
+            match self.crawl_page_test(page.clone()).await {
+                Ok(_) => {
+                    log::info!("Crawl successful.");
+                }
+                Err(e) => {
+                    log::warn!("Crawl failed: {}", e);
+                }
+            }
+        }
+
+        log::info!("All done! no more pages left");
+    }
+}
+
+// Methods for tests and benchmarks
+#[cfg(any(test, feature = "bench"))]
+impl Crawler {
+    /// Create a test instance of a [`Crawler`], which uses an empty [`HashSet`] for `crawled`, making new instances much faster to create.
+    /// Also uses [`PgPool::connect_lazy`] to create a connection, which is much faster and lightweight.
+    pub async fn test_new(starting_url: Page) -> Self {
+        let url = "postgres://search_db_user:123@localhost:5432/search_db";
+        let pool = sqlx::postgres::PgPool::connect_lazy(url).unwrap();
+
+        let queue = Self::init_queue_test(vec![starting_url]);
+
+        let crawled = HashSet::new();
+
+        let client = Self::init_client();
+
+        Crawler {
+            queue,
+            crawled,
+            pool,
+            client,
+        }
+    }
+
+    /// Crawl a single page without writing to the database.
+    ///
+    /// # Errors
+    /// This function returns a [`CrawlerError`] if:
+    /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
+    /// - The [`Page`] is not in English.
+    /// - [`Crawler::extract_html_from_page`] fails.
+    pub async fn crawl_page_test(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
+        let html = self.extract_html_from_page(page.clone()).await?;
+
+        let html = Html::parse_fragment(html.as_str());
+
+        if !Self::is_english(html.clone()) {
+            return Err(CrawlerError::NonEnglishPage(page));
+        }
+
+        let title = Self::extract_title_from_html(html.clone());
+        let urls = self.extract_urls_from_html(html.clone());
+
+        let base_url = page.url.clone();
+
+        for url in urls {
+            let url = string_to_url(&base_url, url);
+
+            let page = if let Some(url) = url {
+                Page::from(url)
+            } else {
+                continue;
+            };
+
+            if self.crawled.contains(&page) || self.is_page_queued(&page) {
+                log::warn!("{} is a duplicate", page.url);
+                continue;
+            }
+
+            // Add the page to the queue of pages to crawl
+            self.queue.queue_page_test(page.clone());
+
+            log::info!("{} is queued", page.url);
+
+            // Add the page to self.crawled, so that it is never crawled again
+            self.crawled.insert(page);
+        }
+
+        log::info!("Crawled {:?}...", base_url);
+
+        Ok(page.into_crawled(title, html.html()))
     }
 }
 

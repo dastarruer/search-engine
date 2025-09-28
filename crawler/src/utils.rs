@@ -6,9 +6,7 @@ use reqwest::StatusCode;
 use url::Url;
 
 /// An implementation of a mock HTTP server.
-///
-/// # Note
-/// Even though this is public, this method is meant to be used for benchmarks and tests only.
+#[cfg(any(test, feature = "bench"))]
 pub struct HttpServer {
     server: MockServer,
 }
