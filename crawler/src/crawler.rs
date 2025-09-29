@@ -89,8 +89,8 @@ impl Crawler {
             return Err(CrawlerError::AdultSite(page));
         }
 
-        let title = Self::extract_title_from_html(html.clone());
-        let urls = self.extract_urls_from_html(html.clone());
+        let title = Self::extract_title_from_html(&html);
+        let urls = self.extract_urls_from_html(&html);
 
         let base_url = page.url.clone();
 
@@ -125,7 +125,7 @@ impl Crawler {
         Ok(page.into_crawled(title, html.html()))
     }
 
-    fn extract_title_from_html(html: Html) -> Option<String> {
+    fn extract_title_from_html(html: &Html) -> Option<String> {
         let selector = Selector::parse("title").unwrap();
 
         let element = html.select(&selector).next();
@@ -249,7 +249,7 @@ impl Crawler {
             })
     }
 
-    fn extract_urls_from_html(&self, html: Html) -> Vec<String> {
+    fn extract_urls_from_html(&self, html: &Html) -> Vec<String> {
         let mut urls = vec![];
 
         let selector = Selector::parse("a").unwrap();
@@ -436,8 +436,8 @@ impl Crawler {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
-        let title = Self::extract_title_from_html(html.clone());
-        let urls = self.extract_urls_from_html(html.clone());
+        let title = Self::extract_title_from_html(&html);
+        let urls = self.extract_urls_from_html(&html);
 
         let base_url = page.url.clone();
 
@@ -678,7 +678,7 @@ mod test {
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
-            let title = Crawler::extract_title_from_html(html).unwrap();
+            let title = Crawler::extract_title_from_html(&html).unwrap();
 
             assert!(title.contains("a page with a title"))
         }
@@ -689,7 +689,7 @@ mod test {
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
-            let title = Crawler::extract_title_from_html(html);
+            let title = Crawler::extract_title_from_html(&html);
 
             assert!(title.is_none())
         }
@@ -753,7 +753,7 @@ mod test {
             html.read_to_string(&mut buf).unwrap();
             let buf = Html::parse_fragment(buf.as_str());
 
-            let urls = crawler.extract_urls_from_html(buf);
+            let urls = crawler.extract_urls_from_html(&buf);
             assert_eq!(urls, expected_urls)
         }
 
