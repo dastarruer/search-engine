@@ -221,7 +221,7 @@ impl Crawler {
 
     /// Checks URL domain against a list of blocked keywords relating to adult content.
     fn is_adult_page(page: &Page) -> bool {
-        let blocked_words = ["porn", "xxx", "sex", "adult"];
+        let blocked_words = ["porn", "xxx", "sex", "adult", "xvideos", ];
         let domain = page.url.as_str().to_lowercase();
 
         blocked_words.iter().any(|s| domain.contains(s))
