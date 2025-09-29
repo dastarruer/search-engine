@@ -1,5 +1,5 @@
 use std::collections::{HashSet, VecDeque};
-use url::Url;
+use reqwest::Url;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Page {

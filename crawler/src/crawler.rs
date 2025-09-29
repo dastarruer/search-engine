@@ -503,7 +503,7 @@ mod test {
     }
 
     mod is_adult {
-        use url::Url;
+        use reqwest::Url;
 
         use super::*;
 

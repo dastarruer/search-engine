@@ -350,7 +350,6 @@ dependencies = [
  "sqlx",
  "thiserror",
  "tokio",
- "url",
 ]
 
 [[package]]
