@@ -81,7 +81,7 @@ impl Crawler {
 
         let html = Html::parse_fragment(html.as_str());
 
-        if !Self::is_english(html.clone()) {
+        if !Self::is_english(&html) {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
@@ -133,7 +133,7 @@ impl Crawler {
         element.map(|element| element.text().collect::<String>())
     }
 
-    fn is_english(html: Html) -> bool {
+    fn is_english(html: &Html) -> bool {
         let selector = Selector::parse("html").unwrap();
 
         for element in html.select(&selector) {
@@ -432,7 +432,7 @@ impl Crawler {
 
         let html = Html::parse_fragment(html.as_str());
 
-        if !Self::is_english(html.clone()) {
+        if !Self::is_english(&html) {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
@@ -498,7 +498,7 @@ mod test {
             let html = crawler.extract_html_from_page(page).await.unwrap();
             let html = Html::parse_fragment(html.as_str());
 
-            assert!(!Crawler::is_english(html));
+            assert!(!Crawler::is_english(&html));
         }
     }
 
