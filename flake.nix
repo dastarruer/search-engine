@@ -44,19 +44,11 @@
 
           # Required for reqwest crate
           openssl
-
-          # Simple script to connect to postgresql database
-          (writeShellScriptBin "connect" ''
-            psql -h localhost -p 5432 -U search_db_user -d search_db
-          '')
         ];
 
         env = {
           # Required by rust-analyzer
           RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
-
-          # Required by the program to connect to the db
-          DATABASE_URL = "postgresql://postgres:123@localhost:5432/postgres";
         };
       };
       nativeBuildInputs = with pkgs; [pkg-config];
