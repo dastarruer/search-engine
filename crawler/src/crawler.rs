@@ -81,7 +81,7 @@ impl Crawler {
 
         let html = Html::parse_fragment(html.as_str());
 
-        if !Self::is_english(html.clone()) {
+        if !Self::is_english(&html) {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
@@ -89,8 +89,8 @@ impl Crawler {
             return Err(CrawlerError::AdultSite(page));
         }
 
-        let title = Self::extract_title_from_html(html.clone());
-        let urls = self.extract_urls_from_html(html.clone());
+        let title = Self::extract_title_from_html(&html);
+        let urls = self.extract_urls_from_html(&html);
 
         let base_url = page.url.clone();
 
@@ -125,7 +125,7 @@ impl Crawler {
         Ok(page.into_crawled(title, html.html()))
     }
 
-    fn extract_title_from_html(html: Html) -> Option<String> {
+    fn extract_title_from_html(html: &Html) -> Option<String> {
         let selector = Selector::parse("title").unwrap();
 
         let element = html.select(&selector).next();
@@ -133,7 +133,7 @@ impl Crawler {
         element.map(|element| element.text().collect::<String>())
     }
 
-    fn is_english(html: Html) -> bool {
+    fn is_english(html: &Html) -> bool {
         let selector = Selector::parse("html").unwrap();
 
         for element in html.select(&selector) {
@@ -221,7 +221,7 @@ impl Crawler {
 
     /// Checks URL domain against a list of blocked keywords relating to adult content.
     fn is_adult_page(page: &Page) -> bool {
-        let blocked_words = ["porn", "xxx", "sex", "adult"];
+        let blocked_words = ["porn", "xxx", "sex", "adult", "xvideos"];
         let domain = page.url.as_str().to_lowercase();
 
         blocked_words.iter().any(|s| domain.contains(s))
@@ -249,7 +249,7 @@ impl Crawler {
             })
     }
 
-    fn extract_urls_from_html(&self, html: Html) -> Vec<String> {
+    fn extract_urls_from_html(&self, html: &Html) -> Vec<String> {
         let mut urls = vec![];
 
         let selector = Selector::parse("a").unwrap();
@@ -432,12 +432,12 @@ impl Crawler {
 
         let html = Html::parse_fragment(html.as_str());
 
-        if !Self::is_english(html.clone()) {
+        if !Self::is_english(&html) {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
-        let title = Self::extract_title_from_html(html.clone());
-        let urls = self.extract_urls_from_html(html.clone());
+        let title = Self::extract_title_from_html(&html);
+        let urls = self.extract_urls_from_html(&html);
 
         let base_url = page.url.clone();
 
@@ -498,12 +498,12 @@ mod test {
             let html = crawler.extract_html_from_page(page).await.unwrap();
             let html = Html::parse_fragment(html.as_str());
 
-            assert!(!Crawler::is_english(html));
+            assert!(!Crawler::is_english(&html));
         }
     }
 
     mod is_adult {
-        use url::Url;
+        use reqwest::Url;
 
         use super::*;
 
@@ -678,7 +678,7 @@ mod test {
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
-            let title = Crawler::extract_title_from_html(html).unwrap();
+            let title = Crawler::extract_title_from_html(&html).unwrap();
 
             assert!(title.contains("a page with a title"))
         }
@@ -689,7 +689,7 @@ mod test {
 
             let html =
                 Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
-            let title = Crawler::extract_title_from_html(html);
+            let title = Crawler::extract_title_from_html(&html);
 
             assert!(title.is_none())
         }
@@ -753,7 +753,7 @@ mod test {
             html.read_to_string(&mut buf).unwrap();
             let buf = Html::parse_fragment(buf.as_str());
 
-            let urls = crawler.extract_urls_from_html(buf);
+            let urls = crawler.extract_urls_from_html(&buf);
             assert_eq!(urls, expected_urls)
         }
 

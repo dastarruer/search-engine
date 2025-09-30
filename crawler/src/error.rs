@@ -1,6 +1,6 @@
 use reqwest::{StatusCode, header::HeaderValue};
 use thiserror::Error;
-use url::Url;
+use reqwest::Url;
 
 use crate::page::Page;
 
