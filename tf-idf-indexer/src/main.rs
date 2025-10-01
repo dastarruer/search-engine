@@ -6,11 +6,12 @@ use scraper::{Html, Selector};
 struct Term<'a> {
     term: &'a str,
     idf: i32,
+    document_frequency: i32
 }
 
 impl<'a> Term<'a> {
     fn new(term: &'a str) -> Self {
-        Term { term, idf: 0 }
+        Term { term, idf: 0, document_frequency: 0 }
     }
 
     ///  Find the number of times that a [`Term`] appears in a given HTML document.
