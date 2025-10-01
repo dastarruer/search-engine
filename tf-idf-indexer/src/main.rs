@@ -4,17 +4,27 @@ use std::path::PathBuf;
 use scraper::{Html, Selector};
 
 struct Term<'a> {
-    term: &'a str,
+    pub term: &'a str,
+
+    /// The inverse document frequency of a term.
+    ///
+    /// This measures how rare a term is across documents. If the term appears in many documents, then the IDF is low. If the term only appears in one or two documents, the IDF is high.
     idf: i32,
-    document_frequency: i32
+
+    /// The amount of documents that contain this term. Used for calculating [`Term::idf`].
+    document_frequency: i32,
 }
 
 impl<'a> Term<'a> {
     fn new(term: &'a str) -> Self {
-        Term { term, idf: 0, document_frequency: 0 }
+        Term {
+            term,
+            idf: 0,
+            document_frequency: 0,
+        }
     }
 
-    ///  Find the number of times that a [`Term`] appears in a given HTML document.
+    /// Find the number of times that a [`Term`] appears in a given HTML document.
     ///
     /// This is called the *term frequency* of a term.
     fn get_tf_in_html(&self, document: Html) -> i32 {
