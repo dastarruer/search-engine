@@ -13,6 +13,9 @@ impl<'a> Term<'a> {
         Term { term, idf: 0 }
     }
 
+    ///  Find the number of times that a [`Term`] appears in a given HTML document.
+    ///
+    /// This is called the *term frequency* of a term.
     fn get_tf_in_html(&self, document: Html) -> i32 {
         let selector = Selector::parse("body").unwrap();
 
