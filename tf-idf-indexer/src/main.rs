@@ -1,6 +1,3 @@
-#[cfg(test)]
-use std::path::PathBuf;
-
 use scraper::{Html, Selector};
 
 struct Term<'a> {
@@ -9,7 +6,7 @@ struct Term<'a> {
     /// The inverse document frequency of a term.
     ///
     /// This measures how rare a term is across documents. If the term appears in many documents, then the IDF is low. If the term only appears in one or two documents, the IDF is high.
-    idf: i32,
+    idf: f32,
 
     /// The amount of documents that contain this term. Used for calculating [`Term::idf`].
     document_frequency: i32,
@@ -19,7 +16,7 @@ impl<'a> Term<'a> {
     fn new(term: &'a str) -> Self {
         Term {
             term,
-            idf: 0,
+            idf: 0.0,
             document_frequency: 0,
         }
     }
@@ -45,13 +42,17 @@ impl<'a> Term<'a> {
 
         count
     }
+
+    fn update_idf(&mut self, num_documents: i32) {
+        self.idf = f32::log10((num_documents / self.document_frequency) as f32);
+    }
 }
 
 /// Return the path of a file in src/test-files given just its filename.
 #[cfg(test)]
-pub fn test_file_path_from_filepath(filename: &str) -> PathBuf {
+pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
     // CARGO_MANIFEST_DIR gets the source dir of the project
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
         .join("test-files")
         .join(filename)
@@ -77,5 +78,15 @@ mod test {
         let term = Term::new("hello");
 
         assert_eq!(term.get_tf_in_html(html), 4);
+    }
+
+    #[test]
+    fn test_update_idf() {
+        let mut term = Term::new("hello");
+        term.document_frequency = 2;
+
+        term.update_idf(2);
+
+        assert_eq!(term.idf, 0.0);
     }
 }
