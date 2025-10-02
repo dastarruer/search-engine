@@ -1,4 +1,7 @@
-use scraper::{Html, Selector};
+use once_cell::sync::Lazy;
+use scraper::{Html, Selector, html::Select};
+
+static BODY_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body").unwrap());
 
 struct Term<'a> {
     pub term: &'a str,
@@ -21,15 +24,11 @@ impl<'a> Term<'a> {
         }
     }
 
-    /// Find the number of times that a [`Term`] appears in a given HTML document.
+    /// Find the number of times that a [`Term`] appears in a given piece of text.
     ///
     /// This is called the *term frequency* of a term.
-    fn get_tf_in_html(&self, document: Html) -> i32 {
-        let selector = Selector::parse("body").unwrap();
-
-        document
-            .select(&selector)
-            .flat_map(|e| e.text()) // flatten text nodes
+    fn get_tf<'b>(&self, text: Select<'a, 'b>) -> i32 {
+        text.flat_map(|e| e.text()) // flatten text nodes
             .flat_map(|t| t.split_whitespace()) // flatten words
             .filter(|word| word == &self.term)
             .count() as i32
@@ -50,6 +49,21 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
         .join(filename)
 }
 
+trait ExtractText {
+    fn extract_text<'a, 'b>(&'a self) -> Select<'a, 'static>
+    where
+        'a: 'b;
+}
+
+impl ExtractText for Html {
+    fn extract_text<'a, 'b>(&'a self) -> Select<'a, 'static>
+    where
+        'a: 'b,
+    {
+        self.select(&BODY_SELECTOR)
+    }
+}
+
 fn main() {
     println!("Hello, world!");
 }
@@ -60,7 +74,7 @@ mod test {
 
     use scraper::Html;
 
-    use crate::{Term, test_file_path_from_filepath};
+    use crate::{ExtractText, Term, test_file_path_from_filepath};
 
     #[test]
     fn test_get_tf_in_html() {
@@ -69,7 +83,7 @@ mod test {
 
         let term = Term::new("hello");
 
-        assert_eq!(term.get_tf_in_html(html), 4);
+        assert_eq!(term.get_tf(html.extract_text()), 4);
     }
 
     #[test]
