@@ -27,20 +27,12 @@ impl<'a> Term<'a> {
     fn get_tf_in_html(&self, document: Html) -> i32 {
         let selector = Selector::parse("body").unwrap();
 
-        let mut count = 0;
-
-        // TODO: Convert from loop to iterator
-        for element in document.select(&selector) {
-            for sentence in element.text() {
-                for word in sentence.split_whitespace() {
-                    if word == self.term {
-                        count += 1;
-                    }
-                }
-            }
-        }
-
-        count
+        document
+            .select(&selector)
+            .flat_map(|e| e.text()) // flatten text nodes
+            .flat_map(|t| t.split_whitespace()) // flatten words
+            .filter(|word| word == &self.term)
+            .count() as i32
     }
 
     fn update_idf(&mut self, num_documents: i32) {
