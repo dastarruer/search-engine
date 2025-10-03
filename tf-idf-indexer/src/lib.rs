@@ -38,7 +38,9 @@ impl<'a> Term<'a> {
     ///
     /// This is called the *term frequency* of a term.
     fn get_tf<'b>(&self, text: &Vec<Term>) -> i32 {
-        text.iter().filter(|t| t.term == self.term).count() as i32
+        text.iter()
+            .filter(|t| t.term.eq_ignore_ascii_case(self.term))
+            .count() as i32
     }
 
     fn update_idf(&mut self, num_documents: i32) {
@@ -110,7 +112,11 @@ mod test {
                 <p>hippopotamus hippopotamus hippopotamus</p>
             </body>"#,
         );
-        let expected_terms = vec![Term::new("hippopotamus"), Term::new("hippopotamus"), Term::new("hippopotamus")];
+        let expected_terms = vec![
+            Term::new("hippopotamus"),
+            Term::new("hippopotamus"),
+            Term::new("hippopotamus"),
+        ];
 
         assert_eq!(html.extract_relevant_terms(), expected_terms);
     }
