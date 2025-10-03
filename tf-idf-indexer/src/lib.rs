@@ -29,7 +29,7 @@ impl<'a> Term<'a> {
     ///
     /// This is called the *term frequency* of a term.
     fn get_tf<'b>(&self, text: &Vec<Term>) -> i32 {
-        text.iter().filter(|t| t == &self).count() as i32
+        text.iter().filter(|t| t.term == self.term).count() as i32
     }
 
     fn update_idf(&mut self, num_documents: i32) {
