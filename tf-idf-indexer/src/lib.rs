@@ -46,13 +46,21 @@ impl Term {
 
     /// Find the number of times that a [`Term`] appears in a given piece of text.
     ///
-    /// This is called the *term frequency* of a term.
+    /// This is called the *term frequency* of a term. This is useful when
+    /// calculating the TF-IDF score of a term, which is used to check how
+    /// frequent a [`Term`] is in one document, and how rare it is in other
+    /// documents.
     fn get_tf<'b>(&self, text: &Vec<Term>) -> i32 {
         text.iter()
             .filter(|t| t.term.eq_ignore_ascii_case(&self.term))
             .count() as i32
     }
 
+    /// Update the IDF score of a [`Term`] (see [`Term::idf`] for more details).
+    ///
+    /// This is useful when calculating the TF-IDF score of a term, which is
+    /// used to check how frequent a [`Term`] is in one document, and how rare
+    /// it is in other documents.
     fn update_idf(&mut self, num_documents: i32) {
         let idf = num_documents as f32 / self.document_frequency as f32;
         self.idf = OrderedFloat(idf.log10());
