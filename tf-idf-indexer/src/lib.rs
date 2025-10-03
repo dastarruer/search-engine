@@ -1,35 +1,45 @@
 use std::collections::HashSet;
 
 use once_cell::sync::Lazy;
+use ordered_float::OrderedFloat;
 use scraper::{Html, Selector};
 
 static BODY_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body").unwrap());
 
-static STOP_WORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+static STOP_WORDS: Lazy<HashSet<Term>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
         .iter()
         .copied()
+        .map(|t| Term::new(t.to_string()))
         .collect()
 });
 
-#[derive(PartialEq, Debug)]
-struct Term<'a> {
-    pub term: &'a str,
+mod helper {
+    #[allow(non_camel_case_types)]
+    pub type f32_helper = f32;
+}
+#[allow(non_camel_case_types)]
+// This float type allows us to implement `Hash` for `Term`, so we can put it in a `HashSet`
+type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+struct Term {
+    pub term: String,
 
     /// The inverse document frequency of a term.
     ///
     /// This measures how rare a term is across documents. If the term appears in many documents, then the IDF is low. If the term only appears in one or two documents, the IDF is high.
-    idf: f32,
+    idf: ordered_f32,
 
     /// The amount of documents that contain this term. Used for calculating [`Term::idf`].
     document_frequency: i32,
 }
 
-impl<'a> Term<'a> {
-    fn new(term: &'a str) -> Self {
+impl Term {
+    fn new(term: String) -> Self {
         Term {
             term,
-            idf: 0.0,
+            idf: ordered_float::OrderedFloat(0.0),
             document_frequency: 0,
         }
     }
@@ -39,12 +49,13 @@ impl<'a> Term<'a> {
     /// This is called the *term frequency* of a term.
     fn get_tf<'b>(&self, text: &Vec<Term>) -> i32 {
         text.iter()
-            .filter(|t| t.term.eq_ignore_ascii_case(self.term))
+            .filter(|t| t.term.eq_ignore_ascii_case(&self.term))
             .count() as i32
     }
 
     fn update_idf(&mut self, num_documents: i32) {
-        self.idf = f32::log10((num_documents / self.document_frequency) as f32);
+        let idf = num_documents as f32 / self.document_frequency as f32;
+        self.idf = OrderedFloat(idf.log10());
     }
 
     /// Checks if the `Term` is a stop word.
@@ -53,7 +64,7 @@ impl<'a> Term<'a> {
     /// These words are not necessary to index, since they carry little semantic meaning. These can therefore be filtered
     /// out.
     fn is_stop_word(&self) -> bool {
-        STOP_WORDS.contains(&self.term)
+        STOP_WORDS.contains(&self)
     }
 }
 
@@ -68,7 +79,7 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
 }
 
 trait ExtractTerms {
-    fn extract_relevant_terms(&self) -> Vec<Term<'_>>;
+    fn extract_relevant_terms(&self) -> Vec<Term>;
 }
 
 impl ExtractTerms for Html {
@@ -76,7 +87,7 @@ impl ExtractTerms for Html {
     ///
     /// First filters out common 'stop words' (see [`Term::is_stop_word`] for more information), and then returns the resulting list of [`Term`]s.
     // TODO: Strip punctuation
-    fn extract_relevant_terms(&self) -> Vec<Term<'_>> {
+    fn extract_relevant_terms(&self) -> Vec<Term> {
         self.select(&BODY_SELECTOR)
             .flat_map(|e| e.text())
             .flat_map(|t| t.split_whitespace())
@@ -100,7 +111,7 @@ mod test {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();
         let html = Html::parse_document(html.as_str());
 
-        let term = Term::new("hippopotamus");
+        let term = Term::new(String::from("hippopotamus"));
 
         assert_eq!(term.get_tf(&html.extract_relevant_terms()), 4);
     }
@@ -114,9 +125,9 @@ mod test {
             </body>"#,
         );
         let expected_terms = vec![
-            Term::new("hippopotamus"),
-            Term::new("hippopotamus"),
-            Term::new("hippopotamus"),
+            Term::new(String::from("hippopotamus")),
+            Term::new(String::from("hippopotamus")),
+            Term::new(String::from("hippopotamus")),
         ];
 
         assert_eq!(html.extract_relevant_terms(), expected_terms);
@@ -124,7 +135,7 @@ mod test {
 
     #[test]
     fn test_update_idf() {
-        let mut term = Term::new("hippopotamus");
+        let mut term = Term::new(String::from("hippopotamus"));
         term.document_frequency = 2;
 
         term.update_idf(2);
@@ -140,7 +151,10 @@ mod test {
 
         let terms = html.extract_relevant_terms();
 
-        let included_terms = vec![Term::new("hippopotamus"), Term::new("ladder")];
+        let included_terms = vec![
+            Term::new(String::from("hippopotamus")),
+            Term::new(String::from("ladder")),
+        ];
 
         assert_eq!(terms, included_terms);
     }
