@@ -1,9 +1,18 @@
+use std::collections::HashSet;
+
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
 
 static BODY_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body").unwrap());
 
-#[derive(PartialEq)]
+static STOP_WORDS: Lazy<HashSet<&'static str>> = Lazy::new(|| {
+    stop_words::get(stop_words::LANGUAGE::English)
+        .iter()
+        .copied()
+        .collect()
+});
+
+#[derive(PartialEq, Debug)]
 struct Term<'a> {
     pub term: &'a str,
 
@@ -35,6 +44,15 @@ impl<'a> Term<'a> {
     fn update_idf(&mut self, num_documents: i32) {
         self.idf = f32::log10((num_documents / self.document_frequency) as f32);
     }
+
+    /// Checks if the `Term` is a stop word.
+    ///
+    /// A stop word is a common word such as 'is,' 'was,' 'has,' etc.
+    /// These words are not necessary to index, since they carry little semantic meaning. These can therefore be filtered
+    /// out.
+    fn is_stop_word(&self) -> bool {
+        STOP_WORDS.contains(&self.term)
+    }
 }
 
 /// Return the path of a file in src/test-files given just its filename.
@@ -48,15 +66,21 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
 }
 
 trait ExtractTerms {
-    fn extract_terms(&self) -> Vec<Term<'_>>;
+    fn extract_relevant_terms(&self) -> Vec<Term<'_>>;
 }
 
 impl ExtractTerms for Html {
-    fn extract_terms(&self) -> Vec<Term<'_>>
-    {
-        self.select(&BODY_SELECTOR).flat_map(|e| e.text())
-            .flat_map(|t| t.split_whitespace()).map(Term::new).collect()
-
+    /// Extract relevant [`Term`]s from [`Html`].
+    ///
+    /// First filters out common 'stop words' (see [`Term::is_stop_word`] for more information), and then returns the resulting list of [`Term`]s.
+    // TODO: Strip punctuation
+    fn extract_relevant_terms(&self) -> Vec<Term<'_>> {
+        self.select(&BODY_SELECTOR)
+            .flat_map(|e| e.text())
+            .flat_map(|t| t.split_whitespace())
+            .map(|t| Term::new(t.trim()))
+            .filter(|t| !t.is_stop_word())
+            .collect()
     }
 }
 
@@ -69,22 +93,48 @@ mod test {
     use crate::{ExtractTerms, Term, test_file_path_from_filepath};
 
     #[test]
-    fn test_get_tf_in_html() {
+    fn test_get_tf_of_term() {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();
         let html = Html::parse_document(html.as_str());
 
-        let term = Term::new("hello");
+        let term = Term::new("hippopotamus");
 
-        assert_eq!(term.get_tf(&html.extract_terms()), 4);
+        assert_eq!(term.get_tf(&html.extract_relevant_terms()), 4);
+    }
+
+    #[test]
+    fn test_extract_terms() {
+        let html = Html::parse_document(
+            r#"
+            <body>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+        );
+        let expected_terms = vec![Term::new("hippopotamus"), Term::new("hippopotamus"), Term::new("hippopotamus")];
+
+        assert_eq!(html.extract_relevant_terms(), expected_terms);
     }
 
     #[test]
     fn test_update_idf() {
-        let mut term = Term::new("hello");
+        let mut term = Term::new("hippopotamus");
         term.document_frequency = 2;
 
         term.update_idf(2);
 
         assert_eq!(term.idf, 0.0);
+    }
+
+    #[test]
+    fn test_filter_stop_words() {
+        let html =
+            fs::read_to_string(test_file_path_from_filepath("filter_stop_words.html")).unwrap();
+        let html = Html::parse_document(html.as_str());
+
+        let terms = html.extract_relevant_terms();
+
+        let included_terms = vec![Term::new("hippopotamus"), Term::new("ladder")];
+
+        assert_eq!(terms, included_terms);
     }
 }
