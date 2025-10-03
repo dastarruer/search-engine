@@ -80,7 +80,8 @@ impl ExtractTerms for Html {
         self.select(&BODY_SELECTOR)
             .flat_map(|e| e.text())
             .flat_map(|t| t.split_whitespace())
-            .map(|t| Term::new(t.trim()))
+            .map(|t| t.trim().chars().filter(|c| c.is_alphanumeric()).collect())
+            .map(|t: String| Term::new(t))
             .filter(|t| !t.is_stop_word())
             .collect()
     }
