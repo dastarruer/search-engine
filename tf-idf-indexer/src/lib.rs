@@ -76,7 +76,7 @@ impl Term {
     /// These words are not necessary to index, since they carry little semantic meaning. These can therefore be filtered
     /// out.
     fn is_stop_word(&self) -> bool {
-        STOP_WORDS.contains(&self)
+        STOP_WORDS.contains(self)
     }
 }
 
