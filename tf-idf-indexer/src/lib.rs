@@ -22,6 +22,10 @@ mod helper {
 // This float type allows us to implement `Hash` for `Term`, so we can put it in a `HashSet`
 type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
 
+struct Document {
+    html: Html,
+}
+
 #[derive(PartialEq, Eq, Hash, Debug)]
 struct Term {
     pub term: String,
@@ -61,7 +65,7 @@ impl Term {
     /// This is useful when calculating the TF-IDF score of a term, which is
     /// used to check how frequent a [`Term`] is in one document, and how rare
     /// it is in other documents.
-    fn update_idf(&mut self, num_documents: i32) {
+    fn get_idf_entry_for_document(&mut self, num_documents: i32) {
         let idf = num_documents as f32 / self.document_frequency as f32;
         self.idf = OrderedFloat(idf.log10());
     }
@@ -86,20 +90,27 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
         .join(filename)
 }
 
-trait ExtractTerms {
-    fn extract_relevant_terms(&self) -> Vec<Term>;
-}
+impl Document {
+    fn new(html: Html) -> Self {
+        Document { html }
+    }
 
-impl ExtractTerms for Html {
     /// Extract relevant [`Term`]s from [`Html`].
     ///
     /// First filters out common 'stop words' (see [`Term::is_stop_word`] for more information), and then returns the resulting list of [`Term`]s.
     // TODO: Strip punctuation
     fn extract_relevant_terms(&self) -> Vec<Term> {
-        self.select(&BODY_SELECTOR)
+        self.html
+            .select(&BODY_SELECTOR)
             .flat_map(|e| e.text())
             .flat_map(|t| t.split_whitespace())
-            .map(|t| t.trim().chars().filter(|c| c.is_alphanumeric()).collect())
+            .map(|t| {
+                t.trim()
+                    .to_lowercase()
+                    .chars()
+                    .filter(|c| c.is_alphanumeric())
+                    .collect()
+            })
             .map(|t: String| Term::new(t))
             .filter(|t| !t.is_stop_word())
             .collect()
@@ -112,33 +123,33 @@ mod test {
 
     use scraper::Html;
 
-    use crate::{ExtractTerms, Term, test_file_path_from_filepath};
+    use crate::{Document, Term, test_file_path_from_filepath};
 
     #[test]
     fn test_get_tf_of_term() {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();
-        let html = Html::parse_document(html.as_str());
+        let document = Document::new(Html::parse_document(html.as_str()));
 
         let term = Term::new(String::from("hippopotamus"));
 
-        assert_eq!(term.get_tf(&html.extract_relevant_terms()), 4);
+        assert_eq!(term.get_tf(&document.extract_relevant_terms()), 4);
     }
 
     #[test]
     fn test_extract_terms() {
-        let html = Html::parse_document(
+        let document = Document::new(Html::parse_document(
             r#"
             <body>
                 <p>hippopotamus hippopotamus hippopotamus</p>
             </body>"#,
-        );
+        ));
         let expected_terms = vec![
             Term::new(String::from("hippopotamus")),
             Term::new(String::from("hippopotamus")),
             Term::new(String::from("hippopotamus")),
         ];
 
-        assert_eq!(html.extract_relevant_terms(), expected_terms);
+        assert_eq!(document.extract_relevant_terms(), expected_terms);
     }
 
     #[test]
@@ -146,7 +157,7 @@ mod test {
         let mut term = Term::new(String::from("hippopotamus"));
         term.document_frequency = 2;
 
-        term.update_idf(2);
+        term.get_idf_entry_for_document(2);
 
         assert_eq!(term.idf, 0.0);
     }
@@ -155,9 +166,9 @@ mod test {
     fn test_filter_stop_words() {
         let html =
             fs::read_to_string(test_file_path_from_filepath("filter_stop_words.html")).unwrap();
-        let html = Html::parse_document(html.as_str());
+        let document = Document::new(Html::parse_document(html.as_str()));
 
-        let terms = html.extract_relevant_terms();
+        let terms = document.extract_relevant_terms();
 
         let included_terms = vec![
             Term::new(String::from("hippopotamus")),
