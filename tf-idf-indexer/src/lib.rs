@@ -19,7 +19,7 @@ mod helper {
     pub type f32_helper = f32;
 }
 #[allow(non_camel_case_types)]
-// This float type allows us to implement `Hash` for `Term`, so we can put it in a `HashSet`
+// This float type allows us to implement `Hash` and `Eq` for `Term`, so we can put it in a `HashSet`
 type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
 
 #[derive(PartialEq, Eq, Debug)]
