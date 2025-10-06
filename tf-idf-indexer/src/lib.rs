@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
@@ -6,11 +6,11 @@ use scraper::{Html, Selector};
 
 static BODY_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body").unwrap());
 
-static STOP_WORDS: Lazy<HashSet<Term>> = Lazy::new(|| {
+static STOP_WORDS: Lazy<HashSet<StopWordTerm>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
         .iter()
         .copied()
-        .map(|t| Term::new(t.to_string()))
+        .map(StopWordTerm::new)
         .collect()
 });
 
@@ -22,11 +22,7 @@ mod helper {
 // This float type allows us to implement `Hash` for `Term`, so we can put it in a `HashSet`
 type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
 
-struct Document {
-    html: Html,
-}
-
-#[derive(PartialEq, Eq, Hash, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 struct Term {
     pub term: String,
 
@@ -37,6 +33,19 @@ struct Term {
 
     /// The amount of documents that contain this term. Used for calculating [`Term::idf`].
     document_frequency: i32,
+
+    /// The TF-IDF scores of each [`Document`].
+    ///
+    /// TF-IDF is measured as the term frequency of a [`Term`] in a [`Document`] multiplied by [`Term::idf`].
+    tf_idf_scores: HashMap<ordered_f32, Document>,
+}
+
+// Manually implement the Hash trait since HashMap does not implement Hash
+impl std::hash::Hash for Term {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Just hash the term instead of anything else
+        self.term.to_lowercase().hash(state);
+    }
 }
 
 impl Term {
@@ -45,6 +54,7 @@ impl Term {
             term,
             idf: ordered_float::OrderedFloat(0.0),
             document_frequency: 0,
+            tf_idf_scores: HashMap::new(),
         }
     }
 
@@ -76,7 +86,18 @@ impl Term {
     /// These words are not necessary to index, since they carry little semantic meaning. These can therefore be filtered
     /// out.
     fn is_stop_word(&self) -> bool {
-        STOP_WORDS.contains(self)
+        STOP_WORDS.contains(&StopWordTerm::new(&self.term))
+    }
+}
+
+#[derive(PartialEq, Eq, Debug, Hash)]
+struct StopWordTerm<'a> {
+    pub term: &'a str,
+}
+
+impl<'a> StopWordTerm<'a> {
+    fn new(term: &'a str) -> Self {
+        StopWordTerm { term }
     }
 }
 
@@ -90,9 +111,23 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
         .join(filename)
 }
 
+#[derive(PartialEq, Eq, Debug)]
+struct Document {
+    id: i32,
+    html: Html,
+}
+
+// Manually implement the Hash trait since Html does not implement Hash
+impl std::hash::Hash for Document {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Just hash the term instead of anything else
+        self.id.hash(state);
+    }
+}
+
 impl Document {
-    fn new(html: Html) -> Self {
-        Document { html }
+    fn new(html: Html, id: i32) -> Self {
+        Document { html, id }
     }
 
     /// Extract relevant [`Term`]s from [`Html`].
@@ -125,10 +160,12 @@ mod test {
 
     use crate::{Document, Term, test_file_path_from_filepath};
 
+    const DEFAULT_ID: i32 = 0;
+
     #[test]
     fn test_get_tf_of_term() {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();
-        let document = Document::new(Html::parse_document(html.as_str()));
+        let document = Document::new(Html::parse_document(html.as_str()), DEFAULT_ID);
 
         let term = Term::new(String::from("hippopotamus"));
 
@@ -137,12 +174,15 @@ mod test {
 
     #[test]
     fn test_extract_terms() {
-        let document = Document::new(Html::parse_document(
-            r#"
+        let document = Document::new(
+            Html::parse_document(
+                r#"
             <body>
                 <p>hippopotamus hippopotamus hippopotamus</p>
             </body>"#,
-        ));
+            ),
+            0,
+        );
         let expected_terms = vec![
             Term::new(String::from("hippopotamus")),
             Term::new(String::from("hippopotamus")),
@@ -166,7 +206,7 @@ mod test {
     fn test_filter_stop_words() {
         let html =
             fs::read_to_string(test_file_path_from_filepath("filter_stop_words.html")).unwrap();
-        let document = Document::new(Html::parse_document(html.as_str()));
+        let document = Document::new(Html::parse_document(html.as_str()), 0);
 
         let terms = document.extract_relevant_terms();
 
