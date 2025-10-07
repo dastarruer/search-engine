@@ -8,6 +8,10 @@
       url = "https://flakehub.com/f/nix-community/fenix/0.1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    rustowl = {
+      url = "github:nix-community/rustowl-flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs: let
@@ -31,6 +35,9 @@
           cargo
           rustfmt
           rust-src
+
+          # A tool to visualize lifetimes for values
+          inputs.rustowl.packages.${prev.stdenv.hostPlatform.system}.default
         ]);
     };
 
