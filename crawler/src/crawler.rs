@@ -265,14 +265,18 @@ impl Crawler {
 
     async fn init_queue(mut starting_urls: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
         let mut queue = PageQueue::default();
+        let queued_page_limit = 1000; // Limit the number so starting the crawler does not take a long time
 
-        let queued_pages_query = r#"
+        let queued_pages_query = format!(
+            r#"
             SELECT url FROM pages
             WHERE is_crawled = FALSE
-            LIMIT 100;"#;
+            LIMIT {};"#,
+            queued_page_limit
+        );
 
         // Query the database for all the queued urls
-        let mut rows: Vec<Page> = sqlx::query(queued_pages_query)
+        let mut rows: Vec<Page> = sqlx::query(queued_pages_query.as_str())
             .fetch_all(pool)
             .await
             .unwrap()
@@ -310,8 +314,8 @@ impl Crawler {
             .max_lifetime(Some(std::time::Duration::from_secs(1800))) // recycle old connections
             .idle_timeout(Some(std::time::Duration::from_secs(600))) // close idle connections
             .connect(url) // async connect
-            .await.expect("DATABASE_URL should correctly point to the PostGreSQL database.");
-
+            .await
+            .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
 
         let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE;";
         let mut visited = HashSet::new();
