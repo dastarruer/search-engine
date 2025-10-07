@@ -79,11 +79,11 @@ pub(crate) fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
 /// - DB_PORT
 /// - DB_NAME
 pub(crate) fn construct_postgres_url() -> String {
-    let endpoint = std::env::var("DB_ENDPOINT").expect("DB_ENDPOINT must be set.");
-    let port = std::env::var("DB_PORT").expect("DB_PORT must be set.");
-    let dbname = std::env::var("DB_NAME").expect("DB_NAME must be set.");
-    let user = std::env::var("DB_USER").expect("DB_USER must be set.");
-    let password = std::env::var("DB_PASSWORD").expect("DB_PASSWORD must be set.");
+    let endpoint = retrieve_env_var("DB_ENDPOINT");
+    let port = retrieve_env_var("DB_PORT");
+    let dbname = retrieve_env_var("DB_NAME");
+    let user = retrieve_env_var("DB_USER");
+    let password = retrieve_env_var("DB_PASSWORD");
 
     // If the password has special characters like '@' or '#' this will convert
     // them into a URL friendly format
