@@ -3,7 +3,7 @@ use std::{collections::HashSet, time::Duration};
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use scraper::{Html, Selector};
 
-use sqlx::{PgPool, Row};
+use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 
 use crate::{
     error::CrawlerError,
@@ -303,9 +303,15 @@ impl Crawler {
         let url = construct_postgres_url();
         let url = url.as_str();
 
-        let pool = sqlx::postgres::PgPool::connect(url)
-            .await
-            .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
+        let pool = PgPoolOptions::new()
+            .max_connections(10) // maximum connections in the pool
+            .min_connections(2) // keep a few always alive
+            .acquire_timeout(std::time::Duration::from_secs(5)) // connection timeout
+            .max_lifetime(Some(std::time::Duration::from_secs(1800))) // recycle old connections
+            .idle_timeout(Some(std::time::Duration::from_secs(600))) // close idle connections
+            .connect(url) // async connect
+            .await.expect("DATABASE_URL should correctly point to the PostGreSQL database.");
+
 
         let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE;";
         let mut visited = HashSet::new();
