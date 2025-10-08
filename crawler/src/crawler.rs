@@ -1,9 +1,9 @@
 use std::{collections::HashSet, time::Duration};
 
+use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
-use rustrict::{CensorStr, Type};
+use rustrict::{Censor, Type};
 use scraper::{Html, Selector};
-
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 
 use crate::{
@@ -21,6 +21,17 @@ pub struct Crawler {
     pool: PgPool,
     client: Client,
 }
+
+// Should this be a global variable? No, but I need static access to this and this is the easiest solution ok-
+// TODO: Find a way to move this into Crawler struct
+static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
+    let mut trie = rustrict::Trie::default();
+
+    // add a certain... domain that's been giving me trouble...
+    trie.set("xvideos", Type::SEXUAL);
+
+    trie
+});
 
 impl Crawler {
     pub async fn new(starting_urls: Vec<Page>) -> Self {
@@ -222,22 +233,32 @@ impl Crawler {
 
     /// Checks URL domain against a list of blocked keywords relating to inappropriate content.
     fn is_inappropriate_page(page: &Page, html: &Html) -> bool {
-        let domain = page.url.as_str();
+        // add a certain uh... domain that's been giving me trouble
+        let mut blocked_keywords = rustrict::Trie::default();
+        blocked_keywords.set("xvideos", Type::SEXUAL);
+
+        let mut domain = Censor::from_str(page.url.as_str());
+        domain.with_trie(&BLOCKED_KEYWORDS);
 
         // First check that the domain is appropriate
-        if domain.is_inappropriate() {
+        // Note that `Type::NONE` just means that the content is
+        // appropriate
+        if domain.analyze() != Type::NONE {
             return true;
         }
 
         let body_selector = Selector::parse("body").unwrap();
-        let content: String = html
+
+        let content = html
             .select(&body_selector)
             .flat_map(|e| e.text())
             .flat_map(|t| t.split_whitespace())
-            .collect();
+            .collect::<String>();
+        let mut content = Censor::from_str(content.as_str());
+        content.with_trie(&BLOCKED_KEYWORDS);
 
         // Then check if the content is appropriate
-        content.is_inappropriate()
+        content.analyze() != Type::NONE
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -529,7 +550,8 @@ mod test {
 
         #[test]
         fn test_inappropriate_page_url() {
-            let page = Page::from(Url::parse("https://porn.xxx").unwrap());
+            // a common... site that keeps getting crawled
+            let page = Page::from(Url::parse("https://xvideos.com").unwrap());
             assert!(Crawler::is_inappropriate_page(&page, &Html::new_document()));
         }
 

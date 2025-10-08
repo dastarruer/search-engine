@@ -357,6 +357,7 @@ dependencies = [
  "flexi_logger",
  "httpmock",
  "log",
+ "once_cell",
  "reqwest",
  "rustrict",
  "scraper",
