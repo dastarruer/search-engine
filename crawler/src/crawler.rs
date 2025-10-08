@@ -1,6 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
+use rustrict::{CensorStr, Type};
 use scraper::{Html, Selector};
 
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
@@ -85,8 +86,8 @@ impl Crawler {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
-        if Self::is_adult_page(&page) {
-            return Err(CrawlerError::AdultSite(page));
+        if Self::is_inappropriate_page(&page, &html) {
+            return Err(CrawlerError::InappropriateSite(page));
         }
 
         let title = Self::extract_title_from_html(&html);
@@ -219,12 +220,24 @@ impl Crawler {
         }
     }
 
-    /// Checks URL domain against a list of blocked keywords relating to adult content.
-    fn is_adult_page(page: &Page) -> bool {
-        let blocked_words = ["porn", "xxx", "sex", "adult", "xvideos"];
-        let domain = page.url.as_str().to_lowercase();
+    /// Checks URL domain against a list of blocked keywords relating to inappropriate content.
+    fn is_inappropriate_page(page: &Page, html: &Html) -> bool {
+        let domain = page.url.as_str();
 
-        blocked_words.iter().any(|s| domain.contains(s))
+        // First check that the domain is appropriate
+        if domain.is(Type::INAPPROPRIATE) {
+            return true;
+        }
+
+        let body_selector = Selector::parse("body").unwrap();
+        let content: String = html
+            .select(&body_selector)
+            .flat_map(|e| e.text())
+            .flat_map(|t| t.split_whitespace())
+            .collect();
+
+        // Then check if the content is appropriate
+        content.is(Type::INAPPROPRIATE)
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -265,18 +278,14 @@ impl Crawler {
 
     async fn init_queue(mut starting_urls: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
         let mut queue = PageQueue::default();
-        let queued_page_limit = 1000; // Limit the number so starting the crawler does not take a long time
 
-        let queued_pages_query = format!(
-            r#"
+        let queued_pages_query = r#"
             SELECT url FROM pages
             WHERE is_crawled = FALSE
-            LIMIT {};"#,
-            queued_page_limit
-        );
+            LIMIT 100;"#;
 
         // Query the database for all the queued urls
-        let mut rows: Vec<Page> = sqlx::query(queued_pages_query.as_str())
+        let mut rows: Vec<Page> = sqlx::query(queued_pages_query)
             .fetch_all(pool)
             .await
             .unwrap()
@@ -512,21 +521,39 @@ mod test {
         }
     }
 
-    mod is_adult {
+    mod is_inappropriate_page {
         use reqwest::Url;
+        use scraper::Html;
 
         use super::*;
 
-        #[tokio::test]
-        async fn test_adult_page() {
+        #[test]
+        fn test_inappropriate_page_url() {
             let page = Page::from(Url::parse("https://porn.xxx").unwrap());
-            assert!(Crawler::is_adult_page(&page));
+            assert!(Crawler::is_inappropriate_page(&page, &Html::new_document()));
+        }
+
+        #[test]
+        fn test_inappropriate_page_content() {
+            let html = Html::parse_document(
+                r#"
+            <body>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+            );
+
+            let page = Page::from(Url::parse("https://a-very-innocent-site.com").unwrap());
+
+            assert!(Crawler::is_inappropriate_page(&page, &html));
         }
 
         #[tokio::test]
         async fn test_safe_page() {
             let page = Page::from(Url::parse("https://safe.com").unwrap());
-            assert!(!Crawler::is_adult_page(&page));
+            assert!(!Crawler::is_inappropriate_page(
+                &page,
+                &Html::new_document()
+            ));
         }
     }
 

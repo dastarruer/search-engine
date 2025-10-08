@@ -1,6 +1,6 @@
+use reqwest::Url;
 use reqwest::{StatusCode, header::HeaderValue};
 use thiserror::Error;
-use reqwest::Url;
 
 use crate::page::Page;
 
@@ -25,11 +25,11 @@ pub enum CrawlerError {
     RequestTimeout(Page),
 
     #[error("HTML decoding error from {url}: {error_str}.")]
-    HtmlDecodingError{url: Url, error_str: String},
+    HtmlDecodingError { url: Url, error_str: String },
 
     #[error("{url} is a non-English site.", url = .0.url)]
     NonEnglishPage(Page),
 
     #[error("{url} is an adult site.", url = .0.url)]
-    AdultSite(Page)
+    InappropriateSite(Page),
 }
