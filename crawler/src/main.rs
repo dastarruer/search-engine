@@ -2,26 +2,16 @@ use std::{fs, path::PathBuf};
 
 use crawler::crawler::Crawler;
 use crawler::page::Page;
+use flexi_logger::{Duplicate, Logger, WriteMode};
 use reqwest::Url;
 
 #[cfg(feature = "logging")]
-use flexi_logger::{Duplicate, FileSpec, Logger, WriteMode};
+use flexi_logger::FileSpec;
 
-#[cfg(feature = "logging")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_up_logging().await?;
 
-    let mut crawler = Crawler::new(get_start_urls()).await;
-
-    crawler.run().await?;
-
-    Ok(())
-}
-
-#[cfg(not(feature = "logging"))]
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut crawler = Crawler::new(get_start_urls()).await;
 
     crawler.run().await?;
@@ -40,6 +30,17 @@ async fn set_up_logging() -> Result<(), Box<dyn std::error::Error>> {
                 .suppress_basename()
                 .suffix("log"),
         )
+        .duplicate_to_stdout(Duplicate::Info)
+        .write_mode(WriteMode::BufferAndFlush)
+        .start()?;
+
+    Ok(())
+}
+
+// The only differnce with this is that it does not write log output to a file
+#[cfg(not(feature = "logging"))]
+async fn set_up_logging() -> Result<(), Box<dyn std::error::Error>> {
+    let _logger = Logger::try_with_str("info")?
         .duplicate_to_stdout(Duplicate::Info)
         .write_mode(WriteMode::BufferAndFlush)
         .start()?;
