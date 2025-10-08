@@ -225,7 +225,7 @@ impl Crawler {
         let domain = page.url.as_str();
 
         // First check that the domain is appropriate
-        if domain.is(Type::INAPPROPRIATE) {
+        if domain.is_inappropriate() {
             return true;
         }
 
@@ -237,7 +237,7 @@ impl Crawler {
             .collect();
 
         // Then check if the content is appropriate
-        content.is(Type::INAPPROPRIATE)
+        content.is_inappropriate()
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
