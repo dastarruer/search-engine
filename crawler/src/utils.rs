@@ -1,7 +1,13 @@
+#[cfg(any(test, feature = "bench"))]
 use std::path::PathBuf;
 
+#[cfg(any(test, feature = "bench"))]
 use httpmock::prelude::*;
-use reqwest::{StatusCode, Url};
+
+#[cfg(any(test, feature = "bench"))]
+use reqwest::{StatusCode};
+
+use reqwest::Url;
 use url::form_urlencoded;
 
 /// An implementation of a mock HTTP server.
