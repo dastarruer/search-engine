@@ -2,8 +2,10 @@ use std::{fs, path::PathBuf};
 
 use crawler::crawler::Crawler;
 use crawler::page::Page;
-use flexi_logger::{Duplicate, FileSpec, Logger, WriteMode};
 use reqwest::Url;
+
+#[cfg(feature = "logging")]
+use flexi_logger::{Duplicate, FileSpec, Logger, WriteMode};
 
 #[cfg(feature = "logging")]
 #[tokio::main]
