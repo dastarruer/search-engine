@@ -5,6 +5,7 @@ use crawler::page::Page;
 use flexi_logger::{Duplicate, FileSpec, Logger, WriteMode};
 use reqwest::Url;
 
+#[cfg(feature = "logging")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_up_logging().await?;
@@ -16,6 +17,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(not(feature = "logging"))]
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut crawler = Crawler::new(get_start_urls()).await;
+
+    crawler.run().await?;
+
+    Ok(())
+}
+
+#[cfg(feature = "logging")]
 async fn set_up_logging() -> Result<(), Box<dyn std::error::Error>> {
     let log_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("logs");
 
