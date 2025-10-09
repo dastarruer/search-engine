@@ -1,9 +1,10 @@
 use std::{collections::HashSet, time::Duration};
 
+use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
+use rustrict::{Censor, Type};
 use scraper::{Html, Selector};
-
-use sqlx::{PgPool, Row};
+use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 
 use crate::{
     error::CrawlerError,
@@ -20,6 +21,17 @@ pub struct Crawler {
     pool: PgPool,
     client: Client,
 }
+
+// Should this be a global variable? No, but I need static access to this and this is the easiest solution ok-
+// TODO: Find a way to move this into Crawler struct
+static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
+    let mut trie = rustrict::Trie::default();
+
+    // add a certain... domain that's been giving me trouble...
+    trie.set("xvideos", Type::SEXUAL);
+
+    trie
+});
 
 impl Crawler {
     pub async fn new(starting_urls: Vec<Page>) -> Self {
@@ -85,8 +97,8 @@ impl Crawler {
             return Err(CrawlerError::NonEnglishPage(page));
         }
 
-        if Self::is_adult_page(&page) {
-            return Err(CrawlerError::AdultSite(page));
+        if Self::is_inappropriate_page(&page, &html) {
+            return Err(CrawlerError::InappropriateSite(page));
         }
 
         let title = Self::extract_title_from_html(&html);
@@ -219,12 +231,34 @@ impl Crawler {
         }
     }
 
-    /// Checks URL domain against a list of blocked keywords relating to adult content.
-    fn is_adult_page(page: &Page) -> bool {
-        let blocked_words = ["porn", "xxx", "sex", "adult", "xvideos"];
-        let domain = page.url.as_str().to_lowercase();
+    /// Checks URL domain against a list of blocked keywords relating to inappropriate content.
+    fn is_inappropriate_page(page: &Page, html: &Html) -> bool {
+        // add a certain uh... domain that's been giving me trouble
+        let mut blocked_keywords = rustrict::Trie::default();
+        blocked_keywords.set("xvideos", Type::SEXUAL);
 
-        blocked_words.iter().any(|s| domain.contains(s))
+        let mut domain = Censor::from_str(page.url.as_str());
+        domain.with_trie(&BLOCKED_KEYWORDS);
+
+        // First check that the domain is appropriate
+        // Note that `Type::NONE` just means that the content is
+        // appropriate
+        if domain.analyze() != Type::NONE {
+            return true;
+        }
+
+        let body_selector = Selector::parse("body").unwrap();
+
+        let content = html
+            .select(&body_selector)
+            .flat_map(|e| e.text())
+            .flat_map(|t| t.split_whitespace())
+            .collect::<String>();
+        let mut content = Censor::from_str(content.as_str());
+        content.with_trie(&BLOCKED_KEYWORDS);
+
+        // Then check if the content is appropriate
+        content.analyze() != Type::NONE
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -303,11 +337,26 @@ impl Crawler {
         let url = construct_postgres_url();
         let url = url.as_str();
 
-        let pool = sqlx::postgres::PgPool::connect(url)
+        let max_connections = 10;
+        let min_connections = 2;
+
+        let connection_timeout = std::time::Duration::from_secs(5);
+
+        let max_lifetime = Some(std::time::Duration::from_secs(1800));
+        let idle_timeout = Some(std::time::Duration::from_secs(600));
+
+        let pool = PgPoolOptions::new()
+            .max_connections(max_connections)
+            .min_connections(min_connections)
+            .acquire_timeout(connection_timeout) // connection timeout
+            .max_lifetime(max_lifetime) // recycle old connections
+            .idle_timeout(idle_timeout) // close idle connections
+            .connect(url) // async connect
             .await
             .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
 
-        let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE;";
+        // Limit the query to return just 100 rows so startup times are not too long
+        let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT 100";
         let mut visited = HashSet::new();
 
         let query = sqlx::query(visited_query);
@@ -502,21 +551,40 @@ mod test {
         }
     }
 
-    mod is_adult {
+    mod is_inappropriate_page {
         use reqwest::Url;
+        use scraper::Html;
 
         use super::*;
 
-        #[tokio::test]
-        async fn test_adult_page() {
-            let page = Page::from(Url::parse("https://porn.xxx").unwrap());
-            assert!(Crawler::is_adult_page(&page));
+        #[test]
+        fn test_inappropriate_page_url() {
+            // a common... site that keeps getting crawled
+            let page = Page::from(Url::parse("https://xvideos.com").unwrap());
+            assert!(Crawler::is_inappropriate_page(&page, &Html::new_document()));
+        }
+
+        #[test]
+        fn test_inappropriate_page_content() {
+            let html = Html::parse_document(
+                r#"
+            <body>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+            );
+
+            let page = Page::from(Url::parse("https://a-very-innocent-site.com").unwrap());
+
+            assert!(Crawler::is_inappropriate_page(&page, &html));
         }
 
         #[tokio::test]
         async fn test_safe_page() {
             let page = Page::from(Url::parse("https://safe.com").unwrap());
-            assert!(!Crawler::is_adult_page(&page));
+            assert!(!Crawler::is_inappropriate_page(
+                &page,
+                &Html::new_document()
+            ));
         }
     }
 

@@ -1,7 +1,14 @@
+#[cfg(any(test, feature = "bench"))]
 use std::path::PathBuf;
 
+#[cfg(any(test, feature = "bench"))]
 use httpmock::prelude::*;
-use reqwest::{StatusCode, Url};
+
+#[cfg(any(test, feature = "bench"))]
+use reqwest::{StatusCode};
+
+use reqwest::Url;
+use url::form_urlencoded;
 
 /// An implementation of a mock HTTP server.
 #[cfg(any(test, feature = "bench"))]
@@ -77,22 +84,22 @@ pub(crate) fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
 /// - DB_ENDPOINT
 /// - DB_PORT
 /// - DB_NAME
-pub(crate) fn construct_postgres_url() -> Url {
+pub(crate) fn construct_postgres_url() -> String {
     let endpoint = retrieve_env_var("DB_ENDPOINT");
     let port = retrieve_env_var("DB_PORT");
     let dbname = retrieve_env_var("DB_NAME");
     let user = retrieve_env_var("DB_USER");
     let password = retrieve_env_var("DB_PASSWORD");
 
-    // Start with a base URL
-    let base_url = format!("postgresql://{}:{}/{}", endpoint, port, dbname);
-    let mut url = Url::parse(base_url.as_str()).expect("Failed to build base URL");
+    // If the password has special characters like '@' or '#' this will convert
+    // them into a URL friendly format
+    let encoded_password: String = form_urlencoded::byte_serialize(password.as_bytes()).collect();
+    let encoded_user: String = form_urlencoded::byte_serialize(user.as_bytes()).collect();
 
-    // Insert encoded username and password
-    url.set_username(&user).expect("Invalid username");
-    url.set_password(Some(&password)).expect("Invalid password");
-
-    url
+    format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        encoded_user, encoded_password, endpoint, port, dbname
+    )
 }
 
 fn retrieve_env_var(var: &str) -> String {
