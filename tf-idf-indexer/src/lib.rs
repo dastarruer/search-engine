@@ -116,7 +116,7 @@ impl<'a> StopWordTerm<'a> {
 
 struct Indexer {
     terms: HashMap<String, Term>,
-    documents: Vec<Document>,
+    documents: HashSet<Document>,
     num_documents: i32,
 }
 
@@ -124,7 +124,7 @@ impl Indexer {
     fn new(starting_terms: HashMap<String, Term>) -> Self {
         Indexer {
             terms: starting_terms,
-            documents: Vec::new(),
+            documents: HashSet::new(),
             num_documents: 0,
         }
     }
@@ -163,9 +163,16 @@ impl Indexer {
         }
     }
 
-    /// Add a new [`Document`] to the list of existing documents, and increment [`Indexer::num_documents`].
+    /// Add a new [`Document`] to the set of existing documents, and increment [`Indexer::num_documents`].
+    ///
+    /// # Panics
+    /// - If two [`Document`]s with the same [`Document::id`] are added to the
+    /// set, the program panics.
+    // TODO: Maybe this shouldn't panic...?
     fn add_document(&mut self, document: Document) {
-        self.documents.push(document);
+        assert!(!self.documents.contains(&document));
+
+        self.documents.insert(document);
         self.num_documents += 1;
     }
 
@@ -211,7 +218,7 @@ impl PartialEq for Document {
 // Manually implement the Hash trait since Html does not implement Hash
 impl std::hash::Hash for Document {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        // Just hash the term instead of anything else
+        // Just hash the id, since it's supposed to be unique
         self.id.hash(state);
     }
 }
@@ -302,7 +309,26 @@ mod test {
 
         indexer.add_document(document.clone());
 
-        assert_eq!(indexer.documents.first().unwrap(), &document);
+        assert_eq!(indexer.documents.get(&document).unwrap(), &document);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_add_duplicate_document() {
+        let document = Document::new(
+            Html::parse_document(
+                r#"
+            <body>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+            ),
+            0,
+        );
+
+        let mut indexer = Indexer::new(HashMap::new());
+
+        indexer.add_document(document.clone());
+        indexer.add_document(document.clone());
     }
 
     #[test]
