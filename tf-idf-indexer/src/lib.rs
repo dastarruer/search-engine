@@ -70,11 +70,13 @@ impl Term {
     /// calculating the TF-IDF score of a term, which is used to check how
     /// frequent a [`Term`] is in one document, and how rare it is in other
     /// documents.
-    fn get_tf<'b>(&self, terms: &Vec<Term>) -> i32 {
-        terms
-            .iter()
-            .filter(|t| t.term.eq_ignore_ascii_case(&self.term))
-            .count() as i32
+    fn get_tf<'b>(&self, terms: &Vec<Term>) -> ordered_f32 {
+        ordered_float::OrderedFloat(
+            terms
+                .iter()
+                .filter(|t| t.term.eq_ignore_ascii_case(&self.term))
+                .count() as f32,
+        )
     }
 
     /// Update the IDF score of a [`Term`] (see [`Term::idf`] for more details).
@@ -137,7 +139,7 @@ impl Indexer {
         }
 
         for (_, term) in self.terms.iter_mut() {
-            let tf = ordered_float::OrderedFloat(term.get_tf(&relevant_terms) as f32);
+            let tf = term.get_tf(&relevant_terms);
 
             if tf > ordered_float::OrderedFloat(0.0) {
                 term.document_frequency += 1;
@@ -258,7 +260,10 @@ mod test {
 
         let term = Term::new(String::from("hippopotamus"));
 
-        assert_eq!(term.get_tf(&document.extract_relevant_terms()), 4);
+        assert_eq!(
+            term.get_tf(&document.extract_relevant_terms()),
+            ordered_float::OrderedFloat(4.0)
+        );
     }
 
     #[test]
