@@ -130,7 +130,7 @@ impl Indexer {
     fn parse_document(&mut self, document: Document) {
         let relevant_terms = document.extract_relevant_terms();
 
-        self.num_documents += 1;
+        self.add_document(document.clone());
 
         for term in relevant_terms.clone() {
             self.add_term(term);
@@ -149,23 +149,8 @@ impl Indexer {
 
             term.tf_scores.insert(document.clone(), tf);
             term.tf_idf_scores.insert(document.clone(), tf_idf);
-            self.documents.push(document.clone());
 
             // Go back and update the tf_idf scores for every other single document
-            // let mut tf_idf_scores_clone = term.tf_idf_scores.clone();
-            // for (document, tf_idf) in tf_idf_scores_clone.iter_mut() {
-            //     let tf = term.tf_scores.get(document).unwrap();
-            //     let new_tf_idf = tf * term.idf;
-
-            //     println!("doc id: {}", document.id);
-            //     println!("term: {}", term.term);
-            //     println!("tf: {}", tf);
-            //     println!("idf: {}", term.idf);
-            //     println!("old tf_idf: {}", tf_idf);
-            //     println!("new tf_idf: {}", new_tf_idf);
-
-            //     *tf_idf = new_tf_idf;
-            // }
             let mut tf_scores_clone = term.tf_scores.clone();
             for (document, tf) in tf_scores_clone.iter_mut() {
                 let new_tf_idf = tf.clone() * tf_idf;
@@ -174,6 +159,12 @@ impl Indexer {
 
             term.tf_scores = tf_scores_clone;
         }
+    }
+
+    /// Add a new [`Document`] to the list of existing documents, and increment [`Indexer::num_documents`].
+    fn add_document(&mut self, document: Document) {
+        self.documents.push(document);
+        self.num_documents += 1;
     }
 
     fn add_term(&mut self, term: Term) {
@@ -288,6 +279,25 @@ mod test {
         ];
 
         assert_eq!(document.extract_relevant_terms(), expected_terms);
+    }
+
+    #[test]
+    fn test_add_document() {
+        let document = Document::new(
+            Html::parse_document(
+                r#"
+            <body>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+            ),
+            0,
+        );
+
+        let mut indexer = Indexer::new(HashMap::new());
+
+        indexer.add_document(document.clone());
+
+        assert_eq!(indexer.documents.first().unwrap(), &document);
     }
 
     #[test]
