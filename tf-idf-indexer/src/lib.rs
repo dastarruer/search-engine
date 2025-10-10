@@ -98,6 +98,10 @@ impl Term {
 }
 
 #[derive(PartialEq, Eq, Debug, Hash)]
+/// A simpler verson of [`Term`] just for storing stop words.
+///
+/// A stop word is a common word such as 'is,' 'was,' 'has,' etc.
+/// See [`Term::is_stop_word`] for more information.
 struct StopWordTerm<'a> {
     pub term: &'a str,
 }
