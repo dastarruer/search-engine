@@ -415,14 +415,28 @@ mod test {
         assert_eq!(term.tf_idf_scores, expected_tf_idf);
     }
 
-    #[test]
-    fn test_update_idf() {
-        let mut term = Term::new(String::from("hippopotamus"));
-        term.document_frequency = 2;
+    mod update_idf {
+        use super::*;
 
-        term.clone().update_total_idf(2);
+        #[test]
+        fn test_update_idf() {
+            let mut term = Term::new(String::from("hippopotamus"));
+            term.document_frequency = 2;
 
-        assert_eq!(term.idf, 0.0);
+            term.clone().update_total_idf(2);
+
+            assert_eq!(term.idf, 0.0);
+        }
+
+        #[test]
+        fn test_zero_doc_frequency() {
+            let mut term = Term::new(String::from("hippopotamus"));
+            term.document_frequency = 0;
+
+            term.clone().update_total_idf(2);
+
+            assert_eq!(term.idf, 0.0);
+        }
     }
 
     #[test]
