@@ -189,15 +189,16 @@ impl PageQueue {
         }
     }
 
-    /// Add 100 uncrawled [`Page`]s from the database to the queue.
+    /// Add as many uncrawled [`Page`]s from the database to the queue as is defined by [`crate::QUEUE_LIMIT`].
     ///
     /// Should be called whenever the queue is empty and needs more pages.
-    async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let query = r#"
+    pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
+        let query = format!(r#"
             SELECT url
             FROM pages
             WHERE is_crawled = FALSE
-            LIMIT 100;"#;
+            LIMIT {};"#, crate::QUEUE_LIMIT);
+        let query = query.as_str();
 
         sqlx::query(query)
             .fetch_all(pool)

@@ -34,10 +34,10 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 });
 
 impl Crawler {
-    pub async fn new(starting_urls: Vec<Page>) -> Self {
+    pub async fn new(starting_pages: Vec<Page>) -> Self {
         let (pool, crawled) = Self::init_crawled_and_pool().await;
 
-        let queue = Self::init_queue(starting_urls, &pool).await;
+        let queue = Self::init_queue(starting_pages, &pool).await;
 
         let client = Self::init_client();
 
@@ -297,37 +297,18 @@ impl Crawler {
         urls
     }
 
-    async fn init_queue(mut starting_urls: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
+    async fn init_queue(starting_pages: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
         let mut queue = PageQueue::default();
 
-        let queued_pages_query = r#"
-            SELECT url FROM pages
-            WHERE is_crawled = FALSE
-            LIMIT 100;"#;
+        queue.refresh_queue(pool).await;
 
-        // Query the database for all the queued urls
-        let mut rows: Vec<Page> = sqlx::query(queued_pages_query)
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .map(|row| {
-                let url: String = row.get("url");
-                Page::new(
-                    Url::parse(url.as_str())
-                        .unwrap_or_else(|_| panic!("Url {} should be a valid url.", url)),
-                )
-            })
-            .collect();
-
-        starting_urls.append(&mut rows);
-
-        for url in starting_urls {
-            if let Err(e) = queue.queue_page(url, pool).await {
-                // There should never be an error, but if there is, log it
+        // Queue each page in starting_pages
+        for page in starting_pages {
+            if let Err(e) = queue.queue_page(page, pool).await {
                 log::warn!("Error initializing page queue: {}", e);
             };
         }
+
         queue
     }
 
@@ -406,11 +387,11 @@ impl Crawler {
 // Methods for benchmarks
 #[cfg(feature = "bench")]
 impl Crawler {
-    fn init_queue_test(starting_urls: Vec<Page>) -> PageQueue {
+    fn init_queue_test(starting_pages: Vec<Page>) -> PageQueue {
         let mut queue = PageQueue::default();
 
-        for url in starting_urls {
-            queue.queue_page_test(url);
+        for page in starting_pages {
+            queue.queue_page_test(page);
         }
 
         queue
