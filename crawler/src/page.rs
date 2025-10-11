@@ -150,13 +150,14 @@ impl PageQueue {
             self.hashset.remove(page);
             self.queue.pop_front()
         } else {
+            log::info!("Queue is empty, refreshing...");
             self.refresh_queue(pool).await;
 
             if let Some(page) = self.queue.front() {
                 self.hashset.remove(page);
                 self.queue.pop_front()
             } else {
-                return None;
+                None
             }
         }
     }
