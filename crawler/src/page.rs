@@ -145,6 +145,15 @@ impl PageQueue {
         self.hashset.insert(page);
     }
 
+    /// Pop a queued [`Page`] from the [`PageQueue`].
+    ///
+    /// If the queue is empty, refreshes the queue by querying the database for
+    /// uncrawled pages.
+    ///
+    /// # Returns
+    /// - Returns `Some(Page)` if the queue is not empty, or there are still
+    ///   uncrawled pages in the database.
+    /// - Returns `None` if the database has no more uncrawled pages left.
     pub async fn pop(&mut self, pool: &sqlx::PgPool) -> Option<Page> {
         if let Some(page) = self.queue.front() {
             self.hashset.remove(page);
@@ -161,6 +170,16 @@ impl PageQueue {
         }
     }
 
+    /// Pop a queued [`Page`] from the [`PageQueue`].
+    ///
+    /// # Returns
+    /// - Returns `Some(Page)` if the queue is not empty, and there are still
+    ///   pages left.
+    /// - Returns `None` if the queue has no more pages left.
+    ///
+    /// # Note
+    /// Even though this is public, this method is meant to be used for
+    /// benchmarks and tests only.
     pub fn pop_test(&mut self) -> Option<Page> {
         if let Some(page) = self.queue.front() {
             self.hashset.remove(page);
