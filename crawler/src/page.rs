@@ -1,5 +1,6 @@
-use std::collections::{HashSet, VecDeque};
 use reqwest::Url;
+use sqlx::Row;
+use std::collections::{HashSet, VecDeque};
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Page {
@@ -120,7 +121,7 @@ impl PageQueue {
         PageQueue { queue, hashset }
     }
 
-    /// Pushes a [`Page`] into the [`PageQueue`], and adds it to the database.
+    /// Adds a queued [`Page`] to the database.
     ///
     /// # Errors
     /// This function returns an error if:
@@ -131,9 +132,6 @@ impl PageQueue {
         pool: &sqlx::PgPool,
     ) -> Result<(), Box<dyn std::error::Error>> {
         page.add_to_db(pool).await?;
-
-        self.queue.push_back(page.clone());
-        self.hashset.insert(page);
 
         Ok(())
     }
@@ -147,15 +145,75 @@ impl PageQueue {
         self.hashset.insert(page);
     }
 
-    pub fn pop(&mut self) -> Option<Page> {
-        let page = self.queue.front();
-
-        if let Some(page) = page {
+    /// Pop a queued [`Page`] from the [`PageQueue`].
+    ///
+    /// If the queue is empty, refreshes the queue by querying the database for
+    /// uncrawled pages.
+    ///
+    /// # Returns
+    /// - Returns `Some(Page)` if the queue is not empty, or there are still
+    ///   uncrawled pages in the database.
+    /// - Returns `None` if the database has no more uncrawled pages left.
+    pub async fn pop(&mut self, pool: &sqlx::PgPool) -> Option<Page> {
+        if let Some(page) = self.queue.front() {
             self.hashset.remove(page);
             self.queue.pop_front()
         } else {
+            log::info!("Queue is empty, refreshing...");
+            self.refresh_queue(pool).await;
+
+            if let Some(page) = self.queue.front() {
+                self.hashset.remove(page);
+                self.queue.pop_front()
+            } else {
+                None
+            }
+        }
+    }
+
+    /// Pop a queued [`Page`] from the [`PageQueue`].
+    ///
+    /// # Returns
+    /// - Returns `Some(Page)` if the queue is not empty, and there are still
+    ///   pages left.
+    /// - Returns `None` if the queue has no more pages left.
+    ///
+    /// # Note
+    /// Even though this is public, this method is meant to be used for
+    /// benchmarks and tests only.
+    pub fn pop_test(&mut self) -> Option<Page> {
+        if let Some(page) = self.queue.front() {
+            self.hashset.remove(page);
+            self.queue.pop_back()
+        } else {
             None
         }
+    }
+
+    /// Add as many uncrawled [`Page`]s from the database to the queue as is defined by [`crate::QUEUE_LIMIT`].
+    ///
+    /// Should be called whenever the queue is empty and needs more pages.
+    pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
+        let query = format!(r#"
+            SELECT url
+            FROM pages
+            WHERE is_crawled = FALSE
+            LIMIT {};"#, crate::QUEUE_LIMIT);
+        let query = query.as_str();
+
+        sqlx::query(query)
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|row| {
+                let url: String = row.get("url");
+                let err_msg = format!("Url {} should be a valid url.", url);
+                let page = Page::new(Url::parse(url.as_str()).expect(&err_msg));
+
+                self.queue.push_back(page.clone());
+                self.hashset.insert(page);
+            });
     }
 
     pub fn contains_page(&self, page: &Page) -> bool {
