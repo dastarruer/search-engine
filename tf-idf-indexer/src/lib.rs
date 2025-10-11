@@ -97,6 +97,21 @@ impl Term {
     fn is_stop_word(&self) -> bool {
         STOP_WORDS.contains(&StopWordTerm::new(&self.term))
     }
+
+    /// Updates all TF-IDF scores for this term across every document.
+    ///
+    /// Should be called whenever [`Term::idf`] changes. TF-IDF is calculated
+    /// as term frequency * IDF, which needs to be refreshed for every document
+    /// if IDF ever changes.
+    fn update_tf_idf_scores(&mut self) {
+        let mut tf_scores_clone = self.tf_scores.clone();
+        for (document, tf) in tf_scores_clone.iter_mut() {
+            let new_tf_idf = tf.clone() * self.idf;
+            self.tf_idf_scores.insert(document.clone(), new_tf_idf);
+        }
+
+        self.tf_scores = tf_scores_clone;
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Hash)]
@@ -138,9 +153,11 @@ impl Indexer {
             self.add_term(term);
         }
 
+        // Loop through each stored term
         for (_, term) in self.terms.iter_mut() {
             let tf = term.get_tf(&relevant_terms);
 
+            // If the term appears at least once, incrememnt document frequency
             if tf > ordered_float::OrderedFloat(0.0) {
                 term.document_frequency += 1;
             }
@@ -153,13 +170,7 @@ impl Indexer {
             term.tf_idf_scores.insert(document.clone(), tf_idf);
 
             // Go back and update the tf_idf scores for every other single document
-            let mut tf_scores_clone = term.tf_scores.clone();
-            for (document, tf) in tf_scores_clone.iter_mut() {
-                let new_tf_idf = tf.clone() * tf_idf;
-                term.tf_idf_scores.insert(document.clone(), new_tf_idf);
-            }
-
-            term.tf_scores = tf_scores_clone;
+            term.update_tf_idf_scores();
         }
     }
 
@@ -329,6 +340,43 @@ mod test {
 
         indexer.add_document(document.clone());
         indexer.add_document(document.clone());
+    }
+
+    #[test]
+    fn test_update_tf_idf_scores() {
+        let document1 = Document::new(
+            Html::parse_document("<body><p>hippopotamus hippopotamus</p></body>"),
+            0,
+        );
+        let document2 = Document::new(Html::parse_document("<body><p>ladder</p></body>"), 1);
+
+        let mut term = Term::new(String::from("hippopotamus"));
+
+        // Manually set up TF for both documents
+        let tf1 = ordered_float::OrderedFloat(2.0);
+        let tf2 = ordered_float::OrderedFloat(0.0);
+        term.tf_scores.insert(document1.clone(), tf1);
+        term.tf_scores.insert(document2.clone(), tf2);
+
+        // Update idf, which should be log(2/), where 2 is the number of
+        // documents and 1 is the number of documents the term is found in
+        term.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
+
+        // Update the TF-IDF scores based on the new idf
+        term.update_tf_idf_scores();
+
+        // Expected TF-IDF values
+        let mut expected_tf_idf = HashMap::new();
+        expected_tf_idf.insert(
+            document1.clone(),
+            tf1 * ordered_float::OrderedFloat(f32::consts::LOG10_2),
+        );
+        expected_tf_idf.insert(
+            document2.clone(),
+            tf2 * ordered_float::OrderedFloat(f32::consts::LOG10_2),
+        );
+
+        assert_eq!(term.tf_idf_scores, expected_tf_idf);
     }
 
     #[test]
