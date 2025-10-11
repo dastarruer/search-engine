@@ -104,13 +104,10 @@ impl Term {
     /// as term frequency * IDF, which needs to be refreshed for every document
     /// if IDF ever changes.
     fn update_tf_idf_scores(&mut self) {
-        let mut tf_scores_clone = self.tf_scores.clone();
-        for (document, tf) in tf_scores_clone.iter_mut() {
+        for (document, tf) in self.tf_scores.iter_mut() {
             let new_tf_idf = tf.clone() * self.idf;
             self.tf_idf_scores.insert(document.clone(), new_tf_idf);
         }
-
-        self.tf_scores = tf_scores_clone;
     }
 }
 
