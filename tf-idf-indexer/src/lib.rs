@@ -79,6 +79,16 @@ impl Term {
         )
     }
 
+    /// Update [`Term::document_frequency`] based on given term frequency.
+    ///
+    /// Increments [`Term::document_frequency`] if the term appears at least once.
+    fn update_document_frequency(&mut self, tf: OrderedFloat<f32>) {
+        // If the term appears at least once, incrememnt document frequency
+        if tf > ordered_float::OrderedFloat(0.0) {
+            self.document_frequency += 1;
+        }
+    }
+
     /// Update the IDF score of a [`Term`] (see [`Term::idf`] for more details).
     ///
     /// This is useful when calculating the TF-IDF score of a term, which is
@@ -154,10 +164,7 @@ impl Indexer {
         for (_, term) in self.terms.iter_mut() {
             let tf = term.get_tf(&relevant_terms);
 
-            // If the term appears at least once, incrememnt document frequency
-            if tf > ordered_float::OrderedFloat(0.0) {
-                term.document_frequency += 1;
-            }
+            term.update_document_frequency(tf);
 
             term.update_total_idf(self.num_documents);
 
@@ -299,6 +306,34 @@ mod test {
         ];
 
         assert_eq!(document.extract_relevant_terms(), expected_terms);
+    }
+
+    mod update_document_frequency {
+        use super::*;
+
+        #[test]
+        fn test_positive_nonzero_tf() {
+            let mut term = Term::new(String::from("hippopotamus"));
+
+            // A hypothetical term frequency
+            let tf = ordered_float::OrderedFloat(2.0);
+
+            term.update_document_frequency(tf);
+
+            assert_eq!(term.document_frequency, 1);
+        }
+
+        #[test]
+        fn test_zero_tf() {
+            let mut term = Term::new(String::from("hippopotamus"));
+
+            // A hypothetical term frequency
+            let tf = ordered_float::OrderedFloat(0.0);
+
+            term.update_document_frequency(tf);
+
+            assert_eq!(term.document_frequency, 0);
+        }
     }
 
     #[test]
