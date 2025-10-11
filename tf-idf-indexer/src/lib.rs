@@ -336,42 +336,46 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_add_document() {
-        let document = Document::new(
-            Html::parse_document(
-                r#"
-            <body>
-                <p>hippopotamus hippopotamus hippopotamus</p>
-            </body>"#,
-            ),
-            0,
-        );
+    mod add_document {
+        use super::*;
 
-        let mut indexer = Indexer::new(HashMap::new());
+        #[test]
+        fn test_add_document() {
+            let document = Document::new(
+                Html::parse_document(
+                    r#"
+                <body>
+                    <p>hippopotamus hippopotamus hippopotamus</p>
+                </body>"#,
+                ),
+                0,
+            );
 
-        indexer.add_document(document.clone());
+            let mut indexer = Indexer::new(HashMap::new());
 
-        assert_eq!(indexer.documents.get(&document).unwrap(), &document);
-    }
+            indexer.add_document(document.clone());
 
-    #[test]
-    #[should_panic]
-    fn test_add_duplicate_document() {
-        let document = Document::new(
-            Html::parse_document(
-                r#"
-            <body>
-                <p>hippopotamus hippopotamus hippopotamus</p>
-            </body>"#,
-            ),
-            0,
-        );
+            assert_eq!(indexer.documents.get(&document).unwrap(), &document);
+        }
 
-        let mut indexer = Indexer::new(HashMap::new());
+        #[test]
+        #[should_panic]
+        fn test_add_duplicate_document() {
+            let document = Document::new(
+                Html::parse_document(
+                    r#"
+                <body>
+                    <p>hippopotamus hippopotamus hippopotamus</p>
+                </body>"#,
+                ),
+                0,
+            );
 
-        indexer.add_document(document.clone());
-        indexer.add_document(document.clone());
+            let mut indexer = Indexer::new(HashMap::new());
+
+            indexer.add_document(document.clone());
+            indexer.add_document(document.clone());
+        }
     }
 
     #[test]
