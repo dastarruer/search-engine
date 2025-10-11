@@ -384,25 +384,42 @@ mod test {
             Html::parse_document("<body><p>hippopotamus hippopotamus</p></body>"),
             0,
         );
-        let document2 = Document::new(Html::parse_document("<body><p>ladder</p></body>"), 1);
 
         let mut term = Term::new(String::from("hippopotamus"));
 
         // Manually set up TF for both documents
         let tf1 = ordered_float::OrderedFloat(2.0);
-        let tf2 = ordered_float::OrderedFloat(0.0);
         term.tf_scores.insert(document1.clone(), tf1);
-        term.tf_scores.insert(document2.clone(), tf2);
 
-        // Update idf, which should be log(2/), where 2 is the number of
+        term.update_document_frequency(tf1);
+
+        // Update idf, which should be log(1/1), where 1 is the number of
         // documents and 1 is the number of documents the term is found in
-        term.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
+        term.idf = ordered_float::OrderedFloat(0.0);
 
         // Update the TF-IDF scores based on the new idf
         term.update_tf_idf_scores();
 
         // Expected TF-IDF values
         let mut expected_tf_idf = HashMap::new();
+        expected_tf_idf.insert(document1.clone(), tf1 * ordered_float::OrderedFloat(0.0));
+
+        assert_eq!(term.tf_idf_scores, expected_tf_idf);
+
+        let document2 = Document::new(Html::parse_document("<body><p>ladder</p></body>"), 1);
+
+        let tf2 = ordered_float::OrderedFloat(0.0);
+
+        term.tf_scores.insert(document2.clone(), tf2);
+
+        term.update_document_frequency(tf2);
+
+        // Update idf, which should be log(2/1), where 1 is the number of
+        // documents and 1 is the number of documents the term is found in
+        term.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
+
+        term.update_tf_idf_scores();
+
         expected_tf_idf.insert(
             document1.clone(),
             tf1 * ordered_float::OrderedFloat(f32::consts::LOG10_2),
