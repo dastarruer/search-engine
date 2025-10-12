@@ -10,6 +10,17 @@ services:
     # Build this image after db migrations
     depends_on:
       - flyway
+  indexer:
+    build: ./tf-idf-indexer
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_ENDPOINT: ${DB_ENDPOINT}
+      DB_PORT: ${DB_PORT}
+      DB_NAME: ${DB_NAME}
+    # Build this image after db migrations
+    depends_on:
+      - flyway
 
   flyway:
     image: flyway/flyway
