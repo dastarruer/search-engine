@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use tf_idf_indexer::Indexer;
+
 fn main() {
-    println!("Hello, world!");
+    let mut indexer = Indexer::new(HashMap::new());
 }
