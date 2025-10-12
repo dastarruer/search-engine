@@ -1,4 +1,4 @@
-mod utils;
+pub mod utils;
 
 use std::collections::{HashMap, HashSet};
 
@@ -25,7 +25,7 @@ mod helper {
 type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-struct Term {
+pub struct Term {
     pub term: String,
 
     /// The Inverse Document Frequency of a term.
@@ -56,7 +56,7 @@ impl std::hash::Hash for Term {
 }
 
 impl Term {
-    fn new(term: String) -> Self {
+    pub fn new(term: String) -> Self {
         Term {
             term,
             idf: ordered_float::OrderedFloat(0.0),
@@ -144,19 +144,23 @@ impl<'a> StopWordTerm<'a> {
     }
 }
 
-struct Indexer {
+pub struct Indexer {
     terms: HashMap<String, Term>,
     pages: HashSet<Page>,
     num_pages: i32,
 }
 
 impl Indexer {
-    fn new(starting_terms: HashMap<String, Term>) -> Self {
+    pub fn new(starting_terms: HashMap<String, Term>, starting_pages: HashSet<Page>) -> Self {
         Indexer {
             terms: starting_terms,
-            pages: HashSet::new(),
+            pages: starting_pages,
             num_pages: 0,
         }
+    }
+
+    pub fn run() {
+
     }
 
     fn parse_document(&mut self, page: Page) {
@@ -227,7 +231,7 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
 }
 
 #[derive(Eq, Debug, Clone)]
-struct Page {
+pub struct Page {
     id: i32,
     html: Html,
 }
@@ -247,7 +251,7 @@ impl std::hash::Hash for Page {
 }
 
 impl Page {
-    fn new(html: Html, id: i32) -> Self {
+    pub fn new(html: Html, id: i32) -> Self {
         Page { html, id }
     }
 
@@ -275,7 +279,7 @@ impl Page {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, f32, fs};
+    use std::{collections::{HashMap, HashSet}, f32, fs};
 
     use scraper::Html;
 
@@ -345,6 +349,8 @@ mod test {
     }
 
     mod add_page {
+        use std::collections::HashSet;
+
         use super::*;
 
         #[test]
@@ -359,7 +365,7 @@ mod test {
                 0,
             );
 
-            let mut indexer = Indexer::new(HashMap::new());
+            let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
             indexer.add_page(page.clone());
 
@@ -379,7 +385,7 @@ mod test {
                 0,
             );
 
-            let mut indexer = Indexer::new(HashMap::new());
+            let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
             indexer.add_page(page.clone());
             indexer.add_page(page.clone());
@@ -489,7 +495,7 @@ mod test {
         term.tf_idf_scores
             .insert(page.clone(), ordered_float::OrderedFloat(0.0));
 
-        let mut indexer = Indexer::new(HashMap::new());
+        let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
         indexer.add_term(term.clone());
 
@@ -518,7 +524,7 @@ mod test {
             1,
         );
 
-        let mut indexer = Indexer::new(HashMap::new());
+        let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
         indexer.parse_document(page1.clone());
         indexer.parse_document(page2.clone());

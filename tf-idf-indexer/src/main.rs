@@ -1,7 +1,26 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use tf_idf_indexer::Indexer;
+use scraper::Html;
+use tf_idf_indexer::{Indexer, Page};
 
 fn main() {
-    let mut indexer = Indexer::new(HashMap::new());
+    let mut starting_pages = HashSet::new();
+
+    for i in 0..4 {
+        let id = i;
+
+        let page = Page::new(
+            Html::parse_document(
+                r#"
+            <body>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+            ),
+            id,
+        );
+
+        starting_pages.insert(page);
+    }
+
+    let mut indexer = Indexer::new(HashMap::new(), starting_pages);
 }
