@@ -10,3 +10,4 @@ ordered-float = "5.1.0"
 scraper = "0.24.0"
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls"] }
 stop-words = "0.9.0"
+url = "2.5.7"

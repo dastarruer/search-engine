@@ -1938,6 +1938,7 @@ dependencies = [
  "scraper",
  "sqlx",
  "stop-words",
+ "url",
 ]
 
 [[package]]
