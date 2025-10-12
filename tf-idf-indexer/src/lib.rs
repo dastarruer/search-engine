@@ -26,23 +26,23 @@ type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
 struct Term {
     pub term: String,
 
-    /// The inverse document frequency of a term.
+    /// The Inverse Document Frequency of a term.
     ///
-    /// This measures how rare a term is across documents. If the term appears in many documents, then the IDF is low. If the term only appears in one or two documents, the IDF is high.
+    /// This measures how rare a term is across documents (which are referred to as pages here). If the term appears in many pages, then the IDF is low. If the term only appears in one or two pages, the IDF is high.
     idf: ordered_f32,
 
-    /// The amount of documents that contain this term. Used for calculating [`Term::idf`].
-    document_frequency: i32,
+    /// The amount of pages that contain this term. Used for calculating [`Term::idf`].
+    page_frequency: i32,
 
-    /// The TF scores of each [`Document`].
+    /// The TF scores of each [`Page`].
     ///
-    /// TF is measured as the term frequency of a [`Term`], or how many times a term appears in a given [`Document`].
-    tf_scores: HashMap<Document, ordered_f32>,
+    /// TF is measured as the term frequency of a [`Term`], or how many times a term appears in a given [`Page`].
+    tf_scores: HashMap<Page, ordered_f32>,
 
-    /// The TF-IDF scores of each [`Document`].
+    /// The TF-IDF scores of each [`Page`].
     ///
-    /// TF-IDF is measured as the term frequency of a [`Term`] in a [`Document`] multiplied by [`Term::idf`].
-    tf_idf_scores: HashMap<Document, ordered_f32>,
+    /// TF-IDF is measured as the term frequency of a [`Term`] in a [`Page`] multiplied by [`Term::idf`].
+    tf_idf_scores: HashMap<Page, ordered_f32>,
 }
 
 // Manually implement the Hash trait since HashMap does not implement Hash
@@ -58,7 +58,7 @@ impl Term {
         Term {
             term,
             idf: ordered_float::OrderedFloat(0.0),
-            document_frequency: 0,
+            page_frequency: 0,
             tf_scores: HashMap::new(),
             tf_idf_scores: HashMap::new(),
         }
@@ -68,8 +68,8 @@ impl Term {
     ///
     /// This is called the *term frequency* of a term. This is useful when
     /// calculating the TF-IDF score of a term, which is used to check how
-    /// frequent a [`Term`] is in one document, and how rare it is in other
-    /// documents.
+    /// frequent a [`Term`] is in one page, and how rare it is in other
+    /// pages.
     fn get_tf<'b>(&self, terms: &Vec<Term>) -> ordered_f32 {
         ordered_float::OrderedFloat(
             terms
@@ -79,23 +79,23 @@ impl Term {
         )
     }
 
-    /// Update [`Term::document_frequency`] based on given term frequency.
+    /// Update [`Term::page_frequency`] based on given term frequency.
     ///
-    /// Increments [`Term::document_frequency`] if the term appears at least once.
-    fn update_document_frequency(&mut self, tf: OrderedFloat<f32>) {
-        // If the term appears at least once, incrememnt document frequency
+    /// Increments [`Term::page_frequency`] if the term appears at least once.
+    fn update_page_frequency(&mut self, tf: OrderedFloat<f32>) {
+        // If the term appears at least once, incrememnt page frequency
         if tf > ordered_float::OrderedFloat(0.0) {
-            self.document_frequency += 1;
+            self.page_frequency += 1;
         }
     }
 
     /// Update the IDF score of a [`Term`] (see [`Term::idf`] for more details).
     ///
     /// This is useful when calculating the TF-IDF score of a term, which is
-    /// used to check how frequent a [`Term`] is in one document, and how rare
-    /// it is in other documents.
-    fn update_total_idf(&mut self, num_documents: i32) {
-        let idf = num_documents as f32 / self.document_frequency as f32;
+    /// used to check how frequent a [`Term`] is in one page, and how rare
+    /// it is in other pages.
+    fn update_total_idf(&mut self, num_pages: i32) {
+        let idf = num_pages as f32 / self.page_frequency as f32;
         self.idf = OrderedFloat(idf.log10());
     }
 
@@ -108,15 +108,15 @@ impl Term {
         STOP_WORDS.contains(&StopWordTerm::new(&self.term))
     }
 
-    /// Updates all TF-IDF scores for this term across every document.
+    /// Updates all TF-IDF scores for this term across every page.
     ///
     /// Should be called whenever [`Term::idf`] changes. TF-IDF is calculated
-    /// as term frequency * IDF, which needs to be refreshed for every document
+    /// as term frequency * IDF, which needs to be refreshed for every page
     /// if IDF ever changes.
     fn update_tf_idf_scores(&mut self) {
-        for (document, tf) in self.tf_scores.iter_mut() {
+        for (page, tf) in self.tf_scores.iter_mut() {
             let new_tf_idf = tf.clone() * self.idf;
-            self.tf_idf_scores.insert(document.clone(), new_tf_idf);
+            self.tf_idf_scores.insert(page.clone(), new_tf_idf);
         }
     }
 }
@@ -138,23 +138,23 @@ impl<'a> StopWordTerm<'a> {
 
 struct Indexer {
     terms: HashMap<String, Term>,
-    documents: HashSet<Document>,
-    num_documents: i32,
+    pages: HashSet<Page>,
+    num_pages: i32,
 }
 
 impl Indexer {
     fn new(starting_terms: HashMap<String, Term>) -> Self {
         Indexer {
             terms: starting_terms,
-            documents: HashSet::new(),
-            num_documents: 0,
+            pages: HashSet::new(),
+            num_pages: 0,
         }
     }
 
-    fn parse_document(&mut self, document: Document) {
-        let relevant_terms = document.extract_relevant_terms();
+    fn parse_document(&mut self, page: Page) {
+        let relevant_terms = page.extract_relevant_terms();
 
-        self.add_document(document.clone());
+        self.add_page(page.clone());
 
         for term in relevant_terms.clone() {
             self.add_term(term);
@@ -164,39 +164,39 @@ impl Indexer {
         for (_, term) in self.terms.iter_mut() {
             let tf = term.get_tf(&relevant_terms);
 
-            term.update_document_frequency(tf);
+            term.update_page_frequency(tf);
 
-            term.update_total_idf(self.num_documents);
+            term.update_total_idf(self.num_pages);
 
             let tf_idf = tf * term.idf;
 
-            term.tf_scores.insert(document.clone(), tf);
-            term.tf_idf_scores.insert(document.clone(), tf_idf);
+            term.tf_scores.insert(page.clone(), tf);
+            term.tf_idf_scores.insert(page.clone(), tf_idf);
 
-            // Go back and update the tf_idf scores for every other single document
+            // Go back and update the tf_idf scores for every other single page
             term.update_tf_idf_scores();
         }
     }
 
-    /// Add a new [`Document`] to the set of existing documents, and increment [`Indexer::num_documents`].
+    /// Add a new [`Page`] to the set of existing pages, and increment [`Indexer::num_pages`].
     ///
     /// # Panics
-    /// - If two [`Document`]s with the same [`Document::id`] are added to the
+    /// - If two [`Page`]s with the same [`page::id`] are added to the
     /// set, the program panics.
     // TODO: Maybe this shouldn't panic...?
-    fn add_document(&mut self, document: Document) {
-        assert!(!self.documents.contains(&document));
+    fn add_page(&mut self, page: Page) {
+        assert!(!self.pages.contains(&page));
 
-        self.documents.insert(document);
-        self.num_documents += 1;
+        self.pages.insert(page);
+        self.num_pages += 1;
     }
 
     fn add_term(&mut self, term: Term) {
         if !self.terms.contains_key(&term.term) {
             let mut new_term = term.clone();
 
-            // Initialize tf and tf_idf for all existing documents
-            for doc in &self.documents {
+            // Initialize tf and tf_idf for all existing pages
+            for doc in &self.pages {
                 new_term.tf_scores.insert(doc.clone(), OrderedFloat(0.0));
                 new_term
                     .tf_idf_scores
@@ -219,28 +219,28 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
 }
 
 #[derive(Eq, Debug, Clone)]
-struct Document {
+struct Page {
     id: i32,
     html: Html,
 }
 
-impl PartialEq for Document {
+impl PartialEq for Page {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id
     }
 }
 
 // Manually implement the Hash trait since Html does not implement Hash
-impl std::hash::Hash for Document {
+impl std::hash::Hash for Page {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Just hash the id, since it's supposed to be unique
         self.id.hash(state);
     }
 }
 
-impl Document {
+impl Page {
     fn new(html: Html, id: i32) -> Self {
-        Document { html, id }
+        Page { html, id }
     }
 
     /// Extract relevant [`Term`]s from [`Html`].
@@ -271,26 +271,26 @@ mod test {
 
     use scraper::Html;
 
-    use crate::{Document, Indexer, Term, test_file_path_from_filepath};
+    use crate::{Indexer, Page, Term, test_file_path_from_filepath};
 
     const DEFAULT_ID: i32 = 0;
 
     #[test]
     fn test_get_tf_of_term() {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();
-        let document = Document::new(Html::parse_document(html.as_str()), DEFAULT_ID);
+        let page = Page::new(Html::parse_document(html.as_str()), DEFAULT_ID);
 
         let term = Term::new(String::from("hippopotamus"));
 
         assert_eq!(
-            term.get_tf(&document.extract_relevant_terms()),
+            term.get_tf(&page.extract_relevant_terms()),
             ordered_float::OrderedFloat(4.0)
         );
     }
 
     #[test]
     fn test_extract_terms() {
-        let document = Document::new(
+        let page = Page::new(
             Html::parse_document(
                 r#"
             <body>
@@ -305,10 +305,10 @@ mod test {
             Term::new(String::from("hippopotamus")),
         ];
 
-        assert_eq!(document.extract_relevant_terms(), expected_terms);
+        assert_eq!(page.extract_relevant_terms(), expected_terms);
     }
 
-    mod update_document_frequency {
+    mod update_page_frequency {
         use super::*;
 
         #[test]
@@ -318,9 +318,9 @@ mod test {
             // A hypothetical term frequency
             let tf = ordered_float::OrderedFloat(2.0);
 
-            term.update_document_frequency(tf);
+            term.update_page_frequency(tf);
 
-            assert_eq!(term.document_frequency, 1);
+            assert_eq!(term.page_frequency, 1);
         }
 
         #[test]
@@ -330,18 +330,18 @@ mod test {
             // A hypothetical term frequency
             let tf = ordered_float::OrderedFloat(0.0);
 
-            term.update_document_frequency(tf);
+            term.update_page_frequency(tf);
 
-            assert_eq!(term.document_frequency, 0);
+            assert_eq!(term.page_frequency, 0);
         }
     }
 
-    mod add_document {
+    mod add_page {
         use super::*;
 
         #[test]
-        fn test_add_document() {
-            let document = Document::new(
+        fn test_add_page() {
+            let page = Page::new(
                 Html::parse_document(
                     r#"
                 <body>
@@ -353,15 +353,15 @@ mod test {
 
             let mut indexer = Indexer::new(HashMap::new());
 
-            indexer.add_document(document.clone());
+            indexer.add_page(page.clone());
 
-            assert_eq!(indexer.documents.get(&document).unwrap(), &document);
+            assert_eq!(indexer.pages.get(&page).unwrap(), &page);
         }
 
         #[test]
         #[should_panic]
-        fn test_add_duplicate_document() {
-            let document = Document::new(
+        fn test_add_duplicate_page() {
+            let page = Page::new(
                 Html::parse_document(
                     r#"
                 <body>
@@ -373,28 +373,28 @@ mod test {
 
             let mut indexer = Indexer::new(HashMap::new());
 
-            indexer.add_document(document.clone());
-            indexer.add_document(document.clone());
+            indexer.add_page(page.clone());
+            indexer.add_page(page.clone());
         }
     }
 
     #[test]
     fn test_update_tf_idf_scores() {
-        let document1 = Document::new(
+        let page1 = Page::new(
             Html::parse_document("<body><p>hippopotamus hippopotamus</p></body>"),
             0,
         );
 
         let mut term = Term::new(String::from("hippopotamus"));
 
-        // Manually set up TF for both documents
+        // Manually set up TF for both pages
         let tf1 = ordered_float::OrderedFloat(2.0);
-        term.tf_scores.insert(document1.clone(), tf1);
+        term.tf_scores.insert(page1.clone(), tf1);
 
-        term.update_document_frequency(tf1);
+        term.update_page_frequency(tf1);
 
         // Update idf, which should be log(1/1), where 1 is the number of
-        // documents and 1 is the number of documents the term is found in
+        // pages and 1 is the number of pages the term is found in
         term.idf = ordered_float::OrderedFloat(0.0);
 
         // Update the TF-IDF scores based on the new idf
@@ -402,30 +402,30 @@ mod test {
 
         // Expected TF-IDF values
         let mut expected_tf_idf = HashMap::new();
-        expected_tf_idf.insert(document1.clone(), tf1 * ordered_float::OrderedFloat(0.0));
+        expected_tf_idf.insert(page1.clone(), tf1 * ordered_float::OrderedFloat(0.0));
 
         assert_eq!(term.tf_idf_scores, expected_tf_idf);
 
-        let document2 = Document::new(Html::parse_document("<body><p>ladder</p></body>"), 1);
+        let page2 = Page::new(Html::parse_document("<body><p>ladder</p></body>"), 1);
 
         let tf2 = ordered_float::OrderedFloat(0.0);
 
-        term.tf_scores.insert(document2.clone(), tf2);
+        term.tf_scores.insert(page2.clone(), tf2);
 
-        term.update_document_frequency(tf2);
+        term.update_page_frequency(tf2);
 
         // Update idf, which should be log(2/1), where 1 is the number of
-        // documents and 1 is the number of documents the term is found in
+        // pages and 1 is the number of pages the term is found in
         term.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
 
         term.update_tf_idf_scores();
 
         expected_tf_idf.insert(
-            document1.clone(),
+            page1.clone(),
             tf1 * ordered_float::OrderedFloat(f32::consts::LOG10_2),
         );
         expected_tf_idf.insert(
-            document2.clone(),
+            page2.clone(),
             tf2 * ordered_float::OrderedFloat(f32::consts::LOG10_2),
         );
 
@@ -438,7 +438,7 @@ mod test {
         #[test]
         fn test_update_idf() {
             let mut term = Term::new(String::from("hippopotamus"));
-            term.document_frequency = 2;
+            term.page_frequency = 2;
 
             term.clone().update_total_idf(2);
 
@@ -448,7 +448,7 @@ mod test {
         #[test]
         fn test_zero_doc_frequency() {
             let mut term = Term::new(String::from("hippopotamus"));
-            term.document_frequency = 0;
+            term.page_frequency = 0;
 
             term.clone().update_total_idf(2);
 
@@ -460,9 +460,9 @@ mod test {
     fn test_filter_stop_words() {
         let html =
             fs::read_to_string(test_file_path_from_filepath("filter_stop_words.html")).unwrap();
-        let document = Document::new(Html::parse_document(html.as_str()), 0);
+        let page = Page::new(Html::parse_document(html.as_str()), 0);
 
-        let terms = document.extract_relevant_terms();
+        let terms = page.extract_relevant_terms();
 
         let included_terms = vec![
             Term::new(String::from("hippopotamus")),
@@ -474,12 +474,12 @@ mod test {
 
     #[test]
     fn test_add_term() {
-        let document = Document::new(Html::new_document(), 0);
+        let page = Page::new(Html::new_document(), 0);
         let mut term = Term::new(String::from("hippopotamus"));
         term.tf_scores
-            .insert(document.clone(), ordered_float::OrderedFloat(0.0));
+            .insert(page.clone(), ordered_float::OrderedFloat(0.0));
         term.tf_idf_scores
-            .insert(document.clone(), ordered_float::OrderedFloat(0.0));
+            .insert(page.clone(), ordered_float::OrderedFloat(0.0));
 
         let mut indexer = Indexer::new(HashMap::new());
 
@@ -490,7 +490,7 @@ mod test {
 
     #[test]
     fn test_parse_document() {
-        let document1 = Document::new(
+        let page1 = Page::new(
             Html::parse_document(
                 r#"
         <body>
@@ -500,7 +500,7 @@ mod test {
             0,
         );
 
-        let document2 = Document::new(
+        let page2 = Page::new(
             Html::parse_document(
                 r#"
         <body>
@@ -512,30 +512,30 @@ mod test {
 
         let mut indexer = Indexer::new(HashMap::new());
 
-        indexer.parse_document(document1.clone());
-        indexer.parse_document(document2.clone());
+        indexer.parse_document(page1.clone());
+        indexer.parse_document(page2.clone());
 
         // Hippopotamus term
         let mut expected_hippo = Term::new(String::from("hippopotamus"));
         expected_hippo.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
-        expected_hippo.document_frequency = 1;
+        expected_hippo.page_frequency = 1;
         expected_hippo
             .tf_idf_scores
-            .insert(document2.clone(), ordered_float::OrderedFloat(0.0)); // TF = 0 in document2
+            .insert(page2.clone(), ordered_float::OrderedFloat(0.0)); // TF = 0 in page2
         expected_hippo
             .tf_idf_scores
-            .insert(document1.clone(), ordered_float::OrderedFloat(0.90309)); // TF-IDF in document1
+            .insert(page1.clone(), ordered_float::OrderedFloat(0.90309)); // TF-IDF in page1
 
         // Elephant term
         let mut expected_elephant = Term::new(String::from("elephant"));
         expected_elephant.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
-        expected_elephant.document_frequency = 1;
+        expected_elephant.page_frequency = 1;
         expected_elephant
             .tf_idf_scores
-            .insert(document1.clone(), ordered_float::OrderedFloat(0.0)); // TF = 0 in document1
+            .insert(page1.clone(), ordered_float::OrderedFloat(0.0)); // TF = 0 in page1
         expected_elephant
             .tf_idf_scores
-            .insert(document2.clone(), ordered_float::OrderedFloat(0.90309)); // TF-IDF in document2
+            .insert(page2.clone(), ordered_float::OrderedFloat(0.90309)); // TF-IDF in page2
 
         let mut expected_terms = HashMap::new();
         expected_terms.insert(expected_hippo.term.clone(), expected_hippo.clone());
@@ -543,7 +543,7 @@ mod test {
 
         let expected_terms = vec![expected_hippo, expected_elephant];
 
-        assert_eq!(indexer.num_documents, 2);
+        assert_eq!(indexer.num_pages, 2);
 
         for expected_term in expected_terms {
             let err_msg = &format!("Term '{}' not found in indexer", expected_term.term);
@@ -555,14 +555,14 @@ mod test {
                 expected_term.term
             );
             assert_eq!(
-                term_in_indexer.document_frequency, expected_term.document_frequency,
-                "Document frequency mismatch for term '{}'",
+                term_in_indexer.page_frequency, expected_term.page_frequency,
+                "page frequency mismatch for term '{}'",
                 expected_term.term
             );
 
             for (expected_doc, tf_idf) in &expected_term.tf_idf_scores {
                 let err_msg = &format!(
-                    "TF-IDF {} not found for term '{}' in document {}, instead found TF-IDF {}",
+                    "TF-IDF {} not found for term '{}' in page {}, instead found TF-IDF {}",
                     tf_idf, expected_term.term, expected_doc.id, tf_idf
                 );
                 let (doc, _) = term_in_indexer
@@ -571,7 +571,7 @@ mod test {
                     .expect(err_msg);
                 assert_eq!(
                     doc.id, expected_doc.id,
-                    "Document ID mismatch for term '{}'",
+                    "page ID mismatch for term '{}'",
                     expected_term.term
                 );
             }
