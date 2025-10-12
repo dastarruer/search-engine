@@ -190,7 +190,7 @@ impl Indexer {
     ///
     /// # Panics
     /// - If two [`Page`]s with the same [`page::id`] are added to the
-    /// set, the program panics.
+    ///   set, the program panics.
     // TODO: Maybe this shouldn't panic...?
     fn add_page(&mut self, page: Page) {
         assert!(!self.pages.contains(&page));
