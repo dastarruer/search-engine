@@ -282,19 +282,16 @@ impl Indexer {
         };
     }
 
-    fn add_term(&mut self, term: Term) {
-        if !self.terms.contains_key(&term.term) {
-            let mut new_term = term.clone();
-
+    fn add_term(&mut self, mut term: Term) {
+        let term_str = term.term.clone();
+        if !self.terms.contains_key(&term_str) {
             // Initialize tf and tf_idf for all existing pages
-            for doc in &self.pages {
-                new_term.tf_scores.insert(doc.clone(), OrderedFloat(0.0));
-                new_term
-                    .tf_idf_scores
-                    .insert(doc.clone(), OrderedFloat(0.0));
+            for page in &self.pages {
+                term.tf_scores.insert(page.id, OrderedFloat(0.0));
+                term.tf_idf_scores.insert(page.id, OrderedFloat(0.0));
             }
 
-            self.terms.insert(new_term.term.clone(), new_term);
+            self.terms.insert(term_str, term);
         }
     }
 }
