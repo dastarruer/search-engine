@@ -6,7 +6,7 @@ use url::form_urlencoded;
 /// - DB_ENDPOINT
 /// - DB_PORT
 /// - DB_NAME
-pub(crate) fn construct_postgres_url() -> String {
+pub fn construct_postgres_url() -> String {
     let endpoint = retrieve_env_var("DB_ENDPOINT");
     let port = retrieve_env_var("DB_PORT");
     let dbname = retrieve_env_var("DB_NAME");
