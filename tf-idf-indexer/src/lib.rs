@@ -98,8 +98,8 @@ impl Term {
     /// used to check how frequent a [`Term`] is in one page, and how rare
     /// it is in other pages.
     fn update_total_idf(&mut self, num_pages: i32) {
-        // Prevent divide-by-zero error
-        if self.page_frequency == 0 {
+        // Prevent divide-by-zero error or evaluating log(0)
+        if self.page_frequency == 0 || num_pages == 0 {
             self.idf = ordered_float::OrderedFloat(0.0);
             return;
         }
@@ -556,6 +556,16 @@ mod test {
             term.page_frequency = 0;
 
             term.update_total_idf(2);
+
+            assert_eq!(term.idf, 0.0);
+        }
+
+        #[test]
+        fn test_zero_num_pages() {
+            let mut term = Term::new(String::from("hippopotamus"));
+            term.page_frequency = 2;
+
+            term.update_total_idf(0);
 
             assert_eq!(term.idf, 0.0);
         }
