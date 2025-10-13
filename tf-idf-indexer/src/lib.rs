@@ -163,8 +163,17 @@ impl PageQueue {
     }
 
     fn push(&mut self, page: Page) {
-        self.queue.push_front(page.clone());
+        self.queue.push_back(page.clone());
         self.hashset.insert(page);
+    }
+
+    fn pop(&mut self) -> Option<Page> {
+        if let Some(page) = self.queue.front() {
+            self.hashset.remove(page);
+            self.queue.pop_front()
+        } else {
+            None
+        }
     }
 }
 
@@ -185,19 +194,35 @@ pub struct Indexer {
 
 impl Indexer {
     pub fn new(starting_terms: HashMap<String, Term>, starting_pages: HashSet<Page>) -> Self {
-        let page_queue = PageQueue::new(starting_pages);
+        let num_pages = starting_pages.len() as i32;
 
-        Indexer {
-            terms: starting_terms,
-            pages: page_queue,
-            num_pages: 0,
+        let mut indexer = Indexer {
+            terms: HashMap::new(),
+            pages: PageQueue::new(starting_pages),
+            num_pages,
+        };
+
+        // Add starting terms
+        for (_, term) in starting_terms {
+            indexer.add_term(term);
         }
+
+        indexer
     }
 
-    fn parse_document(&mut self, page: Page) {
-        let relevant_terms = page.extract_relevant_terms();
+    pub fn run(&mut self) {
+        let mut i = 0;
+        while let Some(page) = self.pages.pop() {
+            self.parse_page(page);
+            println!("Page {} parsed", i);
+            i += 1;
+        }
 
-        self.add_page(page.clone());
+        println!("All done!");
+    }
+
+    fn parse_page(&mut self, page: Page) {
+        let relevant_terms = page.extract_relevant_terms();
 
         for term in relevant_terms.clone() {
             self.add_term(term);
@@ -568,8 +593,8 @@ mod test {
 
         let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
-        indexer.parse_document(page1.clone());
-        indexer.parse_document(page2.clone());
+        indexer.parse_page(page1.clone());
+        indexer.parse_page(page2.clone());
 
         // Hippopotamus term
         let mut expected_hippo = Term::new(String::from("hippopotamus"));

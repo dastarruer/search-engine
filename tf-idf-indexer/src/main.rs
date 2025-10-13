@@ -23,4 +23,6 @@ fn main() {
     }
 
     let mut indexer = Indexer::new(HashMap::new(), starting_pages);
+
+    indexer.run();
 }
