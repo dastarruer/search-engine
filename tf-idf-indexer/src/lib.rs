@@ -221,17 +221,16 @@ impl Indexer {
         }
     }
 
-    /// Add a new [`Page`] to the set of existing pages, and increment [`Indexer::num_pages`].
+    /// Add a new [`Page`] to the set of existing pages, and increment
+    /// [`Indexer::num_pages`].
     ///
-    /// # Panics
-    /// - If two [`Page`]s with the same [`page::id`] are added to the
-    ///   set, the program panics.
+    /// Does not add a duplicate page.
     // TODO: Maybe this shouldn't panic...?
     fn add_page(&mut self, page: Page) {
-        assert!(!self.pages.contains(&page));
-
-        self.pages.push(page);
-        self.num_pages += 1;
+        if !self.pages.contains(&page) {
+            self.pages.push(page);
+            self.num_pages += 1;
+        };
     }
 
     fn add_term(&mut self, term: Term) {
@@ -415,7 +414,6 @@ mod test {
         }
 
         #[test]
-        #[should_panic]
         fn test_add_duplicate_page() {
             let page = Page::new(
                 Html::parse_document(
@@ -431,6 +429,8 @@ mod test {
 
             indexer.add_page(page.clone());
             indexer.add_page(page.clone());
+
+            assert_eq!(indexer.pages.queue.len(), 1);
         }
     }
 
