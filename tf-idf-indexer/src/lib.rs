@@ -1,6 +1,6 @@
 pub mod utils;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
@@ -144,23 +144,54 @@ impl<'a> StopWordTerm<'a> {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct PageQueue {
+    queue: VecDeque<Page>,
+    hashset: HashSet<Page>,
+}
+
+impl PageQueue {
+    fn new(pages: HashSet<Page>) -> Self {
+        PageQueue {
+            queue: pages.clone().into_iter().collect(),
+            hashset: pages,
+        }
+    }
+
+    fn contains(&self, page: &Page) -> bool {
+        self.hashset.contains(page)
+    }
+
+    fn push(&mut self, page: Page) {
+        self.queue.push_front(page.clone());
+        self.hashset.insert(page);
+    }
+}
+
+impl<'a> IntoIterator for &'a PageQueue {
+    type Item = &'a Page;
+    type IntoIter = std::collections::vec_deque::Iter<'a, Page>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.queue.iter()
+    }
+}
+
 pub struct Indexer {
     terms: HashMap<String, Term>,
-    pages: HashSet<Page>,
+    pages: PageQueue,
     num_pages: i32,
 }
 
 impl Indexer {
     pub fn new(starting_terms: HashMap<String, Term>, starting_pages: HashSet<Page>) -> Self {
+        let page_queue = PageQueue::new(starting_pages);
+
         Indexer {
             terms: starting_terms,
-            pages: starting_pages,
+            pages: page_queue,
             num_pages: 0,
         }
-    }
-
-    pub fn run() {
-
     }
 
     fn parse_document(&mut self, page: Page) {
@@ -199,7 +230,7 @@ impl Indexer {
     fn add_page(&mut self, page: Page) {
         assert!(!self.pages.contains(&page));
 
-        self.pages.insert(page);
+        self.pages.push(page);
         self.num_pages += 1;
     }
 
@@ -279,7 +310,10 @@ impl Page {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::{HashMap, HashSet}, f32, fs};
+    use std::{
+        collections::{HashMap, HashSet},
+        f32, fs,
+    };
 
     use scraper::Html;
 
@@ -351,7 +385,15 @@ mod test {
     mod add_page {
         use std::collections::HashSet;
 
+        use crate::PageQueue;
+
         use super::*;
+
+        impl PageQueue {
+            fn get(&self, page: &Page) -> Option<&Page> {
+                self.hashset.get(page)
+            }
+        }
 
         #[test]
         fn test_add_page() {
