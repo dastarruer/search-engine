@@ -180,7 +180,7 @@ impl PageQueue {
     /// Refresh the queue by reading from the database.
     async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
         let rows =
-            sqlx::query(r#"SELECT id, html FROM pages WHERE is_indexed = FALSE LIMIT 100;"#)
+            sqlx::query(r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT 100;"#)
                 .fetch_all(pool)
                 .await
                 .unwrap();
