@@ -72,7 +72,7 @@ impl Term {
     /// calculating the TF-IDF score of a term, which is used to check how
     /// frequent a [`Term`] is in one page, and how rare it is in other
     /// pages.
-    fn get_tf<'b>(&self, terms: &Vec<Term>) -> ordered_f32 {
+    fn get_tf(&self, terms: &[Term]) -> ordered_f32 {
         ordered_float::OrderedFloat(
             terms
                 .iter()
@@ -123,7 +123,7 @@ impl Term {
     /// if IDF ever changes.
     fn update_tf_idf_scores(&mut self) {
         for (page, tf) in self.tf_scores.iter_mut() {
-            let new_tf_idf = tf.clone() * self.idf;
+            let new_tf_idf = *tf * self.idf;
             self.tf_idf_scores.insert(page.clone(), new_tf_idf);
         }
     }
