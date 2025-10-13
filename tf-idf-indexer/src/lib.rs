@@ -624,7 +624,10 @@ mod test {
 
         let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
+        indexer.add_page(page1.clone());
         indexer.parse_page(page1.clone());
+
+        indexer.add_page(page2.clone());
         indexer.parse_page(page2.clone());
 
         // Hippopotamus term
