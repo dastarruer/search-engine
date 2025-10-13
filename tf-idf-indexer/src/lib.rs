@@ -37,13 +37,13 @@ pub struct Term {
     /// The amount of pages that contain this term. Used for calculating [`Term::idf`].
     page_frequency: i32,
 
-    /// The TF scores of each [`Page`], stored as .
+    /// The TF scores of each [`Page`], stored as <[`Page::id`]>:`<TF of term in a page>`.
     ///
     /// TF is measured as the term frequency of a [`Term`], or how many times a
     /// term appears in a given [`Page`].
     tf_scores: HashMap<i32, ordered_f32>,
 
-    /// The TF-IDF scores of each [`i32`].
+    /// The TF-IDF scores of each [`i32`], stored as <[`Page::id`]>:<TF-IDF of term in a [`Page`]>.
     ///
     /// TF-IDF is measured as the term frequency of a [`Term`] in a [`Page`] multiplied by [`Term::idf`].
     tf_idf_scores: HashMap<i32, ordered_f32>,
