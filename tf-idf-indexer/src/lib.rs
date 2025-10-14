@@ -124,9 +124,9 @@ impl Term {
     /// as term frequency * IDF, which needs to be refreshed for every page
     /// if IDF ever changes.
     fn update_tf_idf_scores(&mut self) {
-        for (page, tf) in self.tf_scores.iter_mut() {
+        for (page_id, tf) in self.tf_scores.iter_mut() {
             let new_tf_idf = *tf * self.idf;
-            self.tf_idf_scores.insert(page.clone(), new_tf_idf);
+            self.tf_idf_scores.insert(*page_id, new_tf_idf);
         }
     }
 }
