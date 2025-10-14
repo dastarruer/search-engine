@@ -177,21 +177,6 @@ impl PageQueue {
             None
         }
     }
-
-    /// Refresh the queue by reading from the database.
-    async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let rows =
-            sqlx::query(r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT 100;"#)
-                .fetch_all(pool)
-                .await
-                .unwrap();
-
-        for row in rows {
-            let page = Page::new(Html::parse_document(row.get("html")), row.get("id"));
-
-            self.push(page);
-        }
-    }
 }
 
 impl<'a> IntoIterator for &'a PageQueue {
@@ -230,7 +215,7 @@ impl Indexer {
     pub async fn run(&mut self, pool: &sqlx::PgPool) {
         let mut i = 0;
         if self.pages.queue.is_empty() {
-            self.pages.refresh_queue(pool).await;
+            self.refresh_queue(pool).await;
         }
 
         while let Some(page) = self.pages.pop() {
@@ -239,11 +224,26 @@ impl Indexer {
             i += 1;
 
             if self.pages.queue.is_empty() {
-                self.pages.refresh_queue(pool).await;
+                self.refresh_queue(pool).await;
             }
         }
 
         println!("All done!");
+    }
+
+    /// Refresh the queue by reading from the database.
+    pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
+        let rows =
+            sqlx::query(r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT 100;"#)
+                .fetch_all(pool)
+                .await
+                .unwrap();
+
+        for row in rows {
+            let page = Page::new(Html::parse_document(row.get("html")), row.get("id"));
+
+            self.add_page(page);
+        }
     }
 
     fn parse_page(&mut self, page: Page) {
