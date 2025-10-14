@@ -299,13 +299,13 @@ impl Indexer {
     }
 }
 
-/// Return the path of a file in src/test-files given just its filename.
+/// Return the path of a file in src/fixtures given just its filename.
 #[cfg(test)]
 pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
     // CARGO_MANIFEST_DIR gets the source dir of the project
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
-        .join("test-files")
+        .join("fixtures")
         .join(filename)
 }
 
@@ -368,17 +368,6 @@ mod test {
     use crate::{Indexer, Page, Term, test_file_path_from_filepath};
 
     const DEFAULT_ID: i32 = 0;
-
-    use sqlx::{Pool, Postgres, Row};
-
-    #[sqlx::test(migrations = "../migrations")]
-    async fn basic_test(pool: Pool<Postgres>) -> sqlx::Result<()> {
-        let foo = sqlx::query("SELECT * FROM foo").fetch_one(&pool).await?;
-
-        assert_eq!(foo.get::<String, _>("bar"), "foobar!");
-
-        Ok(())
-    }
 
     #[test]
     fn test_get_tf_of_term() {
