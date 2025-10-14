@@ -180,10 +180,11 @@ impl PageQueue {
 
     /// Refresh the queue by reading from the database.
     async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let rows = sqlx::query(r#"SELECT id, html FROM pages WHERE is_indexed = FALSE LIMIT 100;"#)
-            .fetch_all(pool)
-            .await
-            .unwrap();
+        let rows =
+            sqlx::query(r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT 100;"#)
+                .fetch_all(pool)
+                .await
+                .unwrap();
 
         for row in rows {
             let page = Page::new(Html::parse_document(row.get("html")), row.get("id"));
@@ -296,13 +297,13 @@ impl Indexer {
     }
 }
 
-/// Return the path of a file in src/test-files given just its filename.
+/// Return the path of a file in src/fixtures given just its filename.
 #[cfg(test)]
 pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
     // CARGO_MANIFEST_DIR gets the source dir of the project
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
-        .join("test-files")
+        .join("fixtures")
         .join(filename)
 }
 

@@ -91,7 +91,7 @@ impl Crawler {
     pub(crate) async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
-        let html = Html::parse_fragment(html.as_str());
+        let html = Html::parse_document(html.as_str());
 
         if !Self::is_english(&html) {
             return Err(CrawlerError::NonEnglishPage(page));
@@ -469,7 +469,7 @@ impl Crawler {
     pub async fn crawl_page_test(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
-        let html = Html::parse_fragment(html.as_str());
+        let html = Html::parse_document(html.as_str());
 
         if !Self::is_english(&html) {
             return Err(CrawlerError::NonEnglishPage(page));
@@ -535,7 +535,7 @@ mod test {
             let (crawler, page) = create_crawler("non_english_page.html").await;
 
             let html = crawler.extract_html_from_page(page).await.unwrap();
-            let html = Html::parse_fragment(html.as_str());
+            let html = Html::parse_document(html.as_str());
 
             assert!(!Crawler::is_english(&html));
         }
@@ -735,7 +735,7 @@ mod test {
             let (crawler, page) = create_crawler("page_with_title.html").await;
 
             let html =
-                Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
+                Html::parse_document(crawler.extract_html_from_page(page).await.unwrap().as_str());
             let title = Crawler::extract_title_from_html(&html).unwrap();
 
             assert!(title.contains("a page with a title"))
@@ -746,7 +746,7 @@ mod test {
             let (crawler, page) = create_crawler("non_english_page.html").await;
 
             let html =
-                Html::parse_fragment(crawler.extract_html_from_page(page).await.unwrap().as_str());
+                Html::parse_document(crawler.extract_html_from_page(page).await.unwrap().as_str());
             let title = Crawler::extract_title_from_html(&html);
 
             assert!(title.is_none())
@@ -809,7 +809,7 @@ mod test {
 
             let mut buf = String::new();
             html.read_to_string(&mut buf).unwrap();
-            let buf = Html::parse_fragment(buf.as_str());
+            let buf = Html::parse_document(buf.as_str());
 
             let urls = crawler.extract_urls_from_html(&buf);
             assert_eq!(urls, expected_urls)

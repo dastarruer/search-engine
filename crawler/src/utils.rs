@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use httpmock::prelude::*;
 
 #[cfg(any(test, feature = "bench"))]
-use reqwest::{StatusCode};
+use reqwest::StatusCode;
 
 use reqwest::Url;
 use url::form_urlencoded;
@@ -44,13 +44,13 @@ impl HttpServer {
     }
 }
 
-/// Return the path of a file in src/test-files given just its filename.
+/// Return the path of a file in src/fixtures given just its filename.
 #[cfg(test)]
 pub fn test_file_path_from_filepath(filename: &str) -> PathBuf {
     // CARGO_MANIFEST_DIR gets the source dir of the project
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
-        .join("test-files")
+        .join("fixtures")
         .join(filename)
 }
 
