@@ -369,6 +369,17 @@ mod test {
 
     const DEFAULT_ID: i32 = 0;
 
+    use sqlx::{Pool, Postgres, Row};
+
+    #[sqlx::test(migrations = "../migrations")]
+    async fn basic_test(pool: Pool<Postgres>) -> sqlx::Result<()> {
+        let foo = sqlx::query("SELECT * FROM foo").fetch_one(&pool).await?;
+
+        assert_eq!(foo.get::<String, _>("bar"), "foobar!");
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_tf_of_term() {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();

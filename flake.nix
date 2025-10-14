@@ -53,9 +53,17 @@
           openssl
         ];
 
+        shellHook = ''
+          # Start a postgres database for testing purposes
+          ${pkgs.docker}/bin/docker run --name sqlx-test-db -e POSTGRES_PASSWORD=123 -p 5432:5432 -d postgres
+        '';
+
         env = {
           # Required by rust-analyzer
           RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
+
+          # A database url used for testing
+          DATABASE_URL = "postgres://postgres:123@localhost/postgres";
         };
       };
       nativeBuildInputs = with pkgs; [pkg-config];
