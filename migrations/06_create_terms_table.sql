@@ -7,5 +7,5 @@ CREATE TABLE term (
     idf double precision NOT NULL,
     page_frequency integer NOT NULL,
     tf_scores hstore,
-    tf_idf_scores hstore,
+    tf_idf_scores hstore
 );
