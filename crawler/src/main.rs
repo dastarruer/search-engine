@@ -10,6 +10,8 @@ use flexi_logger::FileSpec;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    sqlx::migrate!();
+
     set_up_logging().await?;
 
     let mut crawler = Crawler::new(get_start_urls()).await;

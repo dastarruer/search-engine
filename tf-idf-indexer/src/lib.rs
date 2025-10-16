@@ -299,13 +299,13 @@ impl Indexer {
     }
 }
 
-/// Return the path of a file in src/test-files given just its filename.
+/// Return the path of a file in src/fixtures given just its filename.
 #[cfg(test)]
 pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
     // CARGO_MANIFEST_DIR gets the source dir of the project
     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("src")
-        .join("test-files")
+        .join("fixtures")
         .join(filename)
 }
 

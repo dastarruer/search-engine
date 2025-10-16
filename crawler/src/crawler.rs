@@ -241,9 +241,12 @@ impl Crawler {
         domain.with_trie(&BLOCKED_KEYWORDS);
 
         // First check that the domain is appropriate
-        // Note that `Type::NONE` just means that the content is
-        // appropriate
-        if domain.analyze() != Type::NONE {
+        // While we could check for `Type::NONE`, this leads to less false positives
+        let severity = domain.analyze();
+        if severity == Type::SEXUAL
+            || severity == Type::MODERATE_OR_HIGHER
+            || severity == Type::EVASIVE
+        {
             return true;
         }
 
@@ -543,6 +546,8 @@ mod test {
     }
 
     mod is_inappropriate_page {
+        use std::fs;
+
         use reqwest::Url;
         use scraper::Html;
 
@@ -560,11 +565,23 @@ mod test {
             let html = Html::parse_document(
                 r#"
             <body>
-                <p>hippopotamus hippopotamus hippopotamus</p>
+                <p>porn hippopotamus hippopotamus</p>
             </body>"#,
             );
 
             let page = Page::from(Url::parse("https://a-very-innocent-site.com").unwrap());
+
+            assert!(Crawler::is_inappropriate_page(&page, &html));
+        }
+
+        #[test]
+        fn test_appropriate_page_content() {
+            let filepath = test_file_path_from_filepath("appropriate-site.html");
+            let filepath = filepath.to_str().unwrap();
+            let html = fs::read_to_string(filepath).unwrap();
+            let html = Html::parse_document(&html);
+
+            let page = Page::from(Url::parse("https://spongebob.fandom.com/wiki/Hog_Huntin%27#References").unwrap());
 
             assert!(Crawler::is_inappropriate_page(&page, &html));
         }
