@@ -2,7 +2,9 @@ use std::{collections::HashSet, time::Duration};
 
 use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
-use rustrict::{Censor, Type};
+use rustrict::{Censor, CensorStr, Type};
+use scraper::ElementRef;
+use scraper::Node;
 use scraper::{Html, Selector};
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 
@@ -252,16 +254,40 @@ impl Crawler {
 
         let body_selector = Selector::parse("body").unwrap();
 
-        let content = html
-            .select(&body_selector)
-            .flat_map(|e| e.text())
-            .flat_map(|t| t.split_whitespace())
-            .collect::<String>();
+        let content = Self::extract_text(html);
+
         let mut content = Censor::from_str(content.as_str());
         content.with_trie(&BLOCKED_KEYWORDS);
 
         // Then check if the content is appropriate
         content.analyze() != Type::NONE
+    }
+
+    fn extract_text(html: &Html) -> String {
+        let mut result = String::new();
+        let root = html.root_element();
+
+        // Stack for depth-first traversal
+        let mut stack = vec![root];
+
+        while let Some(element) = stack.pop() {
+            for child in element.children() {
+                match child.value() {
+                    Node::Text(t) => result.push_str(t.trim()),
+                    Node::Element(e) => {
+                        let tag_name = e.name();
+                        if tag_name != "script" && tag_name != "style" {
+                            if let Some(child_el) = ElementRef::wrap(child) {
+                                stack.push(child_el);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        result
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -515,6 +541,8 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
+    use scraper::Html;
+
     use crate::{
         crawler::Crawler,
         page::Page,
@@ -528,6 +556,30 @@ mod test {
         let page = Page::from(server.base_url());
 
         (Crawler::test_new(page.clone()).await, page)
+    }
+
+    #[test]
+    fn test_extract_text() {
+        let html = Html::parse_document(
+            r#"
+            <body>
+                <style>
+                    .global-navigation{
+                        position: fixed;
+                    }
+                </style>
+
+                <script>
+                    let code = "hello world";
+                </script>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+        );
+
+        assert_eq!(
+            Crawler::extract_text(&html),
+            "hippopotamus hippopotamus hippopotamus"
+        )
     }
 
     mod is_english {
