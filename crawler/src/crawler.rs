@@ -241,9 +241,9 @@ impl Crawler {
         domain.with_trie(&BLOCKED_KEYWORDS);
 
         // First check that the domain is appropriate
-        // Note that `Type::NONE` just means that the content is
-        // appropriate
-        if domain.analyze() != Type::NONE {
+        // While we could check for `Type::NONE`, this leads to less false positives
+        let severity = domain.analyze();
+        if severity == Type::SEXUAL || severity == Type::MODERATE_OR_HIGHER || severity == Type::EVASIVE {
             return true;
         }
 
@@ -559,7 +559,7 @@ mod test {
             let html = Html::parse_document(
                 r#"
             <body>
-                <p>hippopotamus hippopotamus hippopotamus</p>
+                <p>porn hippopotamus hippopotamus</p>
             </body>"#,
             );
 
