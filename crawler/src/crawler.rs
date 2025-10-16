@@ -31,6 +31,7 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 
     // add a certain... domain that's been giving me trouble...
     trie.set("xvideos", Type::SEXUAL);
+    // trie.set("SpongeBob", Type::NONE);
     trie
 });
 
@@ -261,30 +262,9 @@ impl Crawler {
     }
 
     fn extract_text(html: &Html) -> String {
-        let mut result = String::new();
-        let root = html.root_element();
-
-        // Stack for depth-first traversal
-        let mut stack = vec![root];
-
-        while let Some(element) = stack.pop() {
-            for child in element.children() {
-                match child.value() {
-                    Node::Text(t) => result.push_str(t.trim()),
-                    Node::Element(e) => {
-                        let tag_name = e.name();
-                        if tag_name != "script" && tag_name != "style" {
-                            if let Some(child_el) = ElementRef::wrap(child) {
-                                stack.push(child_el);
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        result
+        html.select(&Selector::parse("body p").unwrap()) // or "body div#foo div.inner"
+            .flat_map(|el| el.text())
+            .collect()
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
