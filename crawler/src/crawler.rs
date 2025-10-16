@@ -31,7 +31,6 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 
     // add a certain... domain that's been giving me trouble...
     trie.set("xvideos", Type::SEXUAL);
-
     trie
 });
 
@@ -235,24 +234,13 @@ impl Crawler {
 
     /// Checks URL domain against a list of blocked keywords relating to inappropriate content.
     fn is_inappropriate_page(page: &Page, html: &Html) -> bool {
-        // add a certain uh... domain that's been giving me trouble
-        let mut blocked_keywords = rustrict::Trie::default();
-        blocked_keywords.set("xvideos", Type::SEXUAL);
-
         let mut domain = Censor::from_str(page.url.as_str());
         domain.with_trie(&BLOCKED_KEYWORDS);
 
         // First check that the domain is appropriate
-        // While we could check for `Type::NONE`, this leads to less false positives
-        let severity = domain.analyze();
-        if severity == Type::SEXUAL
-            || severity == Type::MODERATE_OR_HIGHER
-            || severity == Type::EVASIVE
-        {
+        if Self::is_severity_inappropriate(domain.analyze()) {
             return true;
         }
-
-        let body_selector = Selector::parse("body").unwrap();
 
         let content = Self::extract_text(html);
 
@@ -260,7 +248,16 @@ impl Crawler {
         content.with_trie(&BLOCKED_KEYWORDS);
 
         // Then check if the content is appropriate
-        content.analyze() != Type::NONE
+        Self::is_severity_inappropriate(content.analyze())
+    }
+
+    /// Checks that the severity of something is at a high enough threshold to
+    /// be considered inappropriate while also minimizing false positives and
+    /// negatives.
+    fn is_severity_inappropriate(severity: rustrict::Type) -> bool {
+        // `Type::SEVERE` is a high enough threshold to prevent a majority of
+        // false positives
+        severity.is(Type::SEVERE)
     }
 
     fn extract_text(html: &Html) -> String {
