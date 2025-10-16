@@ -261,6 +261,11 @@ impl Crawler {
         severity.is(Type::SEVERE)
     }
 
+    /// Extract all visible text from a parsed [`Html`] document.
+    ///
+    /// 'Visible text' means any text that the user can read if they go onto a
+    /// page. For instance, the text of a Wikipedia article is considered
+    /// visible text, while any Javascript or CSS is not.
     fn extract_text(html: &Html) -> String {
         html.select(&Selector::parse("body p").unwrap()) // or "body div#foo div.inner"
             .flat_map(|el| el.text())
