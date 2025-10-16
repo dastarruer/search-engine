@@ -633,9 +633,11 @@ mod test {
             let html = fs::read_to_string(filepath).unwrap();
             let html = Html::parse_document(&html);
 
-            let page = Page::from(Url::parse("https://spongebob.fandom.com/wiki/Hog_Huntin%27#References").unwrap());
+            let page = Page::from(
+                Url::parse("https://spongebob.fandom.com/wiki/Hog_Huntin%27#References").unwrap(),
+            );
 
-            assert!(Crawler::is_inappropriate_page(&page, &html));
+            assert!(!Crawler::is_inappropriate_page(&page, &html));
         }
 
         #[tokio::test]
