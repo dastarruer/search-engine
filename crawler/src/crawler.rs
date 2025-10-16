@@ -321,7 +321,8 @@ impl Crawler {
         let max_connections = 10;
         let min_connections = 2;
 
-        let connection_timeout = std::time::Duration::from_secs(5);
+        // Set a large connection timeout, since as the size of the db increases, queries take longer and longer to execute
+        let connection_timeout = std::time::Duration::from_secs(500);
 
         let max_lifetime = Some(std::time::Duration::from_secs(1800));
         let idle_timeout = Some(std::time::Duration::from_secs(600));
