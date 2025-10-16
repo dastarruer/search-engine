@@ -2,7 +2,7 @@
 FROM rust:latest
 
 # Cd into src
-WORKDIR /usr/src/crawler
+WORKDIR /usr/src/tf-idf-indexer
 
 # Copy the src code into the container
 COPY . .
