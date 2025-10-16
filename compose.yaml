@@ -1,23 +1,21 @@
 services:
   crawler:
-    build: ./crawler
+    build:
+      context: .
+      dockerfile: ./crawler/Dockerfile
     environment:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_ENDPOINT: ${DB_ENDPOINT}
       DB_PORT: ${DB_PORT}
       DB_NAME: ${DB_NAME}
-    volumes:
-      - ./migrations:/usr/src/migrations
   indexer:
-    build: ./tf-idf-indexer
+    build:
+      context: .
+      dockerfile: ./tf-idf-indexer/Dockerfile
     environment:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_ENDPOINT: ${DB_ENDPOINT}
       DB_PORT: ${DB_PORT}
       DB_NAME: ${DB_NAME}
-    volumes:
-      - ./migrations:/usr/src/migrations
-volumes:
-  migrations:
