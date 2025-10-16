@@ -587,11 +587,14 @@ mod test {
         }
 
         #[tokio::test]
-        async fn test_safe_page() {
+        async fn test_appropriate_page_url() {
             let page = Page::from(Url::parse("https://safe.com").unwrap());
             assert!(!Crawler::is_inappropriate_page(
                 &page,
-                &Html::new_document()
+                &Html::parse_document(
+                    r#"
+                <body></body>"#
+                )
             ));
         }
     }
