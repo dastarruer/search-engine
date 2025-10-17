@@ -7,9 +7,7 @@ use tf_idf_indexer::{Indexer, utils};
 async fn main() {
     sqlx::migrate!("../migrations");
 
-    let mut starting_pages = HashSet::new();
-
-    let mut indexer = Indexer::new(HashMap::new(), starting_pages);
+    let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
     let url = utils::construct_postgres_url();
     let url = url.as_str();
