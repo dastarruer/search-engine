@@ -61,8 +61,8 @@ impl std::hash::Hash for Term {
     }
 }
 
-impl Term {
-    pub fn new(term: String) -> Self {
+impl From<String> for Term {
+    fn from(value: String) -> Self {
         Term {
             term,
             idf: ordered_float::OrderedFloat(0.0),
@@ -367,7 +367,7 @@ impl Page {
                     .filter(|c| c.is_alphanumeric())
                     .collect()
             })
-            .map(|t: String| Term::new(t))
+            .map(|t: String| Term::from(t))
             .filter(|t| !t.is_stop_word())
             .collect()
     }
@@ -391,7 +391,7 @@ mod test {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();
         let page = Page::new(Html::parse_document(html.as_str()), DEFAULT_ID);
 
-        let term = Term::new(String::from("hippopotamus"));
+        let term = Term::from(String::from("hippopotamus"));
 
         assert_eq!(
             term.get_tf(&page.extract_relevant_terms()),
@@ -411,9 +411,9 @@ mod test {
             0,
         );
         let expected_terms = vec![
-            Term::new(String::from("hippopotamus")),
-            Term::new(String::from("hippopotamus")),
-            Term::new(String::from("hippopotamus")),
+            Term::from(String::from("hippopotamus")),
+            Term::from(String::from("hippopotamus")),
+            Term::from(String::from("hippopotamus")),
         ];
 
         assert_eq!(page.extract_relevant_terms(), expected_terms);
@@ -424,7 +424,7 @@ mod test {
 
         #[test]
         fn test_positive_nonzero_tf() {
-            let mut term = Term::new(String::from("hippopotamus"));
+            let mut term = Term::from(String::from("hippopotamus"));
 
             // A hypothetical term frequency
             let tf = ordered_float::OrderedFloat(2.0);
@@ -436,7 +436,7 @@ mod test {
 
         #[test]
         fn test_zero_tf() {
-            let mut term = Term::new(String::from("hippopotamus"));
+            let mut term = Term::from(String::from("hippopotamus"));
 
             // A hypothetical term frequency
             let tf = ordered_float::OrderedFloat(0.0);
@@ -507,7 +507,7 @@ mod test {
             0,
         );
 
-        let mut term = Term::new(String::from("hippopotamus"));
+        let mut term = Term::from(String::from("hippopotamus"));
 
         // Manually set up TF for both pages
         let tf1 = ordered_float::OrderedFloat(2.0);
@@ -559,7 +559,7 @@ mod test {
 
         #[test]
         fn test_update_idf() {
-            let mut term = Term::new(String::from("hippopotamus"));
+            let mut term = Term::from(String::from("hippopotamus"));
             term.page_frequency = 2;
 
             term.clone().update_total_idf(2);
@@ -569,7 +569,7 @@ mod test {
 
         #[test]
         fn test_zero_doc_frequency() {
-            let mut term = Term::new(String::from("hippopotamus"));
+            let mut term = Term::from(String::from("hippopotamus"));
             term.page_frequency = 0;
 
             term.update_total_idf(2);
@@ -579,7 +579,7 @@ mod test {
 
         #[test]
         fn test_zero_num_pages() {
-            let mut term = Term::new(String::from("hippopotamus"));
+            let mut term = Term::from(String::from("hippopotamus"));
             term.page_frequency = 2;
 
             term.update_total_idf(0);
@@ -597,8 +597,8 @@ mod test {
         let terms = page.extract_relevant_terms();
 
         let included_terms = vec![
-            Term::new(String::from("hippopotamus")),
-            Term::new(String::from("ladder")),
+            Term::from(String::from("hippopotamus")),
+            Term::from(String::from("ladder")),
         ];
 
         assert_eq!(terms, included_terms);
@@ -607,7 +607,7 @@ mod test {
     #[test]
     fn test_add_term() {
         let page = Page::new(Html::new_document(), 0);
-        let mut term = Term::new(String::from("hippopotamus"));
+        let mut term = Term::from(String::from("hippopotamus"));
         term.tf_scores
             .insert(page.id, ordered_float::OrderedFloat(0.0));
         term.tf_idf_scores
@@ -651,7 +651,7 @@ mod test {
         indexer.parse_page(page2.clone());
 
         // Hippopotamus term
-        let mut expected_hippo = Term::new(String::from("hippopotamus"));
+        let mut expected_hippo = Term::from(String::from("hippopotamus"));
         expected_hippo.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
         expected_hippo.page_frequency = 1;
         expected_hippo
@@ -662,7 +662,7 @@ mod test {
             .insert(page1.id, ordered_float::OrderedFloat(0.90309)); // TF-IDF in page1
 
         // Elephant term
-        let mut expected_elephant = Term::new(String::from("elephant"));
+        let mut expected_elephant = Term::from(String::from("elephant"));
         expected_elephant.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
         expected_elephant.page_frequency = 1;
         expected_elephant
