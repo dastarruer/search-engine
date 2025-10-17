@@ -1,13 +1,9 @@
-use std::collections::{HashMap, HashSet};
-
 use sqlx::postgres::PgPoolOptions;
 use tf_idf_indexer::{Indexer, utils};
 
 #[tokio::main]
 async fn main() {
     sqlx::migrate!("../migrations");
-
-    let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
     let url = utils::construct_postgres_url();
     let url = url.as_str();
@@ -30,5 +26,6 @@ async fn main() {
         .await
         .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
 
+    let mut indexer = Indexer::new_with_pool(&pool).await;
     indexer.run(&pool).await;
 }

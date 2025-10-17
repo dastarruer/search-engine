@@ -336,11 +336,18 @@ impl Indexer {
         self.num_pages
     }
 
-    /// Returns `True` if the page is in the indexer.
+    /// Returns `True` if the page is stored in the indexer.
     ///
-    /// Returns `False` if the page is not in the indexer.
-    pub fn contains(&self, page: &Page) -> bool {
+    /// Returns `False` if the page is not stored in the indexer.
+    pub fn contains_page(&self, page: &Page) -> bool {
         self.pages.contains(page)
+    }
+
+    /// Returns `True` if the term is stored in the indexer.
+    ///
+    /// Returns `False` if the term is not stored in the indexer.
+    pub fn contains_term(&self, term: &Term) -> bool {
+        self.terms.contains_key(&term.term)
     }
 
     /// Add a new [`Page`] to the set of existing pages, and increment
