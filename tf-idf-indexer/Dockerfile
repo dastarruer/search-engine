@@ -2,10 +2,12 @@
 FROM rust:latest
 
 # Cd into src
-WORKDIR /usr/src/crawler
+WORKDIR /usr/src/tf-idf-indexer
 
 # Copy the src code into the container
-COPY . .
+COPY ./tf-idf-indexer .
+
+COPY ./migrations /usr/src/migrations
 
 # Install the application
 RUN cargo install --path .

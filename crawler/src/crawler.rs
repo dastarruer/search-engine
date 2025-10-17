@@ -2,7 +2,9 @@ use std::{collections::HashSet, time::Duration};
 
 use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
-use rustrict::{Censor, Type};
+use rustrict::{Censor, CensorStr, Type};
+use scraper::ElementRef;
+use scraper::Node;
 use scraper::{Html, Selector};
 use sqlx::{PgPool, Row, postgres::PgPoolOptions};
 
@@ -29,7 +31,7 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 
     // add a certain... domain that's been giving me trouble...
     trie.set("xvideos", Type::SEXUAL);
-
+    // trie.set("SpongeBob", Type::NONE);
     trie
 });
 
@@ -233,32 +235,41 @@ impl Crawler {
 
     /// Checks URL domain against a list of blocked keywords relating to inappropriate content.
     fn is_inappropriate_page(page: &Page, html: &Html) -> bool {
-        // add a certain uh... domain that's been giving me trouble
-        let mut blocked_keywords = rustrict::Trie::default();
-        blocked_keywords.set("xvideos", Type::SEXUAL);
-
         let mut domain = Censor::from_str(page.url.as_str());
         domain.with_trie(&BLOCKED_KEYWORDS);
 
         // First check that the domain is appropriate
-        // Note that `Type::NONE` just means that the content is
-        // appropriate
-        if domain.analyze() != Type::NONE {
+        if Self::is_severity_inappropriate(domain.analyze()) {
             return true;
         }
 
-        let body_selector = Selector::parse("body").unwrap();
+        let content = Self::extract_text(html);
 
-        let content = html
-            .select(&body_selector)
-            .flat_map(|e| e.text())
-            .flat_map(|t| t.split_whitespace())
-            .collect::<String>();
         let mut content = Censor::from_str(content.as_str());
         content.with_trie(&BLOCKED_KEYWORDS);
 
         // Then check if the content is appropriate
-        content.analyze() != Type::NONE
+        Self::is_severity_inappropriate(content.analyze())
+    }
+
+    /// Checks that the severity of something is at a high enough threshold to
+    /// be considered inappropriate while also minimizing false positives and
+    /// negatives.
+    fn is_severity_inappropriate(severity: rustrict::Type) -> bool {
+        // `Type::SEVERE` is a high enough threshold to prevent a majority of
+        // false positives
+        severity.is(Type::SEVERE)
+    }
+
+    /// Extract all visible text from a parsed [`Html`] document.
+    ///
+    /// 'Visible text' means any text that the user can read if they go onto a
+    /// page. For instance, the text of a Wikipedia article is considered
+    /// visible text, while any Javascript or CSS is not.
+    fn extract_text(html: &Html) -> String {
+        html.select(&Selector::parse("body p").unwrap()) // or "body div#foo div.inner"
+            .flat_map(|el| el.text())
+            .collect()
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -321,7 +332,8 @@ impl Crawler {
         let max_connections = 10;
         let min_connections = 2;
 
-        let connection_timeout = std::time::Duration::from_secs(5);
+        // Set a large connection timeout, since as the size of the db increases, queries take longer and longer to execute
+        let connection_timeout = std::time::Duration::from_secs(500);
 
         let max_lifetime = Some(std::time::Duration::from_secs(1800));
         let idle_timeout = Some(std::time::Duration::from_secs(600));
@@ -511,6 +523,8 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
+    use scraper::Html;
+
     use crate::{
         crawler::Crawler,
         page::Page,
@@ -524,6 +538,30 @@ mod test {
         let page = Page::from(server.base_url());
 
         (Crawler::test_new(page.clone()).await, page)
+    }
+
+    #[test]
+    fn test_extract_text() {
+        let html = Html::parse_document(
+            r#"
+            <body>
+                <style>
+                    .global-navigation{
+                        position: fixed;
+                    }
+                </style>
+
+                <script>
+                    let code = "hello world";
+                </script>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+        );
+
+        assert_eq!(
+            Crawler::extract_text(&html),
+            "hippopotamus hippopotamus hippopotamus"
+        )
     }
 
     mod is_english {
@@ -542,6 +580,8 @@ mod test {
     }
 
     mod is_inappropriate_page {
+        use std::fs;
+
         use reqwest::Url;
         use scraper::Html;
 
@@ -559,7 +599,7 @@ mod test {
             let html = Html::parse_document(
                 r#"
             <body>
-                <p>hippopotamus hippopotamus hippopotamus</p>
+                <p>porn hippopotamus hippopotamus</p>
             </body>"#,
             );
 
@@ -568,12 +608,29 @@ mod test {
             assert!(Crawler::is_inappropriate_page(&page, &html));
         }
 
+        #[test]
+        fn test_appropriate_page_content() {
+            let filepath = test_file_path_from_filepath("appropriate-site.html");
+            let filepath = filepath.to_str().unwrap();
+            let html = fs::read_to_string(filepath).unwrap();
+            let html = Html::parse_document(&html);
+
+            let page = Page::from(
+                Url::parse("https://spongebob.fandom.com/wiki/Hog_Huntin%27#References").unwrap(),
+            );
+
+            assert!(!Crawler::is_inappropriate_page(&page, &html));
+        }
+
         #[tokio::test]
-        async fn test_safe_page() {
+        async fn test_appropriate_page_url() {
             let page = Page::from(Url::parse("https://safe.com").unwrap());
             assert!(!Crawler::is_inappropriate_page(
                 &page,
-                &Html::new_document()
+                &Html::parse_document(
+                    r#"
+                <body></body>"#
+                )
             ));
         }
     }

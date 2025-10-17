@@ -5,7 +5,9 @@ FROM rust:latest
 WORKDIR /usr/src/crawler
 
 # Copy the src code into the container
-COPY . .
+COPY ./crawler .
+
+COPY ./migrations /usr/src/migrations
 
 # Install the application
 RUN cargo install --path .

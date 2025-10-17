@@ -10,7 +10,7 @@ use flexi_logger::FileSpec;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    sqlx::migrate!("../migrations");
+    sqlx::migrate!();
 
     set_up_logging().await?;
 
