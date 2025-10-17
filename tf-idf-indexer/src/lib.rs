@@ -64,11 +64,29 @@ impl std::hash::Hash for Term {
 impl From<String> for Term {
     fn from(value: String) -> Self {
         Term {
-            term,
+            term: value,
             idf: ordered_float::OrderedFloat(0.0),
             page_frequency: 0,
             tf_scores: HashMap::new(),
             tf_idf_scores: HashMap::new(),
+        }
+    }
+}
+
+impl Term {
+    pub fn new(
+        term: String,
+        idf: ordered_f32,
+        page_frequency: i32,
+        tf_scores: HashMap<i32, ordered_f32>,
+        tf_idf_scores: HashMap<i32, ordered_f32>,
+    ) -> Self {
+        Term {
+            term,
+            idf,
+            page_frequency,
+            tf_scores,
+            tf_idf_scores,
         }
     }
 
@@ -214,6 +232,41 @@ impl Indexer {
         }
 
         indexer
+    }
+
+    pub async fn new_with_pool(pool: &sqlx::Pool<sqlx::Postgres>) -> Indexer {
+        let mut starting_terms = HashMap::new();
+        let mut starting_pages = HashSet::new();
+
+        let term_query = "SELECT term FROM terms;";
+        let page_query =
+            "SELECT html, id FROM pages WHERE is_crawled = TRUE AND is_indexed = FALSE;";
+
+        // Add terms from the db
+        sqlx::query(term_query)
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|row| {
+                let term: String = row.get("term");
+                starting_terms.insert(row.get("term"), Term::from(term));
+            });
+
+        // Add pages from the db
+        sqlx::query(page_query)
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|row| {
+                starting_pages.insert(Page::new(
+                    Html::parse_document(row.get("html")),
+                    row.get("id"),
+                ));
+            });
+
+        Indexer::new(starting_terms, starting_pages)
     }
 
     pub async fn run(&mut self, pool: &sqlx::PgPool) {
