@@ -1,15 +1,68 @@
+use std::fs;
+
+use sqlx::{Pool, migrate::Migrator, postgres::PgPoolOptions};
 use testcontainers_modules::{
-    postgres::{Postgres},
-    testcontainers::{ImageExt, runners::AsyncRunner},
+    postgres::Postgres,
+    testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
 };
 
 /// Set up a Postgres Docker container for testing purposes.
-pub async fn setup() {
-    Postgres::default()
+///
+/// # Params
+/// - `script` - The name of the script to run in the database without the
+///   `.sql` file extension (e.g. `"refresh_queue"`). This is used for inserting
+///   test data.
+///
+/// # Returns
+/// - A [`ContainerAsync<Postgres>`], which is returned to prevent the
+///   container from being dropped.
+/// - A [`Pool`], which is a connection to the database within the Docker
+///   container.
+pub async fn setup(script: &str) -> (ContainerAsync<Postgres>, Pool<sqlx::Postgres>) {
+    // Start a database container
+    let container = Postgres::default()
         .with_tag("latest")
-        .with_env_var(
-            String::from("DATABASE_URL"),
-            String::from("postgres://postgres:postgres@127.0.0.1:5432/postgres"),
-        )
-        .start().await.unwrap();
+        .start()
+        .await
+        .unwrap();
+
+    let db_url = construct_db_url(&container).await;
+
+    let pool = PgPoolOptions::new().connect(&db_url).await.unwrap();
+
+    run_migrations(&pool).await;
+    run_setup_script(script, &pool).await;
+
+    // Return the container so that it does not get dropped once out of scope
+    (container, pool)
+}
+
+async fn run_migrations(pool: &Pool<sqlx::Postgres>) {
+    let migrations = Migrator::new(std::path::Path::new("../migrations"))
+        .await
+        .unwrap();
+    migrations.run(pool).await.unwrap();
+}
+
+async fn run_setup_script(script: &str, pool: &Pool<sqlx::Postgres>) {
+    let script_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join(format!("{}.sql", script).as_str());
+
+    let err_msg = format!("{} should exist.", script_path.to_str().unwrap());
+    let query = fs::read_to_string(script_path).expect(&err_msg);
+    let query = query.as_str();
+
+    sqlx::query(query).execute(pool).await.unwrap();
+}
+
+async fn construct_db_url(container: &ContainerAsync<Postgres>) -> String {
+    let port = container.get_host_port_ipv4(5432).await.unwrap();
+    let host = "127.0.0.1";
+    let user = "postgres";
+    let password = "postgres";
+    let database = "postgres";
+
+    format!("postgres://{user}:{password}@{host}:{port}/{database}")
 }
