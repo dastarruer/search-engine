@@ -240,7 +240,10 @@ impl Indexer {
                 .unwrap();
 
         for row in rows {
-            let page = Page::new(Html::parse_document(row.get("html")), row.get("id"));
+            let html = row.get("html");
+            let id = row.get("id");
+
+            let page = Page::new(Html::parse_document(html), id);
 
             self.add_page(page);
         }
@@ -269,6 +272,18 @@ impl Indexer {
             // Go back and update the tf_idf scores for every other single page
             term.update_tf_idf_scores();
         }
+    }
+
+    /// Returns the number of [`Page`] instances in the indexer.
+    pub fn num_pages(&self) -> i32 {
+        self.num_pages
+    }
+
+    /// Returns `True` if the page is in the indexer.
+    ///
+    /// Returns `False` if the page is not in the indexer.
+    pub fn contains(&self, page: &Page) -> bool {
+        self.pages.contains(page)
     }
 
     /// Add a new [`Page`] to the set of existing pages, and increment
