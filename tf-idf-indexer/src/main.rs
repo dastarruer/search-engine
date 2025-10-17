@@ -5,7 +5,7 @@ use tf_idf_indexer::{Indexer, utils};
 
 #[tokio::main]
 async fn main() {
-    sqlx::migrate!();
+    sqlx::migrate!("../migrations");
 
     let mut starting_pages = HashSet::new();
 
