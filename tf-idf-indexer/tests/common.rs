@@ -52,9 +52,12 @@ async fn run_setup_script(script: &str, pool: &Pool<sqlx::Postgres>) {
 
     let err_msg = format!("{} should exist.", script_path.to_str().unwrap());
     let query = fs::read_to_string(script_path).expect(&err_msg);
-    let query = query.as_str();
 
-    sqlx::query(query).execute(pool).await.unwrap();
+    // If there are multiple commands in the sql script, then run them
+    // separately
+    for query in query.split(";") {
+        sqlx::query(query.trim()).execute(pool).await.unwrap();
+    }
 }
 
 async fn construct_db_url(container: &ContainerAsync<Postgres>) -> String {
