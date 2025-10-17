@@ -29,9 +29,13 @@ type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
 pub struct Term {
     pub term: String,
 
-    /// The Inverse Document Frequency of a term.
+    /// The Inverse Document Frequency of a term, calculated as the total
+    /// number of documents indexed divided by the number of documents the term
+    /// appears in.
     ///
-    /// This measures how rare a term is across documents (which are referred to as pages here). If the term appears in many pages, then the IDF is low. If the term only appears in one or two pages, the IDF is high.
+    /// This measures how rare a term is across documents (which are referred
+    /// to as pages here). If the term appears in many pages, then the IDF is
+    /// low. If the term only appears in one or two pages, the IDF is high.
     idf: ordered_f32,
 
     /// The amount of pages that contain this term. Used for calculating [`Term::idf`].
