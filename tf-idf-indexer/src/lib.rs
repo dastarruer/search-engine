@@ -348,12 +348,7 @@ impl Indexer {
                 .unwrap();
 
         for row in rows {
-            let html = row.get("html");
-            let id = row.get("id");
-
-            let page = Page::new(Html::parse_document(html), id);
-
-            self.add_page(page);
+            self.add_page(Page::from(&row));
         }
     }
 
@@ -448,6 +443,15 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
 pub struct Page {
     id: i32,
     html: Html,
+}
+
+impl From<&sqlx::postgres::PgRow> for Page {
+    fn from(value: &sqlx::postgres::PgRow) -> Self {
+        let html = value.get("html");
+        let id = value.get("id");
+
+        Page::new(Html::parse_document(html), id)
+    }
 }
 
 impl PartialEq for Page {
