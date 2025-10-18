@@ -1,6 +1,6 @@
 pub mod utils;
 
-use sqlx::Row;
+use sqlx::{Row, postgres::types::PgHstore};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use once_cell::sync::Lazy;
@@ -45,12 +45,12 @@ pub struct Term {
     ///
     /// TF is measured as the term frequency of a [`Term`], or how many times a
     /// term appears in a given [`Page`].
-    tf_scores: HashMap<i32, ordered_f32>,
+    tf_scores: PgHstore,
 
     /// The TF-IDF scores of each [`i32`], stored as <[`Page::id`]>:<TF-IDF of term in a [`Page`]>.
     ///
     /// TF-IDF is measured as the term frequency of a [`Term`] in a [`Page`] multiplied by [`Term::idf`].
-    tf_idf_scores: HashMap<i32, ordered_f32>,
+    tf_idf_scores: PgHstore,
 }
 
 // Manually implement the Hash trait since HashMap does not implement Hash
@@ -67,8 +67,8 @@ impl From<String> for Term {
             term: value,
             idf: ordered_float::OrderedFloat(0.0),
             page_frequency: 0,
-            tf_scores: HashMap::new(),
-            tf_idf_scores: HashMap::new(),
+            tf_scores: PgHstore::default(),
+            tf_idf_scores: PgHstore::default(),
         }
     }
 }
@@ -78,8 +78,8 @@ impl Term {
         term: String,
         idf: ordered_f32,
         page_frequency: i32,
-        tf_scores: HashMap<i32, ordered_f32>,
-        tf_idf_scores: HashMap<i32, ordered_f32>,
+        tf_scores: PgHstore,
+        tf_idf_scores: PgHstore,
     ) -> Self {
         Term {
             term,
@@ -147,8 +147,16 @@ impl Term {
     /// if IDF ever changes.
     fn update_tf_idf_scores(&mut self) {
         for (page_id, tf) in self.tf_scores.iter_mut() {
-            let new_tf_idf = *tf * self.idf;
-            self.tf_idf_scores.insert(*page_id, new_tf_idf);
+            let tf = ordered_float::OrderedFloat(
+                tf.as_ref()
+                    .expect("Every page should have a TF score for every term.")
+                    .parse::<f32>()
+                    .expect("Every TF score should be a valid f32 value."),
+            );
+            let new_tf_idf = tf * self.idf;
+
+            self.tf_idf_scores
+                .insert(page_id.to_owned(), Some(new_tf_idf.to_string()));
         }
     }
 }
@@ -238,7 +246,7 @@ impl Indexer {
         let mut starting_terms = HashMap::new();
         let mut starting_pages = HashSet::new();
 
-        let term_query = "SELECT term FROM terms;";
+        let term_query = "SELECT * FROM terms;";
         let page_query =
             "SELECT html, id FROM pages WHERE is_crawled = TRUE AND is_indexed = FALSE;";
 
@@ -250,7 +258,15 @@ impl Indexer {
             .iter()
             .for_each(|row| {
                 let term: String = row.get("term");
-                starting_terms.insert(row.get("term"), Term::from(term));
+                let idf = ordered_float::OrderedFloat(row.get("idf"));
+                let page_frequency: i32 = row.get("page_frequency");
+                let tf_scores: PgHstore = row.get("tf_scores");
+                let tf_idf_scores: PgHstore = row.get("tf_idf_scores");
+
+                starting_terms.insert(
+                    term.clone(),
+                    Term::new(term, idf, page_frequency, tf_scores, tf_idf_scores),
+                );
             });
 
         // Add pages from the db
@@ -323,8 +339,10 @@ impl Indexer {
 
             let tf_idf = tf * term.idf;
 
-            term.tf_scores.insert(page.id, tf);
-            term.tf_idf_scores.insert(page.id, tf_idf);
+            term.tf_scores
+                .insert(page.id.to_string().to_string(), Some(tf.to_string()));
+            term.tf_idf_scores
+                .insert(page.id.to_string().to_string(), Some(tf_idf.to_string()));
 
             // Go back and update the tf_idf scores for every other single page
             term.update_tf_idf_scores();
@@ -354,7 +372,6 @@ impl Indexer {
     /// [`Indexer::num_pages`].
     ///
     /// Does not add a duplicate page.
-    // TODO: Maybe this shouldn't panic...?
     fn add_page(&mut self, page: Page) {
         if !self.pages.contains(&page) {
             self.pages.push(page);
@@ -367,8 +384,14 @@ impl Indexer {
         if !self.terms.contains_key(&term_str) {
             // Initialize tf and tf_idf for all existing pages
             for page in &self.pages {
-                term.tf_scores.insert(page.id, OrderedFloat(0.0));
-                term.tf_idf_scores.insert(page.id, OrderedFloat(0.0));
+                term.tf_scores.insert(
+                    page.id.to_string().to_string(),
+                    Some(OrderedFloat(0.0).to_string()),
+                );
+                term.tf_idf_scores.insert(
+                    page.id.to_string().to_string(),
+                    Some(OrderedFloat(0.0).to_string()),
+                );
             }
 
             self.terms.insert(term_str, term);
@@ -394,7 +417,7 @@ pub struct Page {
 
 impl PartialEq for Page {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.id.to_string() == other.id.to_string()
     }
 }
 
@@ -402,7 +425,7 @@ impl PartialEq for Page {
 impl std::hash::Hash for Page {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Just hash the id, since it's supposed to be unique
-        self.id.hash(state);
+        self.id.to_string().hash(state);
     }
 }
 
@@ -441,6 +464,7 @@ mod test {
     };
 
     use scraper::Html;
+    use sqlx::postgres::types::PgHstore;
 
     use crate::{Indexer, Page, Term, test_file_path_from_filepath};
 
@@ -571,7 +595,8 @@ mod test {
 
         // Manually set up TF for both pages
         let tf1 = ordered_float::OrderedFloat(2.0);
-        term.tf_scores.insert(page1.id, tf1);
+        term.tf_scores
+            .insert(page1.id.to_string(), Some(tf1.to_string()));
 
         term.update_page_frequency(tf1);
 
@@ -583,8 +608,10 @@ mod test {
         term.update_tf_idf_scores();
 
         // Expected TF-IDF values
-        let mut expected_tf_idf = HashMap::new();
-        expected_tf_idf.insert(page1.id, tf1 * ordered_float::OrderedFloat(0.0));
+        let mut expected_tf_idf = PgHstore::from_iter([(
+            page1.id.to_string(),
+            (tf1 * ordered_float::OrderedFloat(0.0)).to_string(),
+        )]);
 
         assert_eq!(term.tf_idf_scores, expected_tf_idf);
 
@@ -592,7 +619,8 @@ mod test {
 
         let tf2 = ordered_float::OrderedFloat(0.0);
 
-        term.tf_scores.insert(page2.id, tf2);
+        term.tf_scores
+            .insert(page2.id.to_string(), Some(tf2.to_string()));
 
         term.update_page_frequency(tf2);
 
@@ -603,12 +631,12 @@ mod test {
         term.update_tf_idf_scores();
 
         expected_tf_idf.insert(
-            page1.id,
-            tf1 * ordered_float::OrderedFloat(f32::consts::LOG10_2),
+            page1.id.to_string(),
+            Some((tf1 * ordered_float::OrderedFloat(f32::consts::LOG10_2)).to_string()),
         );
         expected_tf_idf.insert(
-            page2.id,
-            tf2 * ordered_float::OrderedFloat(f32::consts::LOG10_2),
+            page2.id.to_string(),
+            Some((tf2 * ordered_float::OrderedFloat(f32::consts::LOG10_2)).to_string()),
         );
 
         assert_eq!(term.tf_idf_scores, expected_tf_idf);
@@ -668,10 +696,14 @@ mod test {
     fn test_add_term() {
         let page = Page::new(Html::new_document(), 0);
         let mut term = Term::from(String::from("hippopotamus"));
-        term.tf_scores
-            .insert(page.id, ordered_float::OrderedFloat(0.0));
-        term.tf_idf_scores
-            .insert(page.id, ordered_float::OrderedFloat(0.0));
+        term.tf_scores.insert(
+            page.id.to_string(),
+            Some(ordered_float::OrderedFloat(0.0).to_string()),
+        );
+        term.tf_idf_scores.insert(
+            page.id.to_string(),
+            Some(ordered_float::OrderedFloat(0.0).to_string()),
+        );
 
         let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
@@ -714,23 +746,27 @@ mod test {
         let mut expected_hippo = Term::from(String::from("hippopotamus"));
         expected_hippo.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
         expected_hippo.page_frequency = 1;
-        expected_hippo
-            .tf_idf_scores
-            .insert(page2.id, ordered_float::OrderedFloat(0.0)); // TF = 0 in page2
-        expected_hippo
-            .tf_idf_scores
-            .insert(page1.id, ordered_float::OrderedFloat(0.90309)); // TF-IDF in page1
+        expected_hippo.tf_idf_scores.insert(
+            page2.id.to_string(),
+            Some(ordered_float::OrderedFloat(0.0).to_string()),
+        ); // TF = 0 in page2
+        expected_hippo.tf_idf_scores.insert(
+            page1.id.to_string(),
+            Some(ordered_float::OrderedFloat(0.90309).to_string()),
+        ); // TF-IDF in page1
 
         // Elephant term
         let mut expected_elephant = Term::from(String::from("elephant"));
         expected_elephant.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
         expected_elephant.page_frequency = 1;
-        expected_elephant
-            .tf_idf_scores
-            .insert(page1.id, ordered_float::OrderedFloat(0.0)); // TF = 0 in page1
-        expected_elephant
-            .tf_idf_scores
-            .insert(page2.id, ordered_float::OrderedFloat(0.90309)); // TF-IDF in page2
+        expected_elephant.tf_idf_scores.insert(
+            page1.id.to_string(),
+            Some(ordered_float::OrderedFloat(0.0).to_string()),
+        ); // TF = 0 in page1
+        expected_elephant.tf_idf_scores.insert(
+            page2.id.to_string(),
+            Some(ordered_float::OrderedFloat(0.90309).to_string()),
+        ); // TF-IDF in page2
 
         let mut expected_terms = HashMap::new();
         expected_terms.insert(expected_hippo.term.clone(), expected_hippo.clone());
@@ -753,17 +789,19 @@ mod test {
                 expected_term.term
             );
 
-            for (expected_page_id, tf_idf) in &expected_term.tf_idf_scores {
+            for (expected_page_id, tf_idf) in expected_term.tf_idf_scores {
                 let err_msg = &format!(
-                    "TF-IDF {} not found for term '{}' in page {}, instead found TF-IDF {}",
+                    "TF-IDF {:?} not found for term '{}' in page {}, instead found TF-IDF {:?}",
                     tf_idf, expected_term.term, expected_page_id, tf_idf
                 );
+
                 let (page_id, _) = term_in_indexer
                     .tf_idf_scores
-                    .get_key_value(expected_page_id)
+                    .get_key_value(&expected_page_id)
                     .expect(err_msg);
+
                 assert_eq!(
-                    page_id, expected_page_id,
+                    *page_id, expected_page_id,
                     "page ID mismatch for term '{}'",
                     expected_term.term
                 );

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use scraper::Html;
+use sqlx::postgres::types::PgHstore;
 use tf_idf_indexer::*;
 
 mod common;
@@ -62,54 +63,72 @@ async fn test_new_with_pool() {
         assert!(indexer.contains_page(&page));
     }
 
-    let mut ladder_tf = HashMap::new();
-    ladder_tf.insert(0, ordered_float::OrderedFloat(0.0));
-    ladder_tf.insert(1, ordered_float::OrderedFloat(0.0));
-    ladder_tf.insert(2, ordered_float::OrderedFloat(0.0));
+    // ladder
+    let expected_ladder_tf = PgHstore::from_iter([
+        ("0".to_string(), "0".to_string()),
+        ("1".to_string(), "0".to_string()),
+        ("2".to_string(), "0".to_string()),
+        ("3".to_string(), "0".to_string()),
+    ]);
 
-    let ladder_tf_idf = ladder_tf.clone();
+    let expected_ladder_tf_idf = PgHstore::from_iter([
+        ("0".to_string(), "0".to_string()),
+        ("1".to_string(), "0".to_string()),
+        ("2".to_string(), "0".to_string()),
+        ("3".to_string(), "0".to_string()),
+    ]);
 
-    let mut hippo_tf = HashMap::new();
-    hippo_tf.insert(0, ordered_float::OrderedFloat(0.0));
-    hippo_tf.insert(1, ordered_float::OrderedFloat(0.6667));
-    hippo_tf.insert(2, ordered_float::OrderedFloat(0.6667));
+    // hippo
+    let expected_hippo_tf = PgHstore::from_iter([
+        ("0".to_string(), "0".to_string()),
+        ("1".to_string(), "0".to_string()),
+        ("2".to_string(), "0".to_string()),
+        ("3".to_string(), "0".to_string()),
+    ]);
 
-    let mut hippo_tf_idf = HashMap::new();
-    hippo_tf_idf.insert(0, ordered_float::OrderedFloat(0.0));
-    hippo_tf_idf.insert(1, ordered_float::OrderedFloat(0.2703));
-    hippo_tf_idf.insert(2, ordered_float::OrderedFloat(0.2703));
+    let expected_hippo_tf_idf = PgHstore::from_iter([
+        ("0".to_string(), "0".to_string()),
+        ("1".to_string(), "0".to_string()),
+        ("2".to_string(), "0".to_string()),
+        ("3".to_string(), "0".to_string()),
+    ]);
 
-    let mut pipe_tf = HashMap::new();
-    pipe_tf.insert(0, ordered_float::OrderedFloat(0.3333));
-    pipe_tf.insert(1, ordered_float::OrderedFloat(0.0));
-    pipe_tf.insert(2, ordered_float::OrderedFloat(0.0));
+    // pipe
+    let expected_pipe_tf = PgHstore::from_iter([
+        ("0".to_string(), "0.3333".to_string()),
+        ("1".to_string(), "0".to_string()),
+        ("2".to_string(), "0".to_string()),
+        ("3".to_string(), "0".to_string()),
+    ]);
 
-    let mut pipe_tf_idf = HashMap::new();
-    pipe_tf_idf.insert(0, ordered_float::OrderedFloat(0.3662));
-    pipe_tf_idf.insert(1, ordered_float::OrderedFloat(0.0));
-    pipe_tf_idf.insert(2, ordered_float::OrderedFloat(0.0));
+    let expected_pipe_tf_idf = PgHstore::from_iter([
+        ("0".to_string(), "0.3662".to_string()),
+        ("1".to_string(), "0".to_string()),
+        ("2".to_string(), "0".to_string()),
+        ("3".to_string(), "0".to_string()),
+    ]);
 
     let expected_terms = vec![
         Term::new(
             "ladder".into(),
             ordered_float::OrderedFloat(0.0),
             3,
-            ladder_tf,
-            ladder_tf_idf,
+            expected_ladder_tf,
+            expected_ladder_tf_idf,
         ),
         Term::new(
             "hippopotamus".into(),
             ordered_float::OrderedFloat(0.405465),
             2,
-            hippo_tf,
-            hippo_tf_idf,
+            expected_hippo_tf,
+            expected_hippo_tf_idf,
         ),
         Term::new(
             "pipe".into(),
             ordered_float::OrderedFloat(1.098612),
             1,
-            pipe_tf,
-            pipe_tf_idf,
+            expected_pipe_tf,
+            expected_pipe_tf_idf,
         ),
     ];
 
