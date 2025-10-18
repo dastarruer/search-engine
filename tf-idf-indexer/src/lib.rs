@@ -286,11 +286,9 @@ impl Indexer {
 
     pub async fn new_with_pool(pool: &sqlx::Pool<sqlx::Postgres>) -> Indexer {
         let mut starting_terms = HashMap::new();
-        let mut starting_pages = HashSet::new();
 
         let term_query = "SELECT * FROM terms;";
-        let page_query =
-            "SELECT html, id FROM pages WHERE is_crawled = TRUE AND is_indexed = FALSE;";
+        "SELECT html, id FROM pages WHERE is_crawled = TRUE AND is_indexed = FALSE;";
 
         // Add terms from the db
         sqlx::query(term_query)
@@ -304,35 +302,24 @@ impl Indexer {
                 starting_terms.insert(term.term.clone(), term);
             });
 
-        // Add pages from the db
-        sqlx::query(page_query)
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .for_each(|row| {
-                starting_pages.insert(Page::new(
-                    Html::parse_document(row.get("html")),
-                    row.get("id"),
-                ));
-            });
+        let mut indexer = Indexer::new(starting_terms, HashSet::new());
 
-        Indexer::new(starting_terms, starting_pages)
+        // Add pages from the db
+        indexer.refresh_queue(pool).await;
+
+        indexer
     }
 
     pub async fn run(&mut self, pool: &sqlx::PgPool) {
-        let mut i = 0;
-        if self.pages.queue.is_empty() {
-            self.refresh_queue(pool).await;
-        }
-
         while let Some(page) = self.pages.pop() {
             self.parse_page(page);
-            println!("Page {} parsed", i);
-            i += 1;
 
             if self.pages.queue.is_empty() {
                 self.refresh_queue(pool).await;
+
+                for term in self.terms.values() {
+                    term.add_to_db(pool).await;
+                }
             }
         }
 
