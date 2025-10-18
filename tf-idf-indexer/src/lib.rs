@@ -23,7 +23,7 @@ mod helper {
 }
 #[allow(non_camel_case_types)]
 // This float type allows us to implement `Hash` and `Eq` for `Term`, so we can put it in a `HashSet`
-type ordered_f32 = ordered_float::OrderedFloat<helper::f32_helper>;
+type ordered_f32 = OrderedFloat<helper::f32_helper>;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Term {
@@ -65,7 +65,7 @@ impl From<String> for Term {
     fn from(value: String) -> Self {
         Term {
             term: value,
-            idf: ordered_float::OrderedFloat(0.0),
+            idf: OrderedFloat(0.0),
             page_frequency: 0,
             tf_scores: PgHstore::default(),
             tf_idf_scores: PgHstore::default(),
@@ -97,7 +97,7 @@ impl Term {
     /// frequent a [`Term`] is in one page, and how rare it is in other
     /// pages.
     fn get_tf(&self, terms: &[Term]) -> ordered_f32 {
-        ordered_float::OrderedFloat(
+        OrderedFloat(
             terms
                 .iter()
                 .filter(|t| t.term.eq_ignore_ascii_case(&self.term))
@@ -110,7 +110,7 @@ impl Term {
     /// Increments [`Term::page_frequency`] if the term appears at least once.
     fn update_page_frequency(&mut self, tf: OrderedFloat<f32>) {
         // If the term appears at least once, incrememnt page frequency
-        if tf > ordered_float::OrderedFloat(0.0) {
+        if tf > OrderedFloat(0.0) {
             self.page_frequency += 1;
         }
     }
@@ -123,7 +123,7 @@ impl Term {
     fn update_total_idf(&mut self, num_pages: i32) {
         // Prevent divide-by-zero error or evaluating log(0)
         if self.page_frequency == 0 || num_pages == 0 {
-            self.idf = ordered_float::OrderedFloat(0.0);
+            self.idf = OrderedFloat(0.0);
             return;
         }
 
@@ -147,7 +147,7 @@ impl Term {
     /// if IDF ever changes.
     fn update_tf_idf_scores(&mut self) {
         for (page_id, tf) in self.tf_scores.iter_mut() {
-            let tf = ordered_float::OrderedFloat(
+            let tf = OrderedFloat(
                 tf.as_ref()
                     .expect("Every page should have a TF score for every term.")
                     .parse::<f32>()
@@ -258,7 +258,7 @@ impl Indexer {
             .iter()
             .for_each(|row| {
                 let term: String = row.get("term");
-                let idf = ordered_float::OrderedFloat(row.get("idf"));
+                let idf = OrderedFloat(row.get("idf"));
                 let page_frequency: i32 = row.get("page_frequency");
                 let tf_scores: PgHstore = row.get("tf_scores");
                 let tf_idf_scores: PgHstore = row.get("tf_idf_scores");
@@ -463,6 +463,7 @@ mod test {
         f32, fs,
     };
 
+    use ordered_float::OrderedFloat;
     use scraper::Html;
     use sqlx::postgres::types::PgHstore;
 
@@ -479,7 +480,7 @@ mod test {
 
         assert_eq!(
             term.get_tf(&page.extract_relevant_terms()),
-            ordered_float::OrderedFloat(4.0)
+            OrderedFloat(4.0)
         );
     }
 
@@ -511,7 +512,7 @@ mod test {
             let mut term = Term::from(String::from("hippopotamus"));
 
             // A hypothetical term frequency
-            let tf = ordered_float::OrderedFloat(2.0);
+            let tf = OrderedFloat(2.0);
 
             term.update_page_frequency(tf);
 
@@ -523,7 +524,7 @@ mod test {
             let mut term = Term::from(String::from("hippopotamus"));
 
             // A hypothetical term frequency
-            let tf = ordered_float::OrderedFloat(0.0);
+            let tf = OrderedFloat(0.0);
 
             term.update_page_frequency(tf);
 
@@ -594,7 +595,7 @@ mod test {
         let mut term = Term::from(String::from("hippopotamus"));
 
         // Manually set up TF for both pages
-        let tf1 = ordered_float::OrderedFloat(2.0);
+        let tf1 = OrderedFloat(2.0);
         term.tf_scores
             .insert(page1.id.to_string(), Some(tf1.to_string()));
 
@@ -602,7 +603,7 @@ mod test {
 
         // Update idf, which should be log(1/1), where 1 is the number of
         // pages and 1 is the number of pages the term is found in
-        term.idf = ordered_float::OrderedFloat(0.0);
+        term.idf = OrderedFloat(0.0);
 
         // Update the TF-IDF scores based on the new idf
         term.update_tf_idf_scores();
@@ -610,14 +611,14 @@ mod test {
         // Expected TF-IDF values
         let mut expected_tf_idf = PgHstore::from_iter([(
             page1.id.to_string(),
-            (tf1 * ordered_float::OrderedFloat(0.0)).to_string(),
+            (tf1 * OrderedFloat::<f32>(0.0)).to_string(),
         )]);
 
         assert_eq!(term.tf_idf_scores, expected_tf_idf);
 
         let page2 = Page::new(Html::parse_document("<body><p>ladder</p></body>"), 1);
 
-        let tf2 = ordered_float::OrderedFloat(0.0);
+        let tf2 = OrderedFloat(0.0);
 
         term.tf_scores
             .insert(page2.id.to_string(), Some(tf2.to_string()));
@@ -626,17 +627,17 @@ mod test {
 
         // Update idf, which should be log(2/1), where 1 is the number of
         // pages and 1 is the number of pages the term is found in
-        term.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
+        term.idf = OrderedFloat(f32::consts::LOG10_2);
 
         term.update_tf_idf_scores();
 
         expected_tf_idf.insert(
             page1.id.to_string(),
-            Some((tf1 * ordered_float::OrderedFloat(f32::consts::LOG10_2)).to_string()),
+            Some((tf1 * OrderedFloat(f32::consts::LOG10_2)).to_string()),
         );
         expected_tf_idf.insert(
             page2.id.to_string(),
-            Some((tf2 * ordered_float::OrderedFloat(f32::consts::LOG10_2)).to_string()),
+            Some((tf2 * OrderedFloat(f32::consts::LOG10_2)).to_string()),
         );
 
         assert_eq!(term.tf_idf_scores, expected_tf_idf);
@@ -698,11 +699,11 @@ mod test {
         let mut term = Term::from(String::from("hippopotamus"));
         term.tf_scores.insert(
             page.id.to_string(),
-            Some(ordered_float::OrderedFloat(0.0).to_string()),
+            Some(OrderedFloat(0.0).to_string()),
         );
         term.tf_idf_scores.insert(
             page.id.to_string(),
-            Some(ordered_float::OrderedFloat(0.0).to_string()),
+            Some(OrderedFloat(0.0).to_string()),
         );
 
         let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
@@ -744,28 +745,28 @@ mod test {
 
         // Hippopotamus term
         let mut expected_hippo = Term::from(String::from("hippopotamus"));
-        expected_hippo.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
+        expected_hippo.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_hippo.page_frequency = 1;
         expected_hippo.tf_idf_scores.insert(
             page2.id.to_string(),
-            Some(ordered_float::OrderedFloat(0.0).to_string()),
+            Some(OrderedFloat(0.0).to_string()),
         ); // TF = 0 in page2
         expected_hippo.tf_idf_scores.insert(
             page1.id.to_string(),
-            Some(ordered_float::OrderedFloat(0.90309).to_string()),
+            Some(OrderedFloat(0.90309).to_string()),
         ); // TF-IDF in page1
 
         // Elephant term
         let mut expected_elephant = Term::from(String::from("elephant"));
-        expected_elephant.idf = ordered_float::OrderedFloat(f32::consts::LOG10_2);
+        expected_elephant.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_elephant.page_frequency = 1;
         expected_elephant.tf_idf_scores.insert(
             page1.id.to_string(),
-            Some(ordered_float::OrderedFloat(0.0).to_string()),
+            Some(OrderedFloat(0.0).to_string()),
         ); // TF = 0 in page1
         expected_elephant.tf_idf_scores.insert(
             page2.id.to_string(),
-            Some(ordered_float::OrderedFloat(0.90309).to_string()),
+            Some(OrderedFloat(0.90309).to_string()),
         ); // TF-IDF in page2
 
         let mut expected_terms = HashMap::new();
