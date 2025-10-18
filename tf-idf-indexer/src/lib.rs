@@ -328,15 +328,16 @@ impl Indexer {
 
     /// Refresh the queue by reading from the database.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let rows =
-            sqlx::query(r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT 100;"#)
-                .fetch_all(pool)
-                .await
-                .unwrap();
+        let query = r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT 100;"#;
 
-        for row in rows {
-            self.add_page(Page::from(&row));
-        }
+        sqlx::query(query)
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|row| {
+                self.add_page(Page::from(row));
+            });
     }
 
     fn parse_page(&mut self, page: Page) {
