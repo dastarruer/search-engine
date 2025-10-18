@@ -63,13 +63,25 @@ impl std::hash::Hash for Term {
 
 impl From<String> for Term {
     fn from(value: String) -> Self {
-        Term {
-            term: value,
-            idf: OrderedFloat(0.0),
-            page_frequency: 0,
-            tf_scores: PgHstore::default(),
-            tf_idf_scores: PgHstore::default(),
-        }
+        Term::new(
+            value,
+            OrderedFloat(0.0),
+            0,
+            PgHstore::default(),
+            PgHstore::default(),
+        )
+    }
+}
+
+impl From<&sqlx::postgres::PgRow> for Term {
+    fn from(value: &sqlx::postgres::PgRow) -> Self {
+        let term: String = value.get("term");
+        let idf = OrderedFloat(value.get("idf"));
+        let page_frequency: i32 = value.get("page_frequency");
+        let tf_scores: PgHstore = value.get("tf_scores");
+        let tf_idf_scores: PgHstore = value.get("tf_idf_scores");
+
+        Term::new(term, idf, page_frequency, tf_scores, tf_idf_scores)
     }
 }
 
@@ -257,16 +269,9 @@ impl Indexer {
             .unwrap()
             .iter()
             .for_each(|row| {
-                let term: String = row.get("term");
-                let idf = OrderedFloat(row.get("idf"));
-                let page_frequency: i32 = row.get("page_frequency");
-                let tf_scores: PgHstore = row.get("tf_scores");
-                let tf_idf_scores: PgHstore = row.get("tf_idf_scores");
+                let term = Term::from(row);
 
-                starting_terms.insert(
-                    term.clone(),
-                    Term::new(term, idf, page_frequency, tf_scores, tf_idf_scores),
-                );
+                starting_terms.insert(term.term.clone(), term);
             });
 
         // Add pages from the db
@@ -697,14 +702,10 @@ mod test {
     fn test_add_term() {
         let page = Page::new(Html::new_document(), 0);
         let mut term = Term::from(String::from("hippopotamus"));
-        term.tf_scores.insert(
-            page.id.to_string(),
-            Some(OrderedFloat(0.0).to_string()),
-        );
-        term.tf_idf_scores.insert(
-            page.id.to_string(),
-            Some(OrderedFloat(0.0).to_string()),
-        );
+        term.tf_scores
+            .insert(page.id.to_string(), Some(OrderedFloat(0.0).to_string()));
+        term.tf_idf_scores
+            .insert(page.id.to_string(), Some(OrderedFloat(0.0).to_string()));
 
         let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
 
@@ -747,10 +748,9 @@ mod test {
         let mut expected_hippo = Term::from(String::from("hippopotamus"));
         expected_hippo.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_hippo.page_frequency = 1;
-        expected_hippo.tf_idf_scores.insert(
-            page2.id.to_string(),
-            Some(OrderedFloat(0.0).to_string()),
-        ); // TF = 0 in page2
+        expected_hippo
+            .tf_idf_scores
+            .insert(page2.id.to_string(), Some(OrderedFloat(0.0).to_string())); // TF = 0 in page2
         expected_hippo.tf_idf_scores.insert(
             page1.id.to_string(),
             Some(OrderedFloat(0.90309).to_string()),
@@ -760,10 +760,9 @@ mod test {
         let mut expected_elephant = Term::from(String::from("elephant"));
         expected_elephant.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_elephant.page_frequency = 1;
-        expected_elephant.tf_idf_scores.insert(
-            page1.id.to_string(),
-            Some(OrderedFloat(0.0).to_string()),
-        ); // TF = 0 in page1
+        expected_elephant
+            .tf_idf_scores
+            .insert(page1.id.to_string(), Some(OrderedFloat(0.0).to_string())); // TF = 0 in page1
         expected_elephant.tf_idf_scores.insert(
             page2.id.to_string(),
             Some(OrderedFloat(0.90309).to_string()),
