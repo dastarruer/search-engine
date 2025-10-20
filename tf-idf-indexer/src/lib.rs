@@ -1,7 +1,10 @@
 pub mod utils;
 
 use sqlx::{Row, postgres::types::PgHstore};
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    time::Instant,
+};
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
@@ -297,12 +300,15 @@ impl Indexer {
 
     pub async fn run(&mut self, pool: &sqlx::PgPool) {
         while let Some(page) = self.pages.pop() {
+            log::info!("Parsing page {}...", page.id);
             self.parse_page(page, Some(pool)).await;
 
             if self.pages.queue.is_empty() {
+                log::info!("Page queue is empty, refreshing...");
                 self.refresh_queue(pool).await;
 
                 for term in self.terms.values() {
+                    log::debug!("Adding/updating term: {}", term.term);
                     term.add_to_db(pool).await;
                 }
                 self.empty_terms();
@@ -336,9 +342,13 @@ impl Indexer {
     ///   database. This is useful when testing. If passed as `Some`, then
     ///   terms are added to and read from the database.
     async fn parse_page(&mut self, page: Page, pool: Option<&sqlx::PgPool>) {
+        let start_time = Instant::now();
+
         let relevant_terms = page.extract_relevant_terms();
 
+        log::info!("Found {} terms in page {}", relevant_terms.len(), page.id);
         for term in relevant_terms.clone() {
+            log::debug!("Found term: {}", term.term);
             self.add_term(term, pool).await;
         }
 
@@ -357,9 +367,18 @@ impl Indexer {
             term.update_tf_idf_scores();
         }
 
+        let duration = start_time.elapsed();
         if let Some(pool) = pool {
+            log::info!(
+                "Page {} indexed successfully in {:.2?}! Marking as indexed...",
+                page.id,
+                duration
+            );
             page.mark_as_crawled(pool).await;
+            return;
         }
+
+        log::info!("Page {} indexed successfully in {:.2?}!", page.id, duration);
     }
 
     fn empty_terms(&mut self) {

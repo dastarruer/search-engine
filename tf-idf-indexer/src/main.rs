@@ -11,6 +11,7 @@ async fn main() {
 
     let url = utils::construct_postgres_url();
     let url = url.as_str();
+    log::info!("Connecting to the database at {}...", url);
 
     let max_connections = 10;
     let min_connections = 2;
@@ -29,9 +30,13 @@ async fn main() {
         .connect(url) // async connect
         .await
         .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
+    log::info!("Succesfully connected to the database!");
 
     let mut indexer = Indexer::new_with_pool(&pool).await;
+
+    log::info!("Running indexer...");
     indexer.run(&pool).await;
+    log::info!("Indexer is finished!");
 }
 
 #[cfg(feature = "logging")]
