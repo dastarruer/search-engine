@@ -267,7 +267,7 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    pub fn new(starting_terms: HashMap<String, Term>, starting_pages: HashSet<Page>) -> Self {
+    pub async fn new(starting_terms: HashMap<String, Term>, starting_pages: HashSet<Page>) -> Self {
         let num_pages = starting_pages.len() as i32;
 
         let mut indexer = Indexer {
@@ -278,7 +278,7 @@ impl Indexer {
 
         // Add starting terms
         for (_, term) in starting_terms {
-            indexer.add_term(term);
+            indexer.add_term(term, None).await;
         }
 
         indexer
@@ -288,7 +288,6 @@ impl Indexer {
         let mut starting_terms = HashMap::new();
 
         let term_query = "SELECT * FROM terms;";
-        "SELECT html, id FROM pages WHERE is_crawled = TRUE AND is_indexed = FALSE;";
 
         // Add terms from the db
         sqlx::query(term_query)
@@ -302,7 +301,7 @@ impl Indexer {
                 starting_terms.insert(term.term.clone(), term);
             });
 
-        let mut indexer = Indexer::new(starting_terms, HashSet::new());
+        let mut indexer = Indexer::new(starting_terms, HashSet::new()).await;
 
         // Add pages from the db
         indexer.refresh_queue(pool).await;
@@ -312,7 +311,7 @@ impl Indexer {
 
     pub async fn run(&mut self, pool: &sqlx::PgPool) {
         while let Some(page) = self.pages.pop() {
-            self.parse_page(page);
+            self.parse_page(page, Some(pool)).await;
 
             if self.pages.queue.is_empty() {
                 self.refresh_queue(pool).await;
@@ -340,11 +339,20 @@ impl Indexer {
             });
     }
 
-    fn parse_page(&mut self, page: Page) {
+    /// Parse a [`Page`], extracting relevant terms and adding them to
+    /// [`Indexer::terms`], and optionally add them to the database.
+    ///
+    /// # Parameters
+    /// - `page: Page` - The page to be parsed.
+    /// - `pool: Option<&sqlx::PgPool>` - The connection to the database. If
+    ///   passed as `None`, then terms are not added to or read from the
+    ///   database. This is useful when testing. If passed as `Some`, then
+    ///   terms are added to and read from the database.
+    async fn parse_page(&mut self, page: Page, pool: Option<&sqlx::PgPool>) {
         let relevant_terms = page.extract_relevant_terms();
 
         for term in relevant_terms.clone() {
-            self.add_term(term);
+            self.add_term(term, pool).await;
         }
 
         // Loop through each stored term
@@ -355,15 +363,15 @@ impl Indexer {
 
             term.update_total_idf(self.num_pages);
 
-            let tf_idf = tf * term.idf;
-
             term.tf_scores
-                .insert(page.id.to_string().to_string(), Some(tf.to_string()));
-            term.tf_idf_scores
-                .insert(page.id.to_string().to_string(), Some(tf_idf.to_string()));
+                .insert(page.id.to_string(), Some(tf.to_string()));
 
             // Go back and update the tf_idf scores for every other single page
             term.update_tf_idf_scores();
+        }
+
+        if let Some(pool) = pool {
+            page.mark_as_crawled(pool).await;
         }
     }
 
@@ -397,23 +405,40 @@ impl Indexer {
         };
     }
 
-    fn add_term(&mut self, mut term: Term) {
+    async fn add_term(&mut self, mut term: Term, pool: Option<&sqlx::PgPool>) {
         let term_str = term.term.clone();
         if !self.terms.contains_key(&term_str) {
             // Initialize tf and tf_idf for all existing pages
             for page in &self.pages {
                 term.tf_scores.insert(
-                    page.id.to_string().to_string(),
+                    (page.id - 1).to_string(),
                     Some(OrderedFloat(0.0).to_string()),
                 );
                 term.tf_idf_scores.insert(
-                    page.id.to_string().to_string(),
+                    (page.id - 1).to_string(),
                     Some(OrderedFloat(0.0).to_string()),
                 );
             }
 
             self.terms.insert(term_str, term);
+        } else if let Some(pool) = pool
+            && let Some(term) = Self::get_term_from_db(pool, &term).await
+        {
+            self.terms.insert(term_str, term);
         }
+    }
+
+    async fn get_term_from_db(pool: &sqlx::PgPool, term: &Term) -> Option<Term> {
+        let query = r#"SELECT * FROM terms WHERE term = $1"#;
+
+        if let Ok(Some(row)) = sqlx::query(query)
+            .bind(&term.term)
+            .fetch_optional(pool)
+            .await
+        {
+            return Some(Term::from(&row));
+        }
+        None
     }
 }
 
@@ -444,7 +469,7 @@ impl From<&sqlx::postgres::PgRow> for Page {
 
 impl PartialEq for Page {
     fn eq(&self, other: &Self) -> bool {
-        self.id.to_string() == other.id.to_string()
+        self.id == other.id
     }
 }
 
@@ -452,7 +477,7 @@ impl PartialEq for Page {
 impl std::hash::Hash for Page {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Just hash the id, since it's supposed to be unique
-        self.id.to_string().hash(state);
+        self.id.hash(state);
     }
 }
 
@@ -480,6 +505,14 @@ impl Page {
             .map(|t: String| Term::from(t))
             .filter(|t| !t.is_stop_word())
             .collect()
+    }
+
+    async fn mark_as_crawled(self, pool: &sqlx::PgPool) {
+        sqlx::query("UPDATE pages SET is_indexed = TRUE WHERE id = $1")
+            .bind(self.id)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 }
 
@@ -572,8 +605,8 @@ mod test {
             }
         }
 
-        #[test]
-        fn test_add_page() {
+        #[tokio::test]
+        async fn test_add_page() {
             let page = Page::new(
                 Html::parse_document(
                     r#"
@@ -584,15 +617,15 @@ mod test {
                 0,
             );
 
-            let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
+            let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
 
             indexer.add_page(page.clone());
 
             assert_eq!(indexer.pages.get(&page).unwrap(), &page);
         }
 
-        #[test]
-        fn test_add_duplicate_page() {
+        #[tokio::test]
+        async fn test_add_duplicate_page() {
             let page = Page::new(
                 Html::parse_document(
                     r#"
@@ -603,7 +636,7 @@ mod test {
                 0,
             );
 
-            let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
+            let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
 
             indexer.add_page(page.clone());
             indexer.add_page(page.clone());
@@ -720,8 +753,8 @@ mod test {
         assert_eq!(terms, included_terms);
     }
 
-    #[test]
-    fn test_add_term() {
+    #[tokio::test]
+    async fn test_add_term() {
         let page = Page::new(Html::new_document(), 0);
         let mut term = Term::from(String::from("hippopotamus"));
         term.tf_scores
@@ -729,15 +762,15 @@ mod test {
         term.tf_idf_scores
             .insert(page.id.to_string(), Some(OrderedFloat(0.0).to_string()));
 
-        let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
+        let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
 
-        indexer.add_term(term.clone());
+        indexer.add_term(term.clone(), None).await;
 
         assert_eq!(indexer.terms.get("hippopotamus").unwrap(), &term);
     }
 
-    #[test]
-    fn test_parse_document() {
+    #[tokio::test]
+    async fn test_parse_document() {
         let page1 = Page::new(
             Html::parse_document(
                 r#"
@@ -758,13 +791,13 @@ mod test {
             1,
         );
 
-        let mut indexer = Indexer::new(HashMap::new(), HashSet::new());
+        let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
 
         indexer.add_page(page1.clone());
-        indexer.parse_page(page1.clone());
+        indexer.parse_page(page1.clone(), None).await;
 
         indexer.add_page(page2.clone());
-        indexer.parse_page(page2.clone());
+        indexer.parse_page(page2.clone(), None).await;
 
         // Hippopotamus term
         let mut expected_hippo = Term::from(String::from("hippopotamus"));
