@@ -285,21 +285,7 @@ impl Indexer {
     }
 
     pub async fn new_with_pool(pool: &sqlx::Pool<sqlx::Postgres>) -> Indexer {
-        let mut starting_terms = HashMap::new();
-
-        let term_query = "SELECT * FROM terms;";
-
-        // Add terms from the db
-        sqlx::query(term_query)
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .for_each(|row| {
-                let term = Term::from(row);
-
-                starting_terms.insert(term.term.clone(), term);
-            });
+        let starting_terms = HashMap::new();
 
         let mut indexer = Indexer::new(starting_terms, HashSet::new()).await;
 
@@ -319,6 +305,7 @@ impl Indexer {
                 for term in self.terms.values() {
                     term.add_to_db(pool).await;
                 }
+                self.empty_terms();
             }
         }
 
@@ -375,6 +362,10 @@ impl Indexer {
         }
     }
 
+    fn empty_terms(&mut self) {
+        self.terms.clear();
+    }
+
     /// Returns the number of [`Page`] instances in the indexer.
     pub fn num_pages(&self) -> i32 {
         self.num_pages
@@ -410,14 +401,10 @@ impl Indexer {
         if !self.terms.contains_key(&term_str) {
             // Initialize tf and tf_idf for all existing pages
             for page in &self.pages {
-                term.tf_scores.insert(
-                    (page.id - 1).to_string(),
-                    Some(OrderedFloat(0.0).to_string()),
-                );
-                term.tf_idf_scores.insert(
-                    (page.id - 1).to_string(),
-                    Some(OrderedFloat(0.0).to_string()),
-                );
+                term.tf_scores
+                    .insert((page.id).to_string(), Some(OrderedFloat(0.0).to_string()));
+                term.tf_idf_scores
+                    .insert((page.id).to_string(), Some(OrderedFloat(0.0).to_string()));
             }
 
             self.terms.insert(term_str, term);
@@ -490,6 +477,7 @@ impl Page {
     ///
     /// First filters out common 'stop words' (see [`Term::is_stop_word`] for more information), and then returns the resulting list of [`Term`]s.
     // TODO: Strip punctuation
+    // TODO: Extract text extraction into seperate method and add better testing
     fn extract_relevant_terms(&self) -> Vec<Term> {
         self.html
             .select(&BODY_SELECTOR)
