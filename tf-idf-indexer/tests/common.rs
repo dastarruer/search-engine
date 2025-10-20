@@ -1,10 +1,15 @@
 use std::fs;
 
-use sqlx::{Pool, migrate::Migrator, postgres::PgPoolOptions};
+use sqlx::{
+    Pool,
+    migrate::Migrator,
+    postgres::{PgPoolOptions, types::PgHstore},
+};
 use testcontainers_modules::{
     postgres::Postgres,
     testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
 };
+use tf_idf_indexer::Term;
 
 /// Set up a Postgres Docker container for testing purposes.
 ///
@@ -68,4 +73,63 @@ async fn construct_db_url(container: &ContainerAsync<Postgres>) -> String {
     let database = "postgres";
 
     format!("postgres://{user}:{password}@{host}:{port}/{database}")
+}
+
+pub fn dummy_terms() -> Vec<Term> {
+    // ladder
+    let expected_ladder_tf = PgHstore::from_iter([
+        ("1".to_string(), Some("2".to_string())),
+        ("2".to_string(), Some("1".to_string())),
+        ("3".to_string(), Some("1".to_string())),
+    ]);
+    let expected_ladder_tf_idf = PgHstore::from_iter([
+        ("1".to_string(), Some("0".to_string())),
+        ("2".to_string(), Some("0".to_string())),
+        ("3".to_string(), Some("0".to_string())),
+    ]);
+
+    // hippopotamus (appears in pages 2, 3 only)
+    let expected_hippo_tf = PgHstore::from_iter([
+        ("2".to_string(), Some("2".to_string())),
+        ("3".to_string(), Some("2".to_string())),
+    ]);
+    let expected_hippo_tf_idf = PgHstore::from_iter([
+        ("2".to_string(), Some("0.3521825".to_string())),
+        ("3".to_string(), Some("0.3521825".to_string())),
+    ]);
+
+    let expected_pipe_tf = PgHstore::from_iter([
+        ("1".to_string(), Some("1".to_string())),
+        ("2".to_string(), Some("0".to_string())),
+        ("3".to_string(), Some("0".to_string())),
+    ]);
+    let expected_pipe_tf_idf = PgHstore::from_iter([
+        ("1".to_string(), Some("0.47712123".to_string())),
+        ("2".to_string(), Some("0".to_string())),
+        ("3".to_string(), Some("0".to_string())),
+    ]);
+
+    vec![
+        Term::new(
+            "ladder".into(),
+            ordered_float::OrderedFloat(0.0),
+            3,
+            expected_ladder_tf,
+            expected_ladder_tf_idf,
+        ),
+        Term::new(
+            "hippopotamus".into(),
+            ordered_float::OrderedFloat(0.17609125),
+            2,
+            expected_hippo_tf,
+            expected_hippo_tf_idf,
+        ),
+        Term::new(
+            "pipe".into(),
+            ordered_float::OrderedFloat(0.47712123),
+            1,
+            expected_pipe_tf,
+            expected_pipe_tf_idf,
+        ),
+    ]
 }
