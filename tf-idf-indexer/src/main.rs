@@ -3,8 +3,6 @@ use tf_idf_indexer::{Indexer, utils};
 
 #[tokio::main]
 async fn main() {
-    sqlx::migrate!("../migrations");
-
     let url = utils::construct_postgres_url();
     let url = url.as_str();
 
@@ -25,6 +23,11 @@ async fn main() {
         .connect(url) // async connect
         .await
         .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
+
+    sqlx::migrate!("../migrations")
+        .run(&pool)
+        .await
+        .expect("Migrations should not throw any errors.");
 
     let mut indexer = Indexer::new_with_pool(&pool).await;
     indexer.run(&pool).await;
