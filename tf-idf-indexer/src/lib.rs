@@ -1,6 +1,7 @@
 pub mod utils;
 
 use sqlx::{Row, postgres::types::PgHstore};
+use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     time::Instant,
@@ -165,7 +166,7 @@ impl Term {
     /// This is useful when calculating the TF-IDF score of a term, which is
     /// used to check how frequent a [`Term`] is in one page, and how rare
     /// it is in other pages.
-    fn update_total_idf(&mut self, num_pages: i32) {
+    fn update_total_idf(&mut self, num_pages: i64) {
         // Prevent divide-by-zero error or evaluating log(0)
         if self.page_frequency == 0 || num_pages == 0 {
             self.idf = OrderedFloat(0.0);
@@ -191,7 +192,7 @@ impl Term {
     /// as term frequency * IDF, which needs to be refreshed for every page
     /// if IDF ever changes.
     fn update_tf_idf_scores(&mut self) {
-        for (page_id, tf) in self.tf_scores.iter_mut() {
+        for (page_id, tf) in self.tf_scores.iter() {
             let tf = OrderedFloat(
                 tf.as_ref()
                     .expect("Every page should have a TF score for every term.")
@@ -266,12 +267,12 @@ impl<'a> IntoIterator for &'a PageQueue {
 pub struct Indexer {
     terms: HashMap<String, Term>,
     pages: PageQueue,
-    num_pages: i32,
+    num_pages: i64,
 }
 
 impl Indexer {
     pub async fn new(starting_terms: HashMap<String, Term>, starting_pages: HashSet<Page>) -> Self {
-        let num_pages = starting_pages.len() as i32;
+        let num_pages = starting_pages.len() as i64;
 
         let mut indexer = Indexer {
             terms: HashMap::new(),
@@ -292,6 +293,12 @@ impl Indexer {
 
         let mut indexer = Indexer::new(starting_terms, HashSet::new()).await;
 
+        let num_pages_query = r#"SELECT COUNT(*) FROM pages WHERE is_indexed = TRUE;"#;
+        indexer.num_pages = sqlx::query_scalar(num_pages_query)
+            .fetch_one(pool)
+            .await
+            .expect("Fetching page count should not throw an error.");
+
         // Add pages from the db
         indexer.refresh_queue(pool).await;
 
@@ -303,15 +310,15 @@ impl Indexer {
             log::info!("Parsing page {}...", page.id);
             self.parse_page(page, Some(pool)).await;
 
+            for term in self.terms.values() {
+                log::debug!("Adding/updating term: {}", term.term);
+                term.add_to_db(pool).await;
+            }
+            self.empty_terms();
+
             if self.pages.queue.is_empty() {
                 log::info!("Page queue is empty, refreshing...");
                 self.refresh_queue(pool).await;
-
-                for term in self.terms.values() {
-                    log::debug!("Adding/updating term: {}", term.term);
-                    term.add_to_db(pool).await;
-                }
-                self.empty_terms();
             }
         }
 
@@ -344,12 +351,28 @@ impl Indexer {
     async fn parse_page(&mut self, page: Page, pool: Option<&sqlx::PgPool>) {
         let start_time = Instant::now();
 
-        let relevant_terms = page.extract_relevant_terms();
+        let mut relevant_terms = page.extract_relevant_terms();
 
         log::info!("Found {} terms in page {}", relevant_terms.len(), page.id);
-        for term in relevant_terms.clone() {
+
+        for term in relevant_terms.iter_mut() {
             log::debug!("Found term: {}", term.term);
-            self.add_term(term, pool).await;
+            // TODO: this method is not correctly retrieving the term from the db, and therefore the page frequency is off(?)
+            self.add_term(term.clone(), pool).await;
+        }
+
+        if let Some(pool) = pool {
+            // yes as much as this sucks I can't really see any other way to update every single term's idf and tf-idf scores
+            let term_query = r#"SELECT * FROM terms;"#;
+
+            sqlx::query(term_query)
+                .fetch_all(pool)
+                .await
+                .expect("Fetching terms should not throw an error")
+                .iter()
+                .for_each(|row| {
+                    self.terms.insert(row.get("term"), Term::from(row));
+                });
         }
 
         // Loop through each stored term
@@ -360,8 +383,11 @@ impl Indexer {
 
             term.update_total_idf(self.num_pages);
 
-            term.tf_scores
-                .insert(page.id.to_string(), Some(tf.to_string()));
+            // Only update tf_scores if the term appears in this page
+            if tf > OrderedFloat(0.0) {
+                term.tf_scores
+                    .insert(page.id.to_string(), Some(tf.to_string()));
+            }
 
             // Go back and update the tf_idf scores for every other single page
             term.update_tf_idf_scores();
@@ -386,7 +412,7 @@ impl Indexer {
     }
 
     /// Returns the number of [`Page`] instances in the indexer.
-    pub fn num_pages(&self) -> i32 {
+    pub fn num_pages(&self) -> i64 {
         self.num_pages
     }
 
@@ -415,23 +441,24 @@ impl Indexer {
         };
     }
 
-    async fn add_term(&mut self, mut term: Term, pool: Option<&sqlx::PgPool>) {
-        let term_str = term.term.clone();
-        if !self.terms.contains_key(&term_str) {
-            // Initialize tf and tf_idf for all existing pages
-            for page in &self.pages {
-                term.tf_scores
-                    .insert((page.id).to_string(), Some(OrderedFloat(0.0).to_string()));
-                term.tf_idf_scores
-                    .insert((page.id).to_string(), Some(OrderedFloat(0.0).to_string()));
-            }
+    pub async fn add_term(&mut self, term: Term, pool: Option<&sqlx::PgPool>) {
+        let key = term.term.clone();
 
-            self.terms.insert(term_str, term);
-        } else if let Some(pool) = pool
-            && let Some(term) = Self::get_term_from_db(pool, &term).await
-        {
-            self.terms.insert(term_str, term);
+        // If already in memory, skip, since we don’t need to reload or replace it.
+        if self.terms.contains_key(&key) {
+            return;
         }
+
+        // Try fetching from database if pool is available.
+        if let Some(pool) = pool
+            && let Some(db_term) = Self::get_term_from_db(pool, &term).await
+        {
+            self.terms.insert(key.clone(), db_term.clone());
+            return;
+        }
+
+        // Otherwise, insert the term that was passed.
+        self.terms.insert(key.clone(), term.clone());
     }
 
     async fn get_term_from_db(pool: &sqlx::PgPool, term: &Term) -> Option<Term> {
@@ -467,6 +494,7 @@ pub struct Page {
 impl From<&sqlx::postgres::PgRow> for Page {
     fn from(value: &sqlx::postgres::PgRow) -> Self {
         let html = value.get("html");
+        // TODO: Decrement this by 1 so the ids are zero indexed maybe?
         let id = value.get("id");
 
         Page::new(Html::parse_document(html), id)

@@ -7,4 +7,4 @@ VALUES
 
 INSERT INTO terms (term, idf, page_frequency, tf_scores, tf_idf_scores)
 VALUES
-    ('seagull', 1, 0, '0=>1', '0=>0');
+    ('seagull', 0, 1, '4=>1', '4=>0');
