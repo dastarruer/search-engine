@@ -42,7 +42,7 @@ pub async fn setup(script: &str) -> (ContainerAsync<Postgres>, Pool<sqlx::Postgr
     (container, pool)
 }
 
-async fn run_migrations(pool: &Pool<sqlx::Postgres>) {
+pub async fn run_migrations(pool: &Pool<sqlx::Postgres>) {
     let migrations = Migrator::new(std::path::Path::new("../migrations"))
         .await
         .unwrap();
