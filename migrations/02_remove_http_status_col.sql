@@ -1,2 +1,2 @@
 ALTER TABLE pages
-DROP COLUMN http_status;
+DROP COLUMN IF EXISTS http_status;

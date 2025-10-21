@@ -1,2 +1,2 @@
 ALTER TABLE pages
-ADD COLUMN is_crawled bool NOT NULL;
+ADD COLUMN IF NOT EXISTS is_crawled bool NOT NULL;

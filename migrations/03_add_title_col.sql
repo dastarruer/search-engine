@@ -1,2 +1,2 @@
 ALTER TABLE pages
-ADD COLUMN title text;
+ADD COLUMN IF NOT EXISTS title text;

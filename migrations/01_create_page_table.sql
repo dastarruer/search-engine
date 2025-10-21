@@ -1,4 +1,4 @@
-CREATE TABLE pages (
+CREATE TABLE IF NOT EXISTS pages (
     id serial NOT NULL, -- serial is autoincrementing
     url text NOT NULL UNIQUE,
     html text NOT NULL,
