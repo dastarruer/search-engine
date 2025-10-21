@@ -88,7 +88,7 @@ pub fn dummy_terms() -> Vec<Term> {
         ("3".to_string(), Some("0".to_string())),
     ]);
 
-    // hippopotamus (appears in pages 2, 3 only)
+    // hippopotamus
     let expected_hippo_tf = PgHstore::from_iter([
         ("2".to_string(), Some("2".to_string())),
         ("3".to_string(), Some("2".to_string())),
@@ -98,6 +98,7 @@ pub fn dummy_terms() -> Vec<Term> {
         ("3".to_string(), Some("0.3521825".to_string())),
     ]);
 
+    // pipe
     let expected_pipe_tf = PgHstore::from_iter([
         ("1".to_string(), Some("1".to_string())),
         ("2".to_string(), Some("0".to_string())),

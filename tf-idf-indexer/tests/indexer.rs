@@ -31,7 +31,7 @@ async fn test_refresh_queue() -> sqlx::Result<()> {
 
     indexer.refresh_queue(&pool).await;
 
-    assert_eq!(indexer.num_pages(), expected_pages.len() as i32);
+    assert_eq!(indexer.num_pages(), expected_pages.len() as i64);
 
     for page in expected_pages {
         assert!(indexer.contains_page(&page));
@@ -79,46 +79,83 @@ async fn test_parse_page_with_existing_terms() {
         .map(Term::from)
         .collect();
 
-    // expected: { term: "seagull", idf: 0.47712123, page_frequency: 1, tf_scores: PgHstore({"3": Some("1")}), tf_idf_scores: PgHstore({"3": Some("0.47712123")})
-    // actual: term: "seagull", idf: 0.47712123, page_frequency: 1, tf_scores: PgHstore({"3": Some("1")}), tf_idf_scores: PgHstore({"3": Some("0.47712123")})
-    let expected_seagull_tf = PgHstore::from_iter([("3".to_string(), Some("1".to_string()))]);
-    let expected_seagull_tf_idf =
-        PgHstore::from_iter([("3".to_string(), Some("0.47712123".to_string()))]);
-    let expected_seagull = Term::new(
-        "seagull".into(),
-        ordered_float::OrderedFloat(0.47712123),
-        1,
-        expected_seagull_tf,
-        expected_seagull_tf_idf,
-    );
+    let expected_seagull_tf = PgHstore::from_iter([
+        ("3".to_string(), Some("1".to_string())),
+        ("4".to_string(), Some("1".to_string())),
+    ]);
+    let expected_seagull_tf_idf = PgHstore::from_iter([
+        ("3".to_string(), Some(std::f32::consts::LOG10_2.to_string())),
+        ("4".to_string(), Some(std::f32::consts::LOG10_2.to_string())),
+    ]);
 
     let expected_ladder_tf = PgHstore::from_iter([
         ("1".to_string(), Some("2".to_string())),
         ("2".to_string(), Some("1".to_string())),
-        ("3".to_string(), Some("0".to_string())),
     ]);
     let expected_ladder_tf_idf = PgHstore::from_iter([
-        ("1".to_string(), Some("0.3521825".to_string())),
-        ("2".to_string(), Some("0.17609125".to_string())),
-        ("3".to_string(), Some("0".to_string())),
+        (
+            "1".to_string(),
+            Some((2.0 * std::f32::consts::LOG10_2).to_string()),
+        ),
+        ("2".to_string(), Some(std::f32::consts::LOG10_2.to_string())),
     ]);
-    let expected_ladder = Term::new(
-        "ladder".into(),
-        ordered_float::OrderedFloat(0.17609125),
-        2,
-        expected_ladder_tf,
-        expected_ladder_tf_idf,
+
+    // hippopotamus
+    let expected_hippo_tf = PgHstore::from_iter([
+        ("2".to_string(), Some("2".to_string())),
+        ("3".to_string(), Some("2".to_string())),
+    ]);
+    let expected_hippo_tf_idf = PgHstore::from_iter([
+        (
+            "2".to_string(),
+            Some((2.0 * std::f32::consts::LOG10_2).to_string()),
+        ),
+        (
+            "3".to_string(),
+            Some((2.0 * std::f32::consts::LOG10_2).to_string()),
+        ),
+    ]);
+
+    // pipe
+    let expected_pipe_tf = PgHstore::from_iter([("1".to_string(), Some("1".to_string()))]);
+    let expected_pipe_tf_idf = PgHstore::from_iter(
+        // log4
+        [("1".to_string(), Some(0.60206.to_string()))],
     );
 
-    let mut expected_terms = dummy_terms();
-    expected_terms.push(expected_seagull);
-    expected_terms[0] = expected_ladder;
+    let expected_terms = vec![
+        Term::new(
+            "ladder".into(),
+            ordered_float::OrderedFloat(std::f32::consts::LOG10_2),
+            2,
+            expected_ladder_tf,
+            expected_ladder_tf_idf,
+        ),
+        Term::new(
+            "hippopotamus".into(),
+            ordered_float::OrderedFloat(std::f32::consts::LOG10_2),
+            2,
+            expected_hippo_tf,
+            expected_hippo_tf_idf,
+        ),
+        Term::new(
+            "pipe".into(),
+            // log4
+            ordered_float::OrderedFloat(0.60206),
+            1,
+            expected_pipe_tf,
+            expected_pipe_tf_idf,
+        ),
+        Term::new(
+            "seagull".into(),
+            ordered_float::OrderedFloat(std::f32::consts::LOG10_2),
+            2,
+            expected_seagull_tf,
+            expected_seagull_tf_idf,
+        ),
+    ];
 
     for term in &expected_terms {
-        println!(
-            "Expected terms: {:?}\nActual terms: {:?}",
-            expected_terms, actual_terms
-        );
         assert!(actual_terms.contains(term))
     }
 }
