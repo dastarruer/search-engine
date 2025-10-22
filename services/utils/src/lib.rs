@@ -117,6 +117,21 @@ mod test {
             let html = Html::parse_document(
                 r#"
                 <body>
+                    <p>hippopotamus hippopotamus hippopotamus</p>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
+            );
+        }
+
+        #[test]
+        fn test_with_style_and_script_tags() {
+            let html = Html::parse_document(
+                r#"
+                <body>
                     <style>
                         .global-navigation{
                             position: fixed;
@@ -133,7 +148,7 @@ mod test {
             assert_eq!(
                 html.extract_text(),
                 "hippopotamus hippopotamus hippopotamus"
-            )
+            );
         }
 
         #[test]
@@ -151,7 +166,7 @@ mod test {
             assert_eq!(
                 html.extract_text(),
                 "hippopotamus hippopotamus, Hippopotamus hippopotamus world tis the won"
-            )
+            );
         }
     }
 }
