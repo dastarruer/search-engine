@@ -7,7 +7,7 @@ use utils::{AddToDb, ExtractText};
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
-use scraper::{Html, Selector};
+use scraper::Html;
 
 static STOP_WORDS: Lazy<HashSet<StopWordTerm>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
@@ -93,6 +93,15 @@ impl Term {
         tf_scores: PgHstore,
         tf_idf_scores: PgHstore,
     ) -> Self {
+        // Normalize the term
+        let term = term
+            .to_lowercase()
+            .trim()
+            .chars()
+            .filter(|c| !c.is_ascii_punctuation())
+            .collect();
+
+        println!("Term: {}", term);
         Term {
             term,
             idf,
@@ -524,14 +533,7 @@ impl Page {
         self.html
             .extract_text()
             .split_whitespace()
-            .map(|t| {
-                t.trim()
-                    .to_lowercase()
-                    .chars()
-                    .filter(|c| c.is_alphanumeric())
-                    .collect()
-            })
-            .map(|t: String| Term::from(t))
+            .map(|t: &str| Term::from(t.to_string()))
             .filter(|t| !t.is_stop_word())
             .collect()
     }
