@@ -32,10 +32,7 @@ async fn main() {
         .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
     log::info!("Succesfully connected to the database!");
 
-    sqlx::migrate!("../../migrations")
-        .run(&pool)
-        .await
-        .expect("Migrations should not throw any errors.");
+    ::utils::migrate(&pool).await;
 
     let mut indexer = Indexer::new_with_pool(&pool).await;
 

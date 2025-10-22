@@ -39,6 +39,9 @@ impl Crawler {
     pub async fn new(starting_pages: Vec<Page>) -> Self {
         let (pool, crawled) = Self::init_crawled_and_pool().await;
 
+        // TODO: For now, this will be here but it should be in main.rs instead
+        ::utils::migrate(&pool).await;
+
         let queue = Self::init_queue(starting_pages, &pool).await;
 
         let client = Self::init_client();

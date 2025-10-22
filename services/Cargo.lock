@@ -505,6 +505,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
+ "utils",
 ]
 
 [[package]]
@@ -3440,6 +3441,7 @@ dependencies = [
  "testcontainers-modules",
  "tokio",
  "url",
+ "utils",
 ]
 
 [[package]]
