@@ -3832,6 +3832,8 @@ name = "utils"
 version = "0.1.0"
 dependencies = [
  "sqlx",
+ "testcontainers-modules",
+ "tokio",
  "url",
 ]
 

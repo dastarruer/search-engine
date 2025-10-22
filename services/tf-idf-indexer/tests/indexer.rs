@@ -8,16 +8,6 @@ use crate::common::{dummy_terms};
 
 mod common;
 
-// TODO: Move this to utils crate
-#[tokio::test]
-async fn test_migrations() {
-    // Run migrations once
-    let (_container, pool) = common::setup("dummy_data").await;
-
-    // Run migrations again. Migrations should be written so that they don't panic if run multiple times
-    migrate(&pool).await;
-}
-
 #[tokio::test]
 async fn test_refresh_queue() -> sqlx::Result<()> {
     let (_container, pool) = common::setup("dummy_data").await;
