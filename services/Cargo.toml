@@ -2,7 +2,7 @@
 resolver = "3"
 members = ["crawler", "tf-idf-indexer", "utils"]
 
-[dependencies]
+[workspace.dependencies]
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls", "migrate"] }
 tokio = { version = "1.47.1", features = ["full"] }
 flexi_logger = "0.31.5"
