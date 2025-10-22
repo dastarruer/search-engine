@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crawler", "tf-idf-indexer"]
+members = ["crawler", "tf-idf-indexer", "utils"]
 
 [dependencies]
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls", "migrate"] }
