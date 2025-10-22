@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
 
 static TEXT_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body p").unwrap());
+static IMAGE_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("img").unwrap());
 
 /// Run database migrations on the database.
 ///
@@ -89,17 +90,33 @@ pub trait ExtractText {
 }
 
 impl ExtractText for Html {
-    /// Extract all visible text from a parsed [`Html`] document. Each word is
-    /// separated by whitespace, and punctuation is preserved.
+    /// Extract all visible and image alt text from a parsed [`Html`] document.
+    /// Each word is separated by whitespace, and punctuation is preserved.
     ///
     /// 'Visible text' means any text that the user can read if they go onto a
     /// page. For instance, the text of a Wikipedia article is considered
     /// visible text, while any Javascript or CSS is not.
+    ///
+    /// Alt text gets appended to the end of the return `String` with a space.
     fn extract_text(&self) -> String {
-        self.select(&TEXT_SELECTOR)
+        let mut content = self
+            .select(&TEXT_SELECTOR)
             .flat_map(|el| el.text())
             .collect::<Vec<_>>()
-            .join(" ")
+            .join(" ");
+
+        // Get alt text
+        let alt_text = self
+            .select(&IMAGE_SELECTOR)
+            .flat_map(|el| el.value().attr("alt"))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // Add a space at the end of the string to seperate the alt text from the regular content
+        content.push(' ');
+        content.push_str(alt_text.as_str());
+
+        content.trim().to_string()
     }
 }
 
@@ -148,6 +165,22 @@ mod test {
             assert_eq!(
                 html.extract_text(),
                 "hippopotamus hippopotamus hippopotamus"
+            );
+        }
+
+        #[test]
+        fn test_img_alt_text() {
+            let html = Html::parse_document(
+                r#"
+                <body>
+                    <img src="man_on_building.jpg" alt="A man on a building">
+                    <p>hippopotamus hippopotamus hippopotamus</p>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus A man on a building"
             );
         }
 
