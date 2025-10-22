@@ -1,7 +1,8 @@
 use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
 
-static TEXT_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body p, h1, h2, h3, h4, h5, h6").unwrap());
+static TEXT_SELECTOR: Lazy<Selector> =
+    Lazy::new(|| Selector::parse("body p, h1, h2, h3, h4, h5, h6, ul li, ol li").unwrap());
 static IMAGE_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("img").unwrap());
 
 /// Run database migrations on the database.
@@ -161,6 +162,44 @@ mod test {
             assert_eq!(
                 html.extract_text(),
                 "hippopotamus hippopotamus hippopotamus hippopotamus hippopotamus hippopotamus"
+            );
+        }
+
+        #[test]
+        fn test_unordered_list_tags() {
+            let html = Html::parse_document(
+                r#"
+                <body>
+                    <ul>
+                        <li>hippopotamus</li>
+                        <li>hippopotamus</li>
+                        <li>hippopotamus</li>
+                    </ul>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
+            );
+        }
+
+        #[test]
+        fn test_ordered_list_tags() {
+            let html = Html::parse_document(
+                r#"
+                <body>
+                    <ol>
+                        <li>hippopotamus</li>
+                        <li>hippopotamus</li>
+                        <li>hippopotamus</li>
+                    </ol>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
             );
         }
 
