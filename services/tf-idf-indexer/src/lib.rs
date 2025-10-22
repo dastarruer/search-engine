@@ -1,7 +1,4 @@
-pub mod utils;
-
 use sqlx::{Row, postgres::types::PgHstore};
-use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     time::Instant,

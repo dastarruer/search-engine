@@ -2,16 +2,14 @@ use std::{collections::HashSet, time::Duration};
 
 use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
-use rustrict::{Censor, CensorStr, Type};
-use scraper::ElementRef;
-use scraper::Node;
+use rustrict::{Censor, Type};
 use scraper::{Html, Selector};
-use sqlx::{PgPool, Row, postgres::PgPoolOptions};
+use sqlx::{PgPool, Row};
 
 use crate::{
     error::CrawlerError,
     page::{CrawledPage, Page, PageQueue},
-    utils::{construct_postgres_url, string_to_url},
+    utils::{string_to_url},
 };
 
 #[derive(Clone)]
@@ -329,27 +327,7 @@ impl Crawler {
     /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
     async fn init_crawled_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
-        let url = construct_postgres_url();
-        let url = url.as_str();
-
-        let max_connections = 10;
-        let min_connections = 2;
-
-        // Set a large connection timeout, since as the size of the db increases, queries take longer and longer to execute
-        let connection_timeout = std::time::Duration::from_secs(500);
-
-        let max_lifetime = Some(std::time::Duration::from_secs(1800));
-        let idle_timeout = Some(std::time::Duration::from_secs(600));
-
-        let pool = PgPoolOptions::new()
-            .max_connections(max_connections)
-            .min_connections(min_connections)
-            .acquire_timeout(connection_timeout) // connection timeout
-            .max_lifetime(max_lifetime) // recycle old connections
-            .idle_timeout(idle_timeout) // close idle connections
-            .connect(url) // async connect
-            .await
-            .expect("DATABASE_URL should correctly point to the PostGreSQL database.");
+        let pool = ::utils::init_pool().await;
 
         // Limit the query to return just 100 rows so startup times are not too long
         let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT 100";
