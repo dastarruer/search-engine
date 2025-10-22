@@ -94,13 +94,9 @@ pub fn dummy_terms() -> Vec<Term> {
     // pipe
     let expected_pipe_tf = PgHstore::from_iter([
         ("1".to_string(), Some("1".to_string())),
-        ("2".to_string(), Some("0".to_string())),
-        ("3".to_string(), Some("0".to_string())),
     ]);
     let expected_pipe_tf_idf = PgHstore::from_iter([
         ("1".to_string(), Some("0.47712123".to_string())),
-        ("2".to_string(), Some("0".to_string())),
-        ("3".to_string(), Some("0".to_string())),
     ]);
 
     vec![
