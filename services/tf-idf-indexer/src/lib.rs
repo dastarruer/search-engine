@@ -86,6 +86,22 @@ impl From<&sqlx::postgres::PgRow> for Term {
 }
 
 impl Term {
+    /// Create a new instance of [`Term`].
+    ///
+    /// # Parameters
+    /// - `term` - The term to be stored. This gets normalized, meaning
+    ///   whitespace and punctuation is trimmed, and the term is converted to
+    ///   lowercase.
+    /// - `idf` - The Inverse Document Frequency of a term. See [`Term::idf`]
+    ///   for more information.
+    /// - `page_frequency` - Measures how many pages this term is found in. Used
+    ///   to calculate Inverse Document Frequency.
+    /// - `tf_scores` — A mapping of page IDs to the *Term Frequency* (TF) for
+    ///   this term in each page. Pages with a term frequency of `0` should not be included, since they are not worth storing.
+    /// - `tf_idf_scores` — A mapping of page IDs to their *TF-IDF* score for
+    ///   this term. TF-IDF is computed as `Term Frequency × Inverse Document
+    ///   Frequency`. Pages with a term frequency of `0` should not be
+    ///   included, since they are not worth storing.
     pub fn new(
         term: String,
         idf: ordered_f32,
@@ -111,7 +127,8 @@ impl Term {
         }
     }
 
-    /// Find the number of times that a [`Term`] appears in a given piece of text.
+    /// Find the number of times that a [`Term`] appears in a given piece of
+    /// text.
     ///
     /// This is called the *term frequency* of a term. This is useful when
     /// calculating the TF-IDF score of a term, which is used to check how
