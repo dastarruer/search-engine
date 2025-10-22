@@ -5,6 +5,7 @@ members = ["crawler", "tf-idf-indexer", "utils"]
 [workspace.dependencies]
 sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio-rustls", "migrate"] }
 tokio = { version = "1.47.1", features = ["full"] }
+testcontainers-modules = { version = "0.13.0", features = ["postgres", "blocking"] }
 flexi_logger = "0.31.5"
 url = "2.5.7"
 log = "0.4.28"
