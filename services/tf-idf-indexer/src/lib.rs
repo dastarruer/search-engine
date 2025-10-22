@@ -1,9 +1,9 @@
 use sqlx::{Row, postgres::types::PgHstore};
-use utils::AddToDb;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     time::Instant,
 };
+use utils::AddToDb;
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
@@ -802,7 +802,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_parse_document() {
+    async fn test_parse_page() {
         let page1 = Page::new(
             Html::parse_document(
                 r#"
@@ -835,25 +835,19 @@ mod test {
         let mut expected_hippo = Term::from(String::from("hippopotamus"));
         expected_hippo.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_hippo.page_frequency = 1;
-        expected_hippo
-            .tf_idf_scores
-            .insert(page2.id.to_string(), Some(OrderedFloat(0.0).to_string())); // TF = 0 in page2
         expected_hippo.tf_idf_scores.insert(
             page1.id.to_string(),
             Some(OrderedFloat(0.90309).to_string()),
-        ); // TF-IDF in page1
+        );
 
         // Elephant term
         let mut expected_elephant = Term::from(String::from("elephant"));
         expected_elephant.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_elephant.page_frequency = 1;
-        expected_elephant
-            .tf_idf_scores
-            .insert(page1.id.to_string(), Some(OrderedFloat(0.0).to_string())); // TF = 0 in page1
         expected_elephant.tf_idf_scores.insert(
             page2.id.to_string(),
             Some(OrderedFloat(0.90309).to_string()),
-        ); // TF-IDF in page2
+        ); 
 
         let mut expected_terms = HashMap::new();
         expected_terms.insert(expected_hippo.term.clone(), expected_hippo.clone());
