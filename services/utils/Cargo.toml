@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 sqlx = { workspace = true }
 url = { workspace = true }
+scraper = { workspace = true }
 
 [dev-dependencies]
 testcontainers-modules = { workspace = true }

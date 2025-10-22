@@ -1,3 +1,5 @@
+use scraper::{Html, Selector};
+
 /// Run database migrations on the database.
 ///
 /// # Panics
@@ -77,4 +79,46 @@ pub trait AddToDb {
     /// Add an object to a database.
     #[allow(async_fn_in_trait)]
     async fn add_to_db(&self, pool: &sqlx::PgPool);
+}
+
+/// Extract all visible text from a parsed [`Html`] document.
+///
+/// 'Visible text' means any text that the user can read if they go onto a
+/// page. For instance, the text of a Wikipedia article is considered
+/// visible text, while any Javascript or CSS is not.
+pub fn extract_text(html: &Html) -> String {
+    html.select(&Selector::parse("body p").unwrap()) // or "body div#foo div.inner"
+        .flat_map(|el| el.text())
+        .collect()
+}
+
+#[cfg(test)]
+mod test {
+    use scraper::Html;
+
+    use crate::extract_text;
+
+    #[test]
+    fn test_extract_text() {
+        let html = Html::parse_document(
+            r#"
+            <body>
+                <style>
+                    .global-navigation{
+                        position: fixed;
+                    }
+                </style>
+
+                <script>
+                    let code = "hello world";
+                </script>
+                <p>hippopotamus hippopotamus hippopotamus</p>
+            </body>"#,
+        );
+
+        assert_eq!(
+            extract_text(&html),
+            "hippopotamus hippopotamus hippopotamus"
+        )
+    }
 }
