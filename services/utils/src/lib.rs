@@ -90,7 +90,7 @@ pub trait ExtractText {
 
 impl ExtractText for Html {
     /// Extract all visible text from a parsed [`Html`] document. Each word is
-    /// separated by whitespace.
+    /// separated by whitespace, and punctuation is preserved.
     ///
     /// 'Visible text' means any text that the user can read if they go onto a
     /// page. For instance, the text of a Wikipedia article is considered
@@ -98,7 +98,8 @@ impl ExtractText for Html {
     fn extract_text(&self) -> String {
         self.select(&TEXT_SELECTOR)
             .flat_map(|el| el.text())
-            .collect()
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -108,27 +109,49 @@ mod test {
 
     use crate::ExtractText;
 
-    #[test]
-    fn test_extract_text() {
-        let html = Html::parse_document(
-            r#"
-            <body>
-                <style>
-                    .global-navigation{
-                        position: fixed;
-                    }
-                </style>
+    mod extract_text {
+        use super::*;
 
-                <script>
-                    let code = "hello world";
-                </script>
-                <p>hippopotamus hippopotamus hippopotamus</p>
-            </body>"#,
-        );
+        #[test]
+        fn test_extract_text() {
+            let html = Html::parse_document(
+                r#"
+                <body>
+                    <style>
+                        .global-navigation{
+                            position: fixed;
+                        }
+                    </style>
 
-        assert_eq!(
-            html.extract_text(),
-            "hippopotamus hippopotamus hippopotamus"
-        )
+                    <script>
+                        let code = "hello world";
+                    </script>
+                    <p>hippopotamus hippopotamus hippopotamus</p>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
+            )
+        }
+
+        #[test]
+        fn test_with_punctuation() {
+            let html = Html::parse_document(
+                r#"
+                <html></html>
+
+                <body>
+                    <p>hippopotamus hippopotamus, Hippopotamus</p>
+                    <p>hippopotamus world tis the won</p>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus, Hippopotamus hippopotamus world tis the won"
+            )
+        }
     }
 }
