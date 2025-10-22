@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
-
 use scraper::Html;
 use sqlx::postgres::types::PgHstore;
+use std::collections::{HashMap, HashSet};
 use tf_idf_indexer::*;
+use utils::AddToDb;
 
 use crate::common::{dummy_terms, run_migrations};
 

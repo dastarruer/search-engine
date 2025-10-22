@@ -1,16 +1,17 @@
 use std::{collections::HashSet, time::Duration};
 
+use crate::{
+    error::CrawlerError,
+    page::{CrawledPage, Page, PageQueue},
+    utils::string_to_url,
+};
 use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use rustrict::{Censor, Type};
 use scraper::{Html, Selector};
 use sqlx::{PgPool, Row};
 
-use crate::{
-    error::CrawlerError,
-    page::{CrawledPage, Page, PageQueue},
-    utils::{string_to_url},
-};
+use utils::AddToDb;
 
 #[derive(Clone)]
 pub struct Crawler {
@@ -61,9 +62,7 @@ impl Crawler {
         while let Some(page) = self.next_page().await {
             match self.crawl_page(page.clone()).await {
                 Ok(crawled_page) => {
-                    if let Err(e) = crawled_page.add_to_db(&self.pool).await {
-                        log::error!("Error inserting into DB: {}", e);
-                    }
+                    crawled_page.add_to_db(&self.pool).await;
                 }
                 Err(e) => {
                     log::warn!("Crawl failed: {}", e);
@@ -124,10 +123,7 @@ impl Crawler {
             }
 
             // Add the page to the queue of pages to crawl
-            if let Err(e) = self.queue.queue_page(page.clone(), &self.pool).await {
-                log::warn!("Error with queueing page: {}", e);
-                continue;
-            };
+            self.queue.queue_page(page.clone(), &self.pool).await;
 
             log::info!("{} is queued", page.url);
 
@@ -316,9 +312,7 @@ impl Crawler {
 
         // Queue each page in starting_pages
         for page in starting_pages {
-            if let Err(e) = queue.queue_page(page, pool).await {
-                log::warn!("Error initializing page queue: {}", e);
-            };
+            queue.queue_page(page, pool).await;
         }
 
         queue

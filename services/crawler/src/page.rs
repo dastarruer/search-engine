@@ -1,6 +1,7 @@
 use reqwest::Url;
 use sqlx::Row;
 use std::collections::{HashSet, VecDeque};
+use utils::AddToDb;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Page {
@@ -25,13 +26,11 @@ impl Page {
     pub(crate) fn into_crawled(self, title: Option<String>, html: String) -> CrawledPage {
         CrawledPage::new(self, title, html)
     }
+}
 
-    /// Add a [`Page`] to the database.
-    ///
-    /// # Errors
-    /// This function returns an error if:
-    /// - There is an edgecase that has not been tested yet.
-    pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
+impl AddToDb for Page {
+    /// Add a [`Page`] instance to a database.
+    async fn add_to_db(&self, pool: &sqlx::PgPool) {
         let query = r#"
             INSERT INTO pages (url, is_crawled, is_indexed)
             VALUES ($1, FALSE, FALSE)
@@ -40,9 +39,8 @@ impl Page {
         sqlx::query(query)
             .bind(self.url.to_string())
             .execute(pool)
-            .await?;
-
-        Ok(())
+            .await
+            .unwrap();
     }
 }
 
@@ -66,35 +64,32 @@ impl CrawledPage {
             html,
         }
     }
+}
 
+impl AddToDb for CrawledPage {
     /// Update the database entry for this [`CrawledPage`].
     ///
     /// This will update the row in the `pages` table that matches the
     /// [`CrawledPage`]'s URL, setting its `html`, `title`, and marking
     /// `is_crawled` as `TRUE`.
-    ///
-    /// # Errors
-    /// This function returns an error if:
-    /// - There is an edgecase that has not been tested yet.
-    pub async fn add_to_db(&self, pool: &sqlx::PgPool) -> Result<(), Box<dyn std::error::Error>> {
+    async fn add_to_db(&self, pool: &sqlx::PgPool) {
         let query = r#"
             UPDATE pages
             SET html = $1,
                 title = $2,
                 is_crawled = TRUE
-            WHERE url = $3"#;
+            WHERE url = $3
+            ON CONFLICT (url) DO NOTHING"#;
 
         sqlx::query(query)
             .bind(self.html.as_str())
             .bind(self.title.clone())
             .bind(self.url.to_string())
             .execute(pool)
-            .await?;
-
-        Ok(())
+            .await
+            .unwrap();
     }
 }
-
 impl PartialEq<Page> for CrawledPage {
     fn eq(&self, other: &Page) -> bool {
         self.url == other.url
@@ -122,18 +117,8 @@ impl PageQueue {
     }
 
     /// Adds a queued [`Page`] to the database.
-    ///
-    /// # Errors
-    /// This function returns an error if:
-    /// - The [`Page`] is already in the database.
-    pub async fn queue_page(
-        &mut self,
-        page: Page,
-        pool: &sqlx::PgPool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        page.add_to_db(pool).await?;
-
-        Ok(())
+    pub async fn queue_page(&mut self, page: Page, pool: &sqlx::PgPool) {
+        page.add_to_db(pool).await;
     }
 
     /// Pushes a [`Page`] into the [`PageQueue`].
@@ -194,11 +179,14 @@ impl PageQueue {
     ///
     /// Should be called whenever the queue is empty and needs more pages.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let query = format!(r#"
+        let query = format!(
+            r#"
             SELECT url
             FROM pages
             WHERE is_crawled = FALSE
-            LIMIT {};"#, crate::QUEUE_LIMIT);
+            LIMIT {};"#,
+            crate::QUEUE_LIMIT
+        );
         let query = query.as_str();
 
         sqlx::query(query)

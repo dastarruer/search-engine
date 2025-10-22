@@ -1,4 +1,5 @@
 use sqlx::{Row, postgres::types::PgHstore};
+use utils::AddToDb;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     time::Instant,
@@ -103,36 +104,6 @@ impl Term {
         }
     }
 
-    /// Insert a [`Term`] into the database.
-    ///
-    /// If the term with the same [`Term::term`] already exists, its values are instead
-    /// updated with the new data.
-    pub async fn add_to_db(&self, pool: &sqlx::PgPool) {
-        // This query tries to insert the term and its values into a new row.
-        // But if the term already exists, then it updates the existing term's
-        // values instead.
-        let query = r#"
-            INSERT INTO terms (term, idf, page_frequency, tf_scores, tf_idf_scores)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (term)
-            DO UPDATE SET
-                idf = EXCLUDED.idf,
-                page_frequency = EXCLUDED.page_frequency,
-                tf_scores = EXCLUDED.tf_scores,
-                tf_idf_scores = EXCLUDED.tf_idf_scores
-        "#;
-
-        sqlx::query(query)
-            .bind(&self.term)
-            .bind(*self.idf) // Dereferencing gives the inner f32 value
-            .bind(self.page_frequency)
-            .bind(&self.tf_scores)
-            .bind(&self.tf_idf_scores)
-            .execute(pool)
-            .await
-            .unwrap();
-    }
-
     /// Find the number of times that a [`Term`] appears in a given piece of text.
     ///
     /// This is called the *term frequency* of a term. This is useful when
@@ -201,6 +172,35 @@ impl Term {
             self.tf_idf_scores
                 .insert(page_id.to_owned(), Some(new_tf_idf.to_string()));
         }
+    }
+}
+
+impl AddToDb for Term {
+    /// Add a [`Term`] instance to a database.
+    async fn add_to_db(&self, pool: &sqlx::PgPool) {
+        // This query tries to insert the term and its values into a new row.
+        // But if the term already exists, then it updates the existing term's
+        // values instead.
+        let query = r#"
+            INSERT INTO terms (term, idf, page_frequency, tf_scores, tf_idf_scores)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (term)
+            DO UPDATE SET
+                idf = EXCLUDED.idf,
+                page_frequency = EXCLUDED.page_frequency,
+                tf_scores = EXCLUDED.tf_scores,
+                tf_idf_scores = EXCLUDED.tf_idf_scores
+        "#;
+
+        sqlx::query(query)
+            .bind(&self.term)
+            .bind(*self.idf) // Dereferencing gives the inner f32 value
+            .bind(self.page_frequency)
+            .bind(&self.tf_scores)
+            .bind(&self.tf_idf_scores)
+            .execute(pool)
+            .await
+            .unwrap();
     }
 }
 

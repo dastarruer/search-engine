@@ -72,3 +72,9 @@ fn retrieve_env_var(var: &str) -> String {
     let error_msg = error_msg.as_str();
     std::env::var(var).expect(error_msg)
 }
+
+pub trait AddToDb {
+    /// Add an object to a database.
+    #[allow(async_fn_in_trait)]
+    async fn add_to_db(&self, pool: &sqlx::PgPool);
+}
