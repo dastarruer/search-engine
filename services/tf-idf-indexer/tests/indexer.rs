@@ -2,19 +2,20 @@ use scraper::Html;
 use sqlx::postgres::types::PgHstore;
 use std::collections::{HashMap, HashSet};
 use tf_idf_indexer::*;
-use utils::AddToDb;
+use utils::{migrate, AddToDb};
 
-use crate::common::{dummy_terms, run_migrations};
+use crate::common::{dummy_terms};
 
 mod common;
 
+// TODO: Move this to utils crate
 #[tokio::test]
 async fn test_migrations() {
     // Run migrations once
     let (_container, pool) = common::setup("dummy_data").await;
 
     // Run migrations again. Migrations should be written so that they don't panic if run multiple times
-    run_migrations(&pool).await;
+    migrate(&pool).await;
 }
 
 #[tokio::test]

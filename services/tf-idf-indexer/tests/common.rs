@@ -2,7 +2,6 @@ use std::fs;
 
 use sqlx::{
     Pool,
-    migrate::Migrator,
     postgres::{PgPoolOptions, types::PgHstore},
 };
 use testcontainers_modules::{
@@ -10,6 +9,7 @@ use testcontainers_modules::{
     testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
 };
 use tf_idf_indexer::Term;
+use utils::migrate;
 
 /// Set up a Postgres Docker container for testing purposes.
 ///
@@ -35,18 +35,11 @@ pub async fn setup(script: &str) -> (ContainerAsync<Postgres>, Pool<sqlx::Postgr
 
     let pool = PgPoolOptions::new().connect(&db_url).await.unwrap();
 
-    run_migrations(&pool).await;
+    migrate(&pool).await;
     run_setup_script(script, &pool).await;
 
     // Return the container so that it does not get dropped once out of scope
     (container, pool)
-}
-
-pub async fn run_migrations(pool: &Pool<sqlx::Postgres>) {
-    let migrations = Migrator::new(std::path::Path::new("../migrations"))
-        .await
-        .unwrap();
-    migrations.run(pool).await.unwrap();
 }
 
 async fn run_setup_script(script: &str, pool: &Pool<sqlx::Postgres>) {
