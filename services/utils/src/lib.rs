@@ -1,4 +1,7 @@
+use once_cell::sync::Lazy;
 use scraper::{Html, Selector};
+
+static TEXT_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body p").unwrap());
 
 /// Run database migrations on the database.
 ///
@@ -81,22 +84,29 @@ pub trait AddToDb {
     async fn add_to_db(&self, pool: &sqlx::PgPool);
 }
 
-/// Extract all visible text from a parsed [`Html`] document.
-///
-/// 'Visible text' means any text that the user can read if they go onto a
-/// page. For instance, the text of a Wikipedia article is considered
-/// visible text, while any Javascript or CSS is not.
-pub fn extract_text(html: &Html) -> String {
-    html.select(&Selector::parse("body p").unwrap()) // or "body div#foo div.inner"
-        .flat_map(|el| el.text())
-        .collect()
+pub trait ExtractText {
+    fn extract_text(&self) -> String;
+}
+
+impl ExtractText for Html {
+    /// Extract all visible text from a parsed [`Html`] document. Each word is
+    /// separated by whitespace.
+    ///
+    /// 'Visible text' means any text that the user can read if they go onto a
+    /// page. For instance, the text of a Wikipedia article is considered
+    /// visible text, while any Javascript or CSS is not.
+    fn extract_text(&self) -> String {
+        self.select(&TEXT_SELECTOR)
+            .flat_map(|el| el.text())
+            .collect()
+    }
 }
 
 #[cfg(test)]
 mod test {
     use scraper::Html;
 
-    use crate::extract_text;
+    use crate::ExtractText;
 
     #[test]
     fn test_extract_text() {
@@ -117,7 +127,7 @@ mod test {
         );
 
         assert_eq!(
-            extract_text(&html),
+            html.extract_text(),
             "hippopotamus hippopotamus hippopotamus"
         )
     }

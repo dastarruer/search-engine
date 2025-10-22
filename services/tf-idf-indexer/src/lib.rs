@@ -3,13 +3,11 @@ use std::{
     collections::{HashMap, HashSet, VecDeque},
     time::Instant,
 };
-use utils::AddToDb;
+use utils::{AddToDb, ExtractText};
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 use scraper::{Html, Selector};
-
-static BODY_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("body").unwrap());
 
 static STOP_WORDS: Lazy<HashSet<StopWordTerm>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
@@ -524,9 +522,8 @@ impl Page {
     // TODO: Extract text extraction into seperate method and add better testing
     fn extract_relevant_terms(&self) -> Vec<Term> {
         self.html
-            .select(&BODY_SELECTOR)
-            .flat_map(|e| e.text())
-            .flat_map(|t| t.split_whitespace())
+            .extract_text()
+            .split_whitespace()
             .map(|t| {
                 t.trim()
                     .to_lowercase()
@@ -847,7 +844,7 @@ mod test {
         expected_elephant.tf_idf_scores.insert(
             page2.id.to_string(),
             Some(OrderedFloat(0.90309).to_string()),
-        ); 
+        );
 
         let mut expected_terms = HashMap::new();
         expected_terms.insert(expected_hippo.term.clone(), expected_hippo.clone());

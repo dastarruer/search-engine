@@ -11,7 +11,7 @@ use rustrict::{Censor, Type};
 use scraper::{Html, Selector};
 use sqlx::{PgPool, Row};
 
-use utils::AddToDb;
+use utils::{AddToDb, ExtractText};
 
 #[derive(Clone)]
 pub struct Crawler {
@@ -240,7 +240,7 @@ impl Crawler {
             return true;
         }
 
-        let content = utils::extract_text(html);
+        let content = html.extract_text();
 
         let mut content = Censor::from_str(content.as_str());
         content.with_trie(&BLOCKED_KEYWORDS);
