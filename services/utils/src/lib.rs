@@ -1,5 +1,8 @@
 use once_cell::sync::Lazy;
-use scraper::{Html, Selector};
+use scraper::{
+    ElementRef, Html, Node, Selector,
+    node::{Element, Text},
+};
 
 static TEXT_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse("body p, h1, h2, h3, h4, h5, h6, ul li, ol li").unwrap());
@@ -101,8 +104,22 @@ impl ExtractText for Html {
     /// Alt text gets appended to the end of the return `String` with a space.
     fn extract_text(&self) -> String {
         let mut content = self
-            .select(&TEXT_SELECTOR)
-            .flat_map(|el| el.text())
+            .select(&TEXT_SELECTOR) // Select all tags with relevant text
+            .flat_map(|el| {
+                // Loop through each child node in the element
+                el.children().filter_map(|node| {
+                    // If the node has text, return the text
+                    if let Node::Text(t) = node.value() {
+                        if !t.trim().is_empty() {
+                            Some(t.trim().to_string())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
             .collect::<Vec<_>>()
             .join(" ");
 
@@ -194,6 +211,28 @@ mod test {
                         <li>hippopotamus</li>
                         <li>hippopotamus</li>
                     </ol>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
+            );
+        }
+
+        #[test]
+        fn test_nested_list_tags() {
+            let html = Html::parse_document(
+                r#"
+                <body>
+                    <ul>
+                        <li>hippopotamus
+                            <ul>
+                                <li>hippopotamus</li>
+                                <li>hippopotamus</li>
+                            </ul>
+                        </li>
+                    </ul>
                 </body>"#,
             );
 
