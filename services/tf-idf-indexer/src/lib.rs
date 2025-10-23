@@ -340,9 +340,12 @@ impl Indexer {
 
     /// Refresh the queue by reading from the database.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let query = r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT 100;"#;
+        let query = format!(
+            r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
+            utils::QUEUE_LIMIT
+        );
 
-        sqlx::query(query)
+        sqlx::query(query.as_str())
             .fetch_all(pool)
             .await
             .unwrap()

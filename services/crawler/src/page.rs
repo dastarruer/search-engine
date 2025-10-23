@@ -2,6 +2,7 @@ use reqwest::Url;
 use sqlx::Row;
 use std::collections::{HashSet, VecDeque};
 use utils::AddToDb;
+use utils::QUEUE_LIMIT;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Page {
@@ -175,7 +176,7 @@ impl PageQueue {
         }
     }
 
-    /// Add as many uncrawled [`Page`]s from the database to the queue as is defined by [`crate::QUEUE_LIMIT`].
+    /// Add as many uncrawled [`Page`]s from the database to the queue as is defined by [`utils::QUEUE_LIMIT`].
     ///
     /// Should be called whenever the queue is empty and needs more pages.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
@@ -185,7 +186,7 @@ impl PageQueue {
             FROM pages
             WHERE is_crawled = FALSE
             LIMIT {};"#,
-            crate::QUEUE_LIMIT
+            QUEUE_LIMIT
         );
         let query = query.as_str();
 
