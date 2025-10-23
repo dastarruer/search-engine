@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use sqlx::{Row, postgres::types::PgHstore};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -61,8 +62,10 @@ impl std::hash::Hash for Term {
     }
 }
 
-impl From<String> for Term {
-    fn from(value: String) -> Self {
+impl TryFrom<String> for Term {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         Term::new(
             value,
             OrderedFloat(0.0),
@@ -73,8 +76,11 @@ impl From<String> for Term {
     }
 }
 
-impl From<&sqlx::postgres::PgRow> for Term {
-    fn from(value: &sqlx::postgres::PgRow) -> Self {
+// TODO: Convert back to From, since a term in the database is guaranteed to be a valid term
+impl TryFrom<&sqlx::postgres::PgRow> for Term {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &sqlx::postgres::PgRow) -> Result<Self, Self::Error> {
         let term: String = value.get("term");
         let idf = OrderedFloat(value.get("idf"));
         let page_frequency = value.get::<i32, _>("page_frequency") as u32;
@@ -102,13 +108,29 @@ impl Term {
     ///   this term. TF-IDF is computed as `Term Frequency × Inverse Document
     ///   Frequency`. Pages with a term frequency of `0` should not be
     ///   included, since they are not worth storing.
+    ///
+    /// # Errors
+    /// Returns an error if:
+    /// - The term provided contains numerical characters. This can be a number
+    ///   (e.g. `1220`), or a `String` containing a number (e.g. `hello123`).
     pub fn new(
         term: String,
         idf: ordered_f32,
         page_frequency: u32,
         tf_scores: PgHstore,
         tf_idf_scores: PgHstore,
-    ) -> Self {
+        // TODO: Return an error if this is a number
+    ) -> Result<Self, anyhow::Error> {
+        if term
+            .chars()
+            .any(|c| !c.is_alphabetic() && !c.is_ascii_punctuation())
+        {
+            return Err::<Self, anyhow::Error>(anyhow!(
+                "Term contains invalid characters that are neither punctuation nor letters: {}",
+                term
+            ));
+        }
+
         // Normalize the term
         let term = term
             .to_lowercase()
@@ -118,13 +140,13 @@ impl Term {
             .collect();
 
         println!("Term: {}", term);
-        Term {
+        Ok(Term {
             term,
             idf,
             page_frequency,
             tf_scores,
             tf_idf_scores,
-        }
+        })
     }
 
     /// Find the number of times that a [`Term`] appears in a given piece of
@@ -386,7 +408,9 @@ impl Indexer {
                 .expect("Fetching terms should not throw an error")
                 .iter()
                 .for_each(|row| {
-                    self.terms.insert(row.get("term"), Term::from(row));
+                    if let Ok(term) = Term::try_from(row) {
+                        self.terms.insert(row.get("term"), term);
+                    }
                 });
         }
 
@@ -484,7 +508,10 @@ impl Indexer {
             .fetch_optional(pool)
             .await
         {
-            return Some(Term::from(&row));
+            return Some(
+                Term::try_from(&row)
+                    .expect("Terms stored in the database should be valid, alphabetical terms."),
+            );
         }
         None
     }
@@ -541,7 +568,7 @@ impl Page {
         self.html
             .extract_text()
             .split_whitespace()
-            .map(|t: &str| Term::from(t.to_string()))
+            .flat_map(|t: &str| Term::try_from(t.to_string()))
             .filter(|t| !t.is_stop_word())
             .collect()
     }
@@ -580,12 +607,34 @@ mod test {
         }
     }
 
+    mod new_term {
+        use super::*;
+
+        #[test]
+        #[should_panic]
+        fn test_nonalphabetical_term() {
+            Term::try_from(String::from("123")).unwrap();
+        }
+
+        #[test]
+        #[should_panic]
+        fn test_nonalphabetical_term_with_alphabetical_chars() {
+            Term::try_from(String::from("abc123")).unwrap();
+        }
+
+        #[test]
+        fn test_term_with_punctuation() {
+            let term = Term::try_from(String::from("abc-?>")).unwrap();
+            assert_eq!(term.term, "abc");
+        }
+    }
+
     #[test]
     fn test_get_tf_of_term() {
         let html = fs::read_to_string(test_file_path_from_filepath("tf.html")).unwrap();
         let page = Page::new(Html::parse_document(html.as_str()), DEFAULT_ID);
 
-        let term = Term::from(String::from("hippopotamus"));
+        let term = Term::try_from(String::from("hippopotamus")).unwrap();
 
         assert_eq!(term.get_tf(&page.extract_relevant_terms()), 4);
     }
@@ -602,9 +651,9 @@ mod test {
             0,
         );
         let expected_terms = vec![
-            Term::from(String::from("hippopotamus")),
-            Term::from(String::from("hippopotamus")),
-            Term::from(String::from("hippopotamus")),
+            Term::try_from(String::from("hippopotamus")).unwrap(),
+            Term::try_from(String::from("hippopotamus")).unwrap(),
+            Term::try_from(String::from("hippopotamus")).unwrap(),
         ];
 
         assert_eq!(page.extract_relevant_terms(), expected_terms);
@@ -615,7 +664,7 @@ mod test {
 
         #[test]
         fn test_positive_nonzero_tf() {
-            let mut term = Term::from(String::from("hippopotamus"));
+            let mut term = Term::try_from(String::from("hippopotamus")).unwrap();
 
             // A hypothetical term frequency
             let tf = 2;
@@ -627,7 +676,7 @@ mod test {
 
         #[test]
         fn test_zero_tf() {
-            let mut term = Term::from(String::from("hippopotamus"));
+            let mut term = Term::try_from(String::from("hippopotamus")).unwrap();
 
             // A hypothetical term frequency
             let tf = 0;
@@ -696,7 +745,7 @@ mod test {
             0,
         );
 
-        let mut term = Term::from(String::from("hippopotamus"));
+        let mut term = Term::try_from(String::from("hippopotamus")).unwrap();
 
         // Manually set up TF for both pages
         let tf1 = 2;
@@ -752,7 +801,7 @@ mod test {
 
         #[test]
         fn test_update_idf() {
-            let mut term = Term::from(String::from("hippopotamus"));
+            let mut term = Term::try_from(String::from("hippopotamus")).unwrap();
             term.page_frequency = 2;
 
             term.clone().update_total_idf(2);
@@ -762,7 +811,7 @@ mod test {
 
         #[test]
         fn test_zero_doc_frequency() {
-            let mut term = Term::from(String::from("hippopotamus"));
+            let mut term = Term::try_from(String::from("hippopotamus")).unwrap();
             term.page_frequency = 0;
 
             term.update_total_idf(2);
@@ -772,7 +821,7 @@ mod test {
 
         #[test]
         fn test_zero_num_pages() {
-            let mut term = Term::from(String::from("hippopotamus"));
+            let mut term = Term::try_from(String::from("hippopotamus")).unwrap();
             term.page_frequency = 2;
 
             term.update_total_idf(0);
@@ -790,8 +839,8 @@ mod test {
         let terms = page.extract_relevant_terms();
 
         let included_terms = vec![
-            Term::from(String::from("hippopotamus")),
-            Term::from(String::from("ladder")),
+            Term::try_from(String::from("hippopotamus")).unwrap(),
+            Term::try_from(String::from("ladder")).unwrap(),
         ];
 
         assert_eq!(terms, included_terms);
@@ -800,7 +849,7 @@ mod test {
     #[tokio::test]
     async fn test_add_term() {
         let page = Page::new(Html::new_document(), 0);
-        let mut term = Term::from(String::from("hippopotamus"));
+        let mut term = Term::try_from(String::from("hippopotamus")).unwrap();
         term.tf_scores
             .insert(page.id.to_string(), Some(OrderedFloat(0.0).to_string()));
         term.tf_idf_scores
@@ -844,7 +893,7 @@ mod test {
         indexer.parse_page(page2.clone(), None).await;
 
         // Hippopotamus term
-        let mut expected_hippo = Term::from(String::from("hippopotamus"));
+        let mut expected_hippo = Term::try_from(String::from("hippopotamus")).unwrap();
         expected_hippo.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_hippo.page_frequency = 1;
         expected_hippo.tf_idf_scores.insert(
@@ -853,7 +902,7 @@ mod test {
         );
 
         // Elephant term
-        let mut expected_elephant = Term::from(String::from("elephant"));
+        let mut expected_elephant = Term::try_from(String::from("elephant")).unwrap();
         expected_elephant.idf = OrderedFloat(f32::consts::LOG10_2);
         expected_elephant.page_frequency = 1;
         expected_elephant.tf_idf_scores.insert(

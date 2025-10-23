@@ -16,7 +16,7 @@ async fn test_parse_page() {
         .await
         .unwrap()
         .iter()
-        .map(Term::from)
+        .flat_map(Term::try_from)
         .collect();
 
     let expected_terms = test_parse_page_dummy_terms();
@@ -39,7 +39,7 @@ async fn test_parse_page_with_existing_terms() {
         .await
         .unwrap()
         .iter()
-        .map(Term::from)
+        .flat_map(Term::try_from)
         .collect();
     let expected_terms = test_parse_page_with_existing_terms_dummy_terms();
 
@@ -83,21 +83,24 @@ pub fn test_parse_page_dummy_terms() -> Vec<Term> {
             3,
             expected_ladder_tf,
             expected_ladder_tf_idf,
-        ),
+        )
+        .unwrap(),
         Term::new(
             "hippopotamus".into(),
             ordered_float::OrderedFloat(0.17609125),
             2,
             expected_hippo_tf,
             expected_hippo_tf_idf,
-        ),
+        )
+        .unwrap(),
         Term::new(
             "pipe".into(),
             ordered_float::OrderedFloat(0.47712123),
             1,
             expected_pipe_tf,
             expected_pipe_tf_idf,
-        ),
+        )
+        .unwrap(),
     ]
 }
 
@@ -153,14 +156,16 @@ fn test_parse_page_with_existing_terms_dummy_terms() -> Vec<Term> {
             2,
             expected_ladder_tf,
             expected_ladder_tf_idf,
-        ),
+        )
+        .unwrap(),
         Term::new(
             "hippopotamus".into(),
             ordered_float::OrderedFloat(std::f32::consts::LOG10_2),
             2,
             expected_hippo_tf,
             expected_hippo_tf_idf,
-        ),
+        )
+        .unwrap(),
         Term::new(
             "pipe".into(),
             // log4
@@ -168,13 +173,15 @@ fn test_parse_page_with_existing_terms_dummy_terms() -> Vec<Term> {
             1,
             expected_pipe_tf,
             expected_pipe_tf_idf,
-        ),
+        )
+        .unwrap(),
         Term::new(
             "seagull".into(),
             ordered_float::OrderedFloat(std::f32::consts::LOG10_2),
             2,
             expected_seagull_tf,
             expected_seagull_tf_idf,
-        ),
+        )
+        .unwrap(),
     ]
 }

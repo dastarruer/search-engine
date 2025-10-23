@@ -3430,6 +3430,7 @@ dependencies = [
 name = "tf-idf-indexer"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "criterion",
  "flexi_logger",
  "log",
