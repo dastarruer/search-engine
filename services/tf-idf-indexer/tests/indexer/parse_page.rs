@@ -1,7 +1,7 @@
 use sqlx::postgres::types::PgHstore;
 use tf_idf_indexer::{Indexer, Term};
 
-use crate::common::{self, dummy_terms};
+use crate::common::{self};
 
 #[tokio::test]
 async fn test_parse_page() {
@@ -19,7 +19,7 @@ async fn test_parse_page() {
         .map(Term::from)
         .collect();
 
-    let expected_terms = dummy_terms();
+    let expected_terms = test_parse_page_dummy_terms();
 
     for term in &expected_terms {
         assert!(actual_terms.contains(term))
@@ -41,7 +41,67 @@ async fn test_parse_page_with_existing_terms() {
         .iter()
         .map(Term::from)
         .collect();
+    let expected_terms = test_parse_page_with_existing_terms_dummy_terms();
 
+    for term in &expected_terms {
+        assert!(actual_terms.contains(term))
+    }
+}
+
+pub fn test_parse_page_dummy_terms() -> Vec<Term> {
+    // ladder
+    let expected_ladder_tf = PgHstore::from_iter([
+        ("1".to_string(), Some("2".to_string())),
+        ("2".to_string(), Some("1".to_string())),
+        ("3".to_string(), Some("1".to_string())),
+    ]);
+    let expected_ladder_tf_idf = PgHstore::from_iter([
+        ("1".to_string(), Some("0".to_string())),
+        ("2".to_string(), Some("0".to_string())),
+        ("3".to_string(), Some("0".to_string())),
+    ]);
+
+    // hippopotamus
+    let expected_hippo_tf = PgHstore::from_iter([
+        ("2".to_string(), Some("2".to_string())),
+        ("3".to_string(), Some("2".to_string())),
+    ]);
+    let expected_hippo_tf_idf = PgHstore::from_iter([
+        ("2".to_string(), Some("0.3521825".to_string())),
+        ("3".to_string(), Some("0.3521825".to_string())),
+    ]);
+
+    // pipe
+    let expected_pipe_tf = PgHstore::from_iter([("1".to_string(), Some("1".to_string()))]);
+    let expected_pipe_tf_idf =
+        PgHstore::from_iter([("1".to_string(), Some("0.47712123".to_string()))]);
+
+    vec![
+        Term::new(
+            "ladder".into(),
+            ordered_float::OrderedFloat(0.0),
+            3,
+            expected_ladder_tf,
+            expected_ladder_tf_idf,
+        ),
+        Term::new(
+            "hippopotamus".into(),
+            ordered_float::OrderedFloat(0.17609125),
+            2,
+            expected_hippo_tf,
+            expected_hippo_tf_idf,
+        ),
+        Term::new(
+            "pipe".into(),
+            ordered_float::OrderedFloat(0.47712123),
+            1,
+            expected_pipe_tf,
+            expected_pipe_tf_idf,
+        ),
+    ]
+}
+
+fn test_parse_page_with_existing_terms_dummy_terms() -> Vec<Term> {
     let expected_seagull_tf = PgHstore::from_iter([
         ("3".to_string(), Some("1".to_string())),
         ("4".to_string(), Some("1".to_string())),
@@ -86,7 +146,7 @@ async fn test_parse_page_with_existing_terms() {
         [("1".to_string(), Some(0.60206.to_string()))],
     );
 
-    let expected_terms = vec![
+    vec![
         Term::new(
             "ladder".into(),
             ordered_float::OrderedFloat(std::f32::consts::LOG10_2),
@@ -116,9 +176,5 @@ async fn test_parse_page_with_existing_terms() {
             expected_seagull_tf,
             expected_seagull_tf_idf,
         ),
-    ];
-
-    for term in &expected_terms {
-        assert!(actual_terms.contains(term))
-    }
+    ]
 }
