@@ -1,7 +1,5 @@
 use once_cell::sync::Lazy;
-use scraper::{
-    Html, Node, Selector,
-};
+use scraper::{Html, Node, Selector};
 
 static TEXT_SELECTOR: Lazy<Selector> =
     Lazy::new(|| Selector::parse("body p, h1, h2, h3, h4, h5, h6, ul li, ol li").unwrap());
@@ -154,6 +152,21 @@ mod test {
                 r#"
                 <body>
                     <p>hippopotamus hippopotamus hippopotamus</p>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
+            );
+        }
+
+        #[test]
+        fn test_nested_tags() {
+            let html = Html::parse_document(
+                r#"
+                <body>
+                    <p>hippopotamus <h1>hippopotamus <p>hippopotamus</p></h1></p>
                 </body>"#,
             );
 
