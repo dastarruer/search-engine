@@ -331,5 +331,22 @@ mod test {
                 "hippopotamus hippopotamus hippopotamus"
             );
         }
+
+        #[test]
+        fn test_nested_inline_elements() {
+            let html = Html::parse_document(
+                r#"
+                <html></html>
+
+                <body>
+                    <p><span><strong>hippopotamus</strong></span> hippopotamus <i>hippopotamus</i></p>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
+            );
+        }
     }
 }
