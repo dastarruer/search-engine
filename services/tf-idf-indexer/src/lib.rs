@@ -499,14 +499,14 @@ pub fn test_file_path_from_filepath(filename: &str) -> std::path::PathBuf {
 
 #[derive(Eq, Debug, Clone)]
 pub struct Page {
-    id: i32,
+    id: u32,
     html: Html,
 }
 
 impl From<&sqlx::postgres::PgRow> for Page {
     fn from(value: &sqlx::postgres::PgRow) -> Self {
         let html = value.get("html");
-        let id = value.get("id");
+        let id = value.get::<i32, _>("id") as u32;
 
         Page::new(Html::parse_document(html), id)
     }
@@ -527,7 +527,7 @@ impl std::hash::Hash for Page {
 }
 
 impl Page {
-    pub fn new(html: Html, id: i32) -> Self {
+    pub fn new(html: Html, id: u32) -> Self {
         Page { html, id }
     }
 
@@ -545,7 +545,7 @@ impl Page {
 
     async fn mark_as_crawled(self, pool: &sqlx::PgPool) {
         sqlx::query("UPDATE pages SET is_indexed = TRUE WHERE id = $1")
-            .bind(self.id)
+            .bind(self.id as i32)
             .execute(pool)
             .await
             .unwrap();
@@ -565,7 +565,7 @@ mod test {
 
     use crate::{Indexer, Page, PageQueue, Term, test_file_path_from_filepath};
 
-    const DEFAULT_ID: i32 = 0;
+    const DEFAULT_ID: u32 = 0;
 
     impl Default for Indexer {
         fn default() -> Self {
