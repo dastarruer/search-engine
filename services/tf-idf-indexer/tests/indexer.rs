@@ -1,10 +1,9 @@
 use scraper::Html;
 use sqlx::postgres::types::PgHstore;
-use std::collections::{HashMap, HashSet};
 use tf_idf_indexer::*;
-use utils::{AddToDb};
+use utils::AddToDb;
 
-use crate::common::{dummy_terms};
+use crate::common::dummy_terms;
 
 mod common;
 
@@ -12,7 +11,7 @@ mod common;
 async fn test_refresh_queue() -> sqlx::Result<()> {
     let (_container, pool) = common::setup("dummy_data").await;
 
-    let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
+    let mut indexer = Indexer::new(&pool).await;
 
     let expected_pages = vec![
         Page::new(
@@ -44,7 +43,7 @@ async fn test_refresh_queue() -> sqlx::Result<()> {
 async fn test_parse_page() {
     let (_container, pool) = common::setup("dummy_pages").await;
 
-    let mut indexer = Indexer::new_with_pool(&pool).await;
+    let mut indexer = Indexer::new(&pool).await;
     indexer.run(&pool).await;
 
     let actual_terms_query = r#"SELECT * FROM terms;"#;
@@ -67,7 +66,7 @@ async fn test_parse_page() {
 async fn test_parse_page_with_existing_terms() {
     let (_container, pool) = common::setup("test_parse_page_with_existing_terms").await;
 
-    let mut indexer = Indexer::new_with_pool(&pool).await;
+    let mut indexer = Indexer::new(&pool).await;
     indexer.run(&pool).await;
 
     let actual_terms_query = r#"SELECT * FROM terms;"#;
@@ -206,7 +205,7 @@ async fn test_add_term_to_db() {
 async fn test_new_with_pool() {
     let (_container, pool) = common::setup("dummy_data").await;
 
-    let indexer = Indexer::new_with_pool(&pool).await;
+    let indexer = Indexer::new(&pool).await;
 
     let expected_pages = vec![
         Page::new(

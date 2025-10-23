@@ -290,12 +290,14 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    pub async fn new(starting_terms: HashMap<String, Term>, starting_pages: HashSet<Page>) -> Self {
-        let num_pages = starting_pages.len() as i64;
+    pub async fn new(pool: &sqlx::Pool<sqlx::Postgres>) -> Indexer {
+        let starting_terms: HashMap<i32, Term> = HashMap::new();
+
+        let num_pages = 0;
 
         let mut indexer = Indexer {
             terms: HashMap::new(),
-            pages: PageQueue::new(starting_pages),
+            pages: PageQueue::new(HashSet::new()),
             num_pages,
         };
 
@@ -303,14 +305,6 @@ impl Indexer {
         for (_, term) in starting_terms {
             indexer.add_term(term, None).await;
         }
-
-        indexer
-    }
-
-    pub async fn new_with_pool(pool: &sqlx::Pool<sqlx::Postgres>) -> Indexer {
-        let starting_terms = HashMap::new();
-
-        let mut indexer = Indexer::new(starting_terms, HashSet::new()).await;
 
         let num_pages_query = r#"SELECT COUNT(*) FROM pages WHERE is_indexed = TRUE;"#;
         indexer.num_pages = sqlx::query_scalar(num_pages_query)
@@ -573,9 +567,19 @@ mod test {
     use scraper::Html;
     use sqlx::postgres::types::PgHstore;
 
-    use crate::{Indexer, Page, Term, test_file_path_from_filepath};
+    use crate::{Indexer, Page, PageQueue, Term, test_file_path_from_filepath};
 
     const DEFAULT_ID: i32 = 0;
+
+    impl Default for Indexer {
+        fn default() -> Self {
+            Indexer {
+                terms: HashMap::new(),
+                pages: PageQueue::new(HashSet::new()),
+                num_pages: 0,
+            }
+        }
+    }
 
     #[test]
     fn test_get_tf_of_term() {
@@ -584,10 +588,7 @@ mod test {
 
         let term = Term::from(String::from("hippopotamus"));
 
-        assert_eq!(
-            term.get_tf(&page.extract_relevant_terms()),
-            4
-        );
+        assert_eq!(term.get_tf(&page.extract_relevant_terms()), 4);
     }
 
     #[test]
@@ -639,8 +640,6 @@ mod test {
     }
 
     mod add_page {
-        use std::collections::HashSet;
-
         use crate::PageQueue;
 
         use super::*;
@@ -663,7 +662,7 @@ mod test {
                 0,
             );
 
-            let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
+            let mut indexer = Indexer::default();
 
             indexer.add_page(page.clone());
 
@@ -682,7 +681,7 @@ mod test {
                 0,
             );
 
-            let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
+            let mut indexer = Indexer::default();
 
             indexer.add_page(page.clone());
             indexer.add_page(page.clone());
@@ -808,7 +807,7 @@ mod test {
         term.tf_idf_scores
             .insert(page.id.to_string(), Some(OrderedFloat(0.0).to_string()));
 
-        let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
+        let mut indexer = Indexer::default();
 
         indexer.add_term(term.clone(), None).await;
 
@@ -837,7 +836,7 @@ mod test {
             1,
         );
 
-        let mut indexer = Indexer::new(HashMap::new(), HashSet::new()).await;
+        let mut indexer = Indexer::default();
 
         indexer.add_page(page1.clone());
         indexer.parse_page(page1.clone(), None).await;

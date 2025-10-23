@@ -2,7 +2,7 @@
 use flexi_logger::FileSpec;
 
 use flexi_logger::{Duplicate, Logger, WriteMode};
-use tf_idf_indexer::{Indexer};
+use tf_idf_indexer::Indexer;
 
 #[tokio::main]
 async fn main() {
@@ -14,7 +14,7 @@ async fn main() {
 
     ::utils::migrate(&pool).await;
 
-    let mut indexer = Indexer::new_with_pool(&pool).await;
+    let mut indexer = Indexer::new(&pool).await;
 
     log::info!("Running indexer...");
     indexer.run(&pool).await;
