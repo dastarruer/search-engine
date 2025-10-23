@@ -1,7 +1,6 @@
 use once_cell::sync::Lazy;
 use scraper::{
-    ElementRef, Html, Node, Selector,
-    node::{Element, Text},
+    Html, Node, Selector,
 };
 
 static TEXT_SELECTOR: Lazy<Selector> =
@@ -131,8 +130,10 @@ impl ExtractText for Html {
             .join(" ");
 
         // Add a space at the end of the string to seperate the alt text from the regular content
-        content.push(' ');
-        content.push_str(alt_text.as_str());
+        if !alt_text.is_empty() {
+            content.push(' ');
+            content.push_str(alt_text.as_str());
+        }
 
         content.trim().to_string()
     }
