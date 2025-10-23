@@ -370,7 +370,6 @@ impl Indexer {
 
         for term in relevant_terms.iter_mut() {
             log::debug!("Found term: {}", term.term);
-            // TODO: this method is not correctly retrieving the term from the db, and therefore the page frequency is off(?)
             self.add_term(term.clone(), pool).await;
         }
 
@@ -507,7 +506,6 @@ pub struct Page {
 impl From<&sqlx::postgres::PgRow> for Page {
     fn from(value: &sqlx::postgres::PgRow) -> Self {
         let html = value.get("html");
-        // TODO: Decrement this by 1 so the ids are zero indexed maybe?
         let id = value.get("id");
 
         Page::new(Html::parse_document(html), id)
@@ -536,8 +534,6 @@ impl Page {
     /// Extract relevant [`Term`]s from [`Html`].
     ///
     /// First filters out common 'stop words' (see [`Term::is_stop_word`] for more information), and then returns the resulting list of [`Term`]s.
-    // TODO: Strip punctuation
-    // TODO: Extract text extraction into seperate method and add better testing
     fn extract_relevant_terms(&self) -> Vec<Term> {
         self.html
             .extract_text()
