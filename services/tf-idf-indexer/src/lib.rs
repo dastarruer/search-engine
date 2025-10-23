@@ -39,7 +39,7 @@ pub struct Term {
     idf: ordered_f32,
 
     /// The amount of pages that contain this term. Used for calculating [`Term::idf`].
-    page_frequency: i32,
+    page_frequency: u32,
 
     /// The TF scores of each [`Page`], stored as <[`Page::id`]>:`<TF of term in a page>`.
     ///
@@ -77,7 +77,7 @@ impl From<&sqlx::postgres::PgRow> for Term {
     fn from(value: &sqlx::postgres::PgRow) -> Self {
         let term: String = value.get("term");
         let idf = OrderedFloat(value.get("idf"));
-        let page_frequency: i32 = value.get("page_frequency");
+        let page_frequency = value.get::<i32, _>("page_frequency") as u32;
         let tf_scores: PgHstore = value.get("tf_scores");
         let tf_idf_scores: PgHstore = value.get("tf_idf_scores");
 
@@ -105,7 +105,7 @@ impl Term {
     pub fn new(
         term: String,
         idf: ordered_f32,
-        page_frequency: i32,
+        page_frequency: u32,
         tf_scores: PgHstore,
         tf_idf_scores: PgHstore,
     ) -> Self {
@@ -217,7 +217,7 @@ impl AddToDb for Term {
         sqlx::query(query)
             .bind(&self.term)
             .bind(*self.idf) // Dereferencing gives the inner f32 value
-            .bind(self.page_frequency)
+            .bind(self.page_frequency as i32)
             .bind(&self.tf_scores)
             .bind(&self.tf_idf_scores)
             .execute(pool)
