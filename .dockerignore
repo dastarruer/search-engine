@@ -1,2 +1,18 @@
-crawler/target
-tf-idf-indexer/target
+# target
+services/target
+services/crawler/target
+services/tf-idf-indexer/target
+services/utils/target
+
+# .vscode
+services/crawler/.vscode
+services/tf-idf-indexer/.vscode
+services/utils/.vscode
+
+# crawler
+services/crawler/benches
+services/crawler/logs
+
+# tests
+services/tf-idf-indexer/tests
+services/utils/tests

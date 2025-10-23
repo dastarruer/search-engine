@@ -5,12 +5,12 @@ FROM rust:latest
 WORKDIR /usr/src/crawler
 
 # Copy the src code into the container
-COPY ./crawler .
+COPY ./services .
 
 COPY ./migrations /usr/src/migrations
 
 # Install the application
-RUN cargo install --path .
+RUN cargo install --path ./crawler
 
 # Run the application
 # CMD is the command used to start the container, while RUN is used to set up the container

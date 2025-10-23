@@ -1,9 +1,0 @@
-.direnv
-.vscode
-logs
-target
-.envrc
-.gitignore
-flake.lock
-flake.nix
-flyway.toml
