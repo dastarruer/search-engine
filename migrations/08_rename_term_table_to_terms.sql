@@ -1,1 +1,0 @@
-ALTER TABLE term RENAME TO terms;
