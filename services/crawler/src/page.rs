@@ -79,8 +79,7 @@ impl AddToDb for CrawledPage {
             SET html = $1,
                 title = $2,
                 is_crawled = TRUE
-            WHERE url = $3
-            ON CONFLICT (url) DO NOTHING"#;
+            WHERE url = $3"#;
 
         sqlx::query(query)
             .bind(self.html.as_str())
