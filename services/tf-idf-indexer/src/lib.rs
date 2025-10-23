@@ -2,7 +2,8 @@ use anyhow::anyhow;
 use sqlx::{Row, postgres::types::PgHstore};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    time::Instant,
+    thread::sleep,
+    time::{Duration, Instant},
 };
 use utils::{AddToDb, ExtractText};
 
@@ -277,6 +278,10 @@ impl PageQueue {
         }
     }
 
+    fn is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
     fn contains(&self, page: &Page) -> bool {
         self.hashset.contains(page)
     }
@@ -361,20 +366,33 @@ impl Indexer {
     }
 
     /// Refresh the queue by reading from the database.
+    ///
+    /// If there are no pages currently in the database, then keep looping
+    /// until pages are found.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let query = format!(
-            r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
-            utils::QUEUE_LIMIT
-        );
+        loop {
+            let query = format!(
+                r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
+                utils::QUEUE_LIMIT
+            );
 
-        sqlx::query(query.as_str())
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .for_each(|row| {
-                self.add_page(Page::from(row));
-            });
+            sqlx::query(query.as_str())
+                .fetch_all(pool)
+                .await
+                .unwrap()
+                .iter()
+                .for_each(|row| {
+                    self.add_page(Page::from(row));
+                });
+
+            if !self.pages.is_empty() {
+                break;
+            }
+
+            log::info!("No pages found in the database, trying again in 10 seconds...");
+            sleep(Duration::from_secs(10));
+        }
+        log::info!("Queue is refreshed!");
     }
 
     /// Parse a [`Page`], extracting relevant terms and adding them to
