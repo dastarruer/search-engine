@@ -1,8 +1,9 @@
 use once_cell::sync::Lazy;
 use scraper::{Html, Node, Selector};
 
-static TEXT_SELECTOR: Lazy<Selector> =
-    Lazy::new(|| Selector::parse("body p, h1, h2, h3, h4, h5, h6, ul li, ol li").unwrap());
+static TEXT_SELECTOR: Lazy<Selector> = Lazy::new(|| {
+    Selector::parse("body p, pa, p abbr, p acronym, p b, p bdo, p big, p button, p cite, p code, p dfn, p em, p i, p kbd, p label, p output, p q, p samp, p small, p span, p strong, p sub, p sup, p time, p tt, p var, h1, h2, h3, h4, h5, h6, ul li, ol li").unwrap()
+});
 static IMAGE_SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse("img").unwrap());
 
 /// Run database migrations on the database.
@@ -311,6 +312,23 @@ mod test {
             assert_eq!(
                 html.extract_text(),
                 "hippopotamus hippopotamus, Hippopotamus hippopotamus world tis the won"
+            );
+        }
+
+        #[test]
+        fn test_inline_elements() {
+            let html = Html::parse_document(
+                r#"
+                <html></html>
+
+                <body>
+                    <p><b>hippopotamus</b> <span>hippopotamus</span> <i>hippopotamus</i></p>
+                </body>"#,
+            );
+
+            assert_eq!(
+                html.extract_text(),
+                "hippopotamus hippopotamus hippopotamus"
             );
         }
     }
