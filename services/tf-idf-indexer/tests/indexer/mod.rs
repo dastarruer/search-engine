@@ -40,7 +40,7 @@ async fn test_refresh_queue() -> sqlx::Result<()> {
 }
 
 #[tokio::test]
-async fn test_new_with_pool() {
+async fn test_new() {
     let (_container, pool) = common::setup("dummy_data").await;
 
     let indexer = Indexer::new(&pool).await;
