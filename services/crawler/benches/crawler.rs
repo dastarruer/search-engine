@@ -2,7 +2,7 @@ use crawler::{crawler::Crawler, page::Page, utils::HttpServer};
 use criterion::{Criterion, criterion_group, criterion_main};
 
 /// Benchmark crawling a single page
-fn bench_crawl_from_page(c: &mut Criterion) {
+fn bench_crawl_page(c: &mut Criterion) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all() // Will panic, for some reason...
         .build()
@@ -19,9 +19,9 @@ fn bench_crawl_from_page(c: &mut Criterion) {
 
             let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(page.clone()).await;
+            let mut crawler = Crawler::new(vec![page.clone()], None).await;
 
-            crawler.crawl_page_test(page.clone()).await.unwrap();
+            crawler.crawl_page(page.clone(), None).await.unwrap();
         })
     });
 }
@@ -44,9 +44,9 @@ fn bench_test_run(c: &mut Criterion) {
 
             let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(page.clone()).await;
+            let mut crawler = Crawler::new(vec![page.clone()], None).await;
 
-            crawler.test_run().await;
+            let _ = crawler.run(None).await;
         })
     });
 }

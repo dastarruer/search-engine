@@ -14,11 +14,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let pool = utils::init_pool().await;
 
-    utils::migrate(pool);
+    utils::migrate(&pool).await;
 
-    let mut crawler = Crawler::new(get_start_urls(), &pool).await;
+    let mut crawler = Crawler::new(get_start_urls(), Some(&pool)).await;
 
-    crawler.run(&pool).await?;
+    crawler.run(Some(&pool)).await?;
 
     Ok(())
 }

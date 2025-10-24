@@ -1,21 +1,14 @@
-#[cfg(any(test, feature = "bench"))]
 use std::path::PathBuf;
-
-#[cfg(any(test, feature = "bench"))]
 use httpmock::prelude::*;
-
-#[cfg(any(test, feature = "bench"))]
 use reqwest::StatusCode;
 
 use reqwest::Url;
 
 /// An implementation of a mock HTTP server.
-#[cfg(any(test, feature = "bench"))]
 pub struct HttpServer {
     server: MockServer,
 }
 
-#[cfg(any(test, feature = "bench"))]
 impl HttpServer {
     pub fn new_with_filepath(filepath: PathBuf) -> Self {
         let server = MockServer::start();

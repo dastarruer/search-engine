@@ -20,10 +20,5 @@ rustrict = "0.7.36"
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["async_tokio"] }
 
-[[bench]]
-name = "crawler"
-harness = false
-
 [features]
-bench = []
 logging = []

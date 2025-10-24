@@ -117,8 +117,13 @@ impl PageQueue {
     }
 
     /// Adds a queued [`Page`] to the database.
-    pub async fn queue_page(&mut self, page: Page, pool: &sqlx::PgPool) {
-        page.add_to_db(pool).await;
+    pub async fn queue_page(&mut self, page: Page, pool: Option<&sqlx::PgPool>) {
+        if let Some(pool) = pool {
+            page.add_to_db(pool).await;
+        } else {
+            self.queue.push_back(page.clone());
+            self.hashset.insert(page);
+        }
     }
 
     /// Pushes a [`Page`] into the [`PageQueue`].
@@ -139,13 +144,17 @@ impl PageQueue {
     /// - Returns `Some(Page)` if the queue is not empty, or there are still
     ///   uncrawled pages in the database.
     /// - Returns `None` if the database has no more uncrawled pages left.
-    pub async fn pop(&mut self, pool: &sqlx::PgPool) -> Option<Page> {
+    pub async fn pop(&mut self, pool: Option<&sqlx::PgPool>) -> Option<Page> {
         if let Some(page) = self.queue.front() {
             self.hashset.remove(page);
             self.queue.pop_front()
         } else {
             log::info!("Queue is empty, refreshing...");
-            self.refresh_queue(pool).await;
+            if let Some(pool) = pool {
+                self.refresh_queue(pool).await;
+            } else {
+                return None;
+            }
 
             if let Some(page) = self.queue.front() {
                 self.hashset.remove(page);
@@ -153,25 +162,6 @@ impl PageQueue {
             } else {
                 None
             }
-        }
-    }
-
-    /// Pop a queued [`Page`] from the [`PageQueue`].
-    ///
-    /// # Returns
-    /// - Returns `Some(Page)` if the queue is not empty, and there are still
-    ///   pages left.
-    /// - Returns `None` if the queue has no more pages left.
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for
-    /// benchmarks and tests only.
-    pub fn pop_test(&mut self) -> Option<Page> {
-        if let Some(page) = self.queue.front() {
-            self.hashset.remove(page);
-            self.queue.pop_back()
-        } else {
-            None
         }
     }
 

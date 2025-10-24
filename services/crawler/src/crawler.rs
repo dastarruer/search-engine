@@ -34,10 +34,14 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 });
 
 impl Crawler {
-    pub async fn new(starting_pages: Vec<Page>, pool: &sqlx::PgPool) -> Self {
-        let crawled = Self::init_crawled(pool).await;
+    pub async fn new(starting_pages: Vec<Page>, pool: Option<&sqlx::PgPool>) -> Self {
+        let crawled = if let Some(pool) = pool {
+            Self::init_crawled(pool).await
+        } else {
+            HashSet::new()
+        };
 
-        let queue = Self::init_queue(starting_pages, &pool).await;
+        let queue = Self::init_queue(starting_pages, pool).await;
 
         let client = Self::init_client();
 
@@ -53,11 +57,15 @@ impl Crawler {
     /// # Returns
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
-    pub async fn run(&mut self, pool: &sqlx::PgPool) -> Result<(), Error> {
+    pub async fn run(&mut self, pool: Option<&sqlx::PgPool>) -> Result<(), Error> {
         while let Some(page) = self.next_page(pool).await {
             match self.crawl_page(page.clone(), pool).await {
                 Ok(crawled_page) => {
-                    crawled_page.add_to_db(pool).await;
+                    if let Some(pool) = pool {
+                        crawled_page.add_to_db(pool).await;
+                    } else {
+                        log::info!("Crawl successful.");
+                    }
                 }
                 Err(e) => {
                     log::warn!("Crawl failed: {}", e);
@@ -69,12 +77,32 @@ impl Crawler {
         Ok(())
     }
 
+    // /// Perform a test run without writing to the database.
+    // ///
+    // /// # Returns
+    // /// - Returns `Ok` if no errors happen.
+    // /// - Returns `Err` if an untested fatal error happens.
+    // pub async fn test_run(&mut self) {
+    //     while let Some(page) = self.next_page_test() {
+    //         match self.crawl_page_test(page.clone()).await {
+    //             Ok(_) => {
+    //                 log::info!("Crawl successful.");
+    //             }
+    //             Err(e) => {
+    //                 log::warn!("Crawl failed: {}", e);
+    //             }
+    //         }
+    //     }
+
+    //     log::info!("All done! no more pages left");
+    // }
+
     /// Returns the next [`Page`] in the queue.
     ///
     /// # Returns
     /// - Return `Some(Page)` if a [`Page`] exists in the queue.
     /// - Returns `None` if the queue is empty.
-    pub async fn next_page(&mut self, pool: &sqlx::PgPool) -> Option<Page> {
+    pub async fn next_page(&mut self, pool: Option<&sqlx::PgPool>) -> Option<Page> {
         self.queue.pop(pool).await
     }
 
@@ -85,10 +113,10 @@ impl Crawler {
     /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - The [`Page`] is not in English.
     /// - [`Crawler::extract_html_from_page`] fails.
-    pub(crate) async fn crawl_page(
+    pub async fn crawl_page(
         &mut self,
         page: Page,
-        pool: &sqlx::PgPool,
+        pool: Option<&sqlx::PgPool>,
     ) -> Result<CrawledPage, Error> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
@@ -122,7 +150,7 @@ impl Crawler {
             }
 
             // Add the page to the queue of pages to crawl
-            self.queue.queue_page(page.clone(), &pool).await;
+            self.queue.queue_page(page.clone(), pool).await;
 
             log::info!("{} is queued", page.url);
 
@@ -333,10 +361,12 @@ impl Crawler {
         urls
     }
 
-    async fn init_queue(starting_pages: Vec<Page>, pool: &sqlx::PgPool) -> PageQueue {
+    async fn init_queue(starting_pages: Vec<Page>, pool: Option<&sqlx::PgPool>) -> PageQueue {
         let mut queue = PageQueue::default();
 
-        queue.refresh_queue(pool).await;
+        if let Some(pool) = pool {
+            queue.refresh_queue(pool).await;
+        }
 
         // Queue each page in starting_pages
         for page in starting_pages {
@@ -349,8 +379,10 @@ impl Crawler {
     /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
     async fn init_crawled(pool: &sqlx::PgPool) -> HashSet<Page> {
-        // Limit the query to return just 100 rows so startup times are not too long
-        let visited_query = format!("SELECT * FROM pages WHERE is_crawled = TRUE LIMIT {}", utils::QUEUE_LIMIT);
+        let visited_query = format!(
+            "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT {}",
+            utils::QUEUE_LIMIT
+        );
         let mut visited = HashSet::new();
 
         let query = sqlx::query(visited_query.as_str());
@@ -401,124 +433,10 @@ impl Crawler {
     }
 }
 
-// Methods for benchmarks
-#[cfg(feature = "bench")]
-impl Crawler {
-    fn init_queue_test(starting_pages: Vec<Page>) -> PageQueue {
-        let mut queue = PageQueue::default();
-
-        for page in starting_pages {
-            queue.queue_page_test(page);
-        }
-
-        queue
-    }
-
-    /// Returns the next [`Page`] in the queue.
-    ///
-    /// # Returns
-    /// - Return `Some(Page)` if a [`Page`] exists in the queue.
-    /// - Returns `None` if the queue is empty.
-    fn next_page_test(&mut self) -> Option<Page> {
-        self.queue.pop_test()
-    }
-
-    /// Perform a test run without writing to the database.
-    ///
-    /// # Returns
-    /// - Returns `Ok` if no errors happen.
-    /// - Returns `Err` if an untested fatal error happens.
-    pub async fn test_run(&mut self) {
-        while let Some(page) = self.next_page_test() {
-            match self.crawl_page_test(page.clone()).await {
-                Ok(_) => {
-                    log::info!("Crawl successful.");
-                }
-                Err(e) => {
-                    log::warn!("Crawl failed: {}", e);
-                }
-            }
-        }
-
-        log::info!("All done! no more pages left");
-    }
-}
-
-// Methods for tests and benchmarks
-#[cfg(any(test, feature = "bench"))]
-impl Crawler {
-    /// Create a test instance of a [`Crawler`], which uses an empty [`HashSet`] for `crawled`, making new instances much faster to create.
-    /// Also uses [`PgPool::connect_lazy`] to create a connection, which is much faster and lightweight.
-    pub async fn test_new(starting_url: Page) -> Self {
-        let url = "postgres://search_db_user:123@localhost:5432/search_db";
-        let pool = sqlx::postgres::PgPool::connect_lazy(url).unwrap();
-
-        let queue = Self::init_queue_test(vec![starting_url]);
-
-        let crawled = HashSet::new();
-
-        let client = Self::init_client();
-
-        Crawler {
-            queue,
-            crawled,
-            client,
-        }
-    }
-
-    /// Crawl a single page without writing to the database.
-    ///
-    /// # Errors
-    /// This function returns a [`CrawlerError`] if:
-    /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
-    /// - The [`Page`] is not in English.
-    /// - [`Crawler::extract_html_from_page`] fails.
-    pub async fn crawl_page_test(&mut self, page: Page) -> Result<CrawledPage, Error> {
-        let html = self.extract_html_from_page(page.clone()).await?;
-
-        let html = Html::parse_document(html.as_str());
-
-        if !Self::is_english(&html) {
-            return Err(Error::NonEnglishPage(page));
-        }
-
-        let title = Self::extract_title_from_html(&html);
-        let urls = self.extract_urls_from_html(&html);
-
-        let base_url = page.url.clone();
-
-        for url in urls {
-            let url = string_to_url(&base_url, url);
-
-            let page = if let Some(url) = url {
-                Page::from(url)
-            } else {
-                continue;
-            };
-
-            if self.crawled.contains(&page) || self.is_page_queued(&page) {
-                log::warn!("{} is a duplicate", page.url);
-                continue;
-            }
-
-            // Add the page to the queue of pages to crawl
-            self.queue.queue_page_test(page.clone());
-
-            log::info!("{} is queued", page.url);
-
-            // Add the page to self.crawled, so that it is never crawled again
-            self.crawled.insert(page);
-        }
-
-        log::info!("Crawled {:?}...", base_url);
-
-        Ok(page.into_crawled(title, html.html()))
-    }
-}
-
 #[cfg(test)]
 mod test {
     use scraper::Html;
+    use std::collections::HashSet;
 
     use crate::{
         crawler::Crawler,
@@ -532,7 +450,7 @@ mod test {
 
         let page = Page::from(server.base_url());
 
-        (Crawler::test_new(page.clone()).await, page)
+        (Crawler::new(vec![page.clone()], None).await, page)
     }
 
     mod normalize_url {
@@ -685,7 +603,7 @@ mod test {
             });
 
             let page = Page::from(server.base_url());
-            let crawler = Crawler::test_new(page.clone()).await;
+            let crawler = Crawler::new(vec![page.clone()], None).await;
 
             let error = crawler
                 .extract_html_from_page(page.clone())
@@ -738,7 +656,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::test_new(page.clone()).await;
+                let crawler = Crawler::new(vec![page.clone()], None).await;
 
                 let start = Instant::now();
                 let error = crawler
@@ -767,7 +685,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::test_new(page.clone()).await;
+                let crawler = Crawler::new(vec![page.clone()], None).await;
 
                 let error = crawler
                     .extract_html_from_page(page.clone())
@@ -789,7 +707,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::test_new(page.clone()).await;
+                let crawler = Crawler::new(vec![page.clone()], None).await;
 
                 let error = crawler
                     .extract_html_from_page(page.clone())
@@ -841,7 +759,7 @@ mod test {
             expected_queue.push_back(page.clone());
             assert_eq!(crawler.queue, expected_queue);
 
-            crawler.crawl_page_test(page.clone()).await.unwrap();
+            crawler.crawl_page(page.clone(), None).await.unwrap();
 
             let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
             assert!(crawler.queue.contains_page(&expected_page));
@@ -855,10 +773,10 @@ mod test {
             expected_queue.push_back(page.clone());
             assert_eq!(crawler.queue, expected_queue);
 
-            crawler.crawl_page_test(page.clone()).await.unwrap();
+            crawler.crawl_page(page.clone(), None).await.unwrap();
             let queue_before = crawler.queue.clone();
 
-            crawler.crawl_page_test(page.clone()).await.unwrap();
+            crawler.crawl_page(page.clone(), None).await.unwrap();
             assert_eq!(crawler.queue, queue_before)
         }
     }
@@ -874,7 +792,7 @@ mod test {
             // We don't need to send http requests in this module, so just provide a nonexistent site
             let non_existent_site = Url::parse("https://does-not-exist.comm").unwrap();
             let page = crate::page::Page::from(non_existent_site);
-            let crawler = Crawler::test_new(page).await;
+            let crawler = Crawler::new(vec![page], None).await;
 
             let html_file = test_file_path_from_filepath(filename);
 
