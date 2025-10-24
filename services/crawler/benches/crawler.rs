@@ -59,7 +59,7 @@ criterion_group! {
         .measurement_time(std::time::Duration::from_secs(15))
         .warm_up_time(std::time::Duration::from_secs(5))
         .nresamples(200_000);
-    targets = bench_crawl_from_page, bench_test_run
+    targets = bench_crawl_page, bench_test_run
 }
 
 criterion_main!(benches);
