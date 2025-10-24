@@ -12,9 +12,9 @@ flexi_logger = { workspace = true }
 url = { workspace = true }
 scraper = { workspace = true }
 once_cell = { workspace = true }
-reqwest = { version = "0.12.23", features = ["gzip"] }
+reqwest = { version = "0.12.24", features = ["gzip"] }
 thiserror = "2.0.17"
-httpmock = "0.8.0"
+httpmock = "0.8.2"
 rustrict = "0.7.36"
 
 [dev-dependencies]
