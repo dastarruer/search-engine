@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::page::Page;
 
 #[derive(Debug, Error, PartialEq)]
-pub enum CrawlerError {
+pub enum Error {
     #[error("Request to {url} failed: {error_str}", url = page.url)]
     FailedRequest { page: Page, error_str: String },
 

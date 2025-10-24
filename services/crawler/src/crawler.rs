@@ -1,7 +1,7 @@
 use std::{collections::HashSet, time::Duration};
 
 use crate::{
-    error::CrawlerError,
+    error::Error,
     page::{CrawledPage, Page, PageQueue},
     utils::string_to_url,
 };
@@ -58,7 +58,7 @@ impl Crawler {
     /// # Returns
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
-    pub async fn run(&mut self) -> Result<(), CrawlerError> {
+    pub async fn run(&mut self) -> Result<(), Error> {
         while let Some(page) = self.next_page().await {
             match self.crawl_page(page.clone()).await {
                 Ok(crawled_page) => {
@@ -90,17 +90,17 @@ impl Crawler {
     /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - The [`Page`] is not in English.
     /// - [`Crawler::extract_html_from_page`] fails.
-    pub(crate) async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
+    pub(crate) async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, Error> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
         let html = Html::parse_document(html.as_str());
 
         if !Self::is_english(&html) {
-            return Err(CrawlerError::NonEnglishPage(page));
+            return Err(Error::NonEnglishPage(page));
         }
 
         if Self::is_inappropriate_page(&page, &html) {
-            return Err(CrawlerError::InappropriateSite(page));
+            return Err(Error::InappropriateSite(page));
         }
 
         let title = Self::extract_title_from_html(&html);
@@ -145,7 +145,9 @@ impl Crawler {
     fn normalize_url(url: Url) -> Url {
         // If the url does not have any parameters or fragment, it is
         // already normalized
-        if let None = url.query() && let None = url.fragment() {
+        if let None = url.query()
+            && let None = url.fragment()
+        {
             return url;
         }
 
@@ -203,7 +205,7 @@ impl Crawler {
     /// - The response contains a non-200 or non-429 HTTP status code, or the request times out.
     /// - Sending the request results in an error.
     /// - Decoding the HTML from the [`reqwest::Response`] throws an error, such as UTF-8 errors.
-    async fn extract_html_from_page(&self, page: Page) -> Result<String, CrawlerError> {
+    async fn extract_html_from_page(&self, page: Page) -> Result<String, Error> {
         let mut resp = self.make_get_request(page.clone()).await?;
 
         let status = resp.status();
@@ -212,7 +214,7 @@ impl Crawler {
                 let html = Self::extract_html_from_resp(resp).await?;
 
                 if html.is_none() {
-                    return Err(CrawlerError::EmptyPage(page));
+                    return Err(Error::EmptyPage(page));
                 }
 
                 Ok(html.unwrap())
@@ -230,7 +232,7 @@ impl Crawler {
 
                     // If delay_secs is not a valid value in seconds
                     if delay_secs.is_err() {
-                        return Err(CrawlerError::InvalidRetryByHeader {
+                        return Err(Error::InvalidRetryByHeader {
                             page,
                             header: Some(retry_after.to_owned()),
                         });
@@ -241,7 +243,7 @@ impl Crawler {
                     let delay = Duration::from_secs(delay_secs);
 
                     if delay > MAX_DELAY {
-                        return Err(CrawlerError::RequestTimeout(page));
+                        return Err(Error::RequestTimeout(page));
                     }
 
                     tokio::time::sleep(delay).await;
@@ -252,7 +254,7 @@ impl Crawler {
                     }
 
                     if resp.status() != StatusCode::OK {
-                        return Err(CrawlerError::RequestTimeout(page));
+                        return Err(Error::RequestTimeout(page));
                     }
 
                     let html = Self::extract_html_from_resp(resp).await?;
@@ -260,11 +262,11 @@ impl Crawler {
                     Ok(html.unwrap())
                 } else {
                     // just give up. it's not worth it.
-                    Err(CrawlerError::InvalidRetryByHeader { page, header: None })
+                    Err(Error::InvalidRetryByHeader { page, header: None })
                 }
             }
             // just give up. it's not worth it.
-            _ => Err(CrawlerError::MalformedHttpStatus { page, status }),
+            _ => Err(Error::MalformedHttpStatus { page, status }),
         }
     }
 
@@ -307,12 +309,12 @@ impl Crawler {
     /// - There was an error while sending the request.
     /// - The redirect loop was detected.
     /// - The redirect limit was exhausted.
-    async fn make_get_request(&self, page: Page) -> Result<reqwest::Response, CrawlerError> {
+    async fn make_get_request(&self, page: Page) -> Result<reqwest::Response, Error> {
         self.client
             .get(page.url.clone())
             .send()
             .await
-            .map_err(|e| CrawlerError::FailedRequest {
+            .map_err(|e| Error::FailedRequest {
                 page,
                 error_str: e.to_string(),
             })
@@ -386,18 +388,13 @@ impl Crawler {
     /// # Returns
     /// - Returns `None` if the [`reqwest::Response`] has no HTML content.
     /// - Returns `Err` if decoding the HTML from the [`reqwest::Response`] throws an error, such as UTF 8 errors.
-    async fn extract_html_from_resp(
-        resp: reqwest::Response,
-    ) -> Result<Option<String>, CrawlerError> {
+    async fn extract_html_from_resp(resp: reqwest::Response) -> Result<Option<String>, Error> {
         let url = resp.url().clone();
 
-        let html = resp
-            .text()
-            .await
-            .map_err(|e| CrawlerError::HtmlDecodingError {
-                url,
-                error_str: e.to_string(),
-            })?;
+        let html = resp.text().await.map_err(|e| Error::HtmlDecodingError {
+            url,
+            error_str: e.to_string(),
+        })?;
 
         if html.is_empty() {
             Ok(None)
@@ -480,13 +477,13 @@ impl Crawler {
     /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - The [`Page`] is not in English.
     /// - [`Crawler::extract_html_from_page`] fails.
-    pub async fn crawl_page_test(&mut self, page: Page) -> Result<CrawledPage, CrawlerError> {
+    pub async fn crawl_page_test(&mut self, page: Page) -> Result<CrawledPage, Error> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
         let html = Html::parse_document(html.as_str());
 
         if !Self::is_english(&html) {
-            return Err(CrawlerError::NonEnglishPage(page));
+            return Err(Error::NonEnglishPage(page));
         }
 
         let title = Self::extract_title_from_html(&html);
@@ -665,7 +662,7 @@ mod test {
 
     mod extract_html_from_page {
         use super::*;
-        use crate::error::CrawlerError;
+        use crate::error::Error;
         use httpmock::Method::GET;
         use reqwest::StatusCode;
 
@@ -701,7 +698,7 @@ mod test {
 
             assert_eq!(
                 error,
-                CrawlerError::MalformedHttpStatus {
+                Error::MalformedHttpStatus {
                     page,
                     status: EXPECTED_STATUS
                 }
@@ -716,13 +713,13 @@ mod test {
                 .extract_html_from_page(page.clone())
                 .await
                 .unwrap_err();
-            assert_eq!(error, CrawlerError::EmptyPage(page))
+            assert_eq!(error, Error::EmptyPage(page))
         }
 
         mod status_429 {
             use crate::{
                 crawler::Crawler,
-                error::CrawlerError,
+                error::Error,
                 page::Page,
                 utils::{HttpServer, test_file_path_from_filepath},
             };
@@ -756,7 +753,7 @@ mod test {
 
                 let elapsed = (end - start).as_secs();
                 assert_eq!(elapsed, TRY_AFTER_SECS);
-                assert_eq!(error, CrawlerError::RequestTimeout(page))
+                assert_eq!(error, Error::RequestTimeout(page))
             }
 
             #[tokio::test]
@@ -780,7 +777,7 @@ mod test {
                     .extract_html_from_page(page.clone())
                     .await
                     .unwrap_err();
-                assert_eq!(error, CrawlerError::RequestTimeout(page))
+                assert_eq!(error, Error::RequestTimeout(page))
             }
 
             #[tokio::test]
@@ -803,10 +800,7 @@ mod test {
                     .await
                     .unwrap_err();
 
-                assert_eq!(
-                    error,
-                    CrawlerError::InvalidRetryByHeader { page, header: None }
-                )
+                assert_eq!(error, Error::InvalidRetryByHeader { page, header: None })
             }
         }
     }
