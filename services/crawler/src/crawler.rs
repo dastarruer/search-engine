@@ -138,9 +138,14 @@ impl Crawler {
 
     /// Normalize a url by stripping any passive parameters that do not change
     /// the page content.
+    ///
+    /// Also strips fragment identifiers (e.g. `https://example.com/data.csv#row=4`
+    /// is normalized as `https://example.com/data.csv`), since these usually
+    /// do not change page content.
     fn normalize_url(url: Url) -> Url {
-        // If the url does not have any parameters
-        if let None = url.query() {
+        // If the url does not have any parameters or fragment, it is
+        // already normalized
+        if let None = url.query() && let None = url.fragment() {
             return url;
         }
 
@@ -151,12 +156,18 @@ impl Crawler {
             .filter(|(query, _)| !Self::query_is_passive(query))
             .collect();
 
-        if !params.is_empty() {
-            return Url::parse_with_params(format!("https://{}{}", domain, path).as_str(), params)
-                .expect("Normalized URL must be a valid url.");
-        }
-        Url::parse(format!("https://{}{}", domain, path).as_str())
-            .expect("Normalized URL must be a valid url.")
+        let mut url = if !params.is_empty() {
+            Url::parse_with_params(format!("https://{}{}", domain, path).as_str(), params)
+                .expect("Normalized URL must be a valid url.")
+        } else {
+            Url::parse(format!("https://{}{}", domain, path).as_str())
+                .expect("Normalized URL must be a valid url.")
+        };
+
+        // Strip the fragment identifier
+        url.set_fragment(None);
+
+        url
     }
 
     fn query_is_passive(query: &std::borrow::Cow<'_, str>) -> bool {
@@ -553,6 +564,16 @@ mod test {
         fn test_url_with_passive_params() {
             let url =
                 Url::parse("https://safe.com?utm_source=newsletter&id=seranking&t=60s").unwrap();
+
+            assert_eq!(
+                Crawler::normalize_url(url.clone()).as_str(),
+                Url::parse("https://safe.com").unwrap().as_str()
+            );
+        }
+
+        #[test]
+        fn test_url_with_fragment_identifier() {
+            let url = Url::parse("https://safe.com#Header").unwrap();
 
             assert_eq!(
                 Crawler::normalize_url(url.clone()).as_str(),
