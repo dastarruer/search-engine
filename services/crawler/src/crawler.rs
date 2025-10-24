@@ -572,12 +572,22 @@ mod test {
         }
 
         #[test]
-        fn test_url_with_fragment_identifier() {
+        fn test_url_with_fragment() {
             let url = Url::parse("https://safe.com#Header").unwrap();
 
             assert_eq!(
                 Crawler::normalize_url(url.clone()).as_str(),
                 Url::parse("https://safe.com").unwrap().as_str()
+            );
+        }
+
+        #[test]
+        fn test_url_with_fragment_and_params() {
+            let url = Url::parse("https://safe.com?utm_source=newsletter&rating=5#Header").unwrap();
+
+            assert_eq!(
+                Crawler::normalize_url(url.clone()).as_str(),
+                Url::parse("https://safe.com?rating=5").unwrap().as_str()
             );
         }
     }
