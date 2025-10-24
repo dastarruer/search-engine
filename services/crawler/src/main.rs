@@ -12,9 +12,10 @@ use flexi_logger::FileSpec;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_up_logging().await?;
 
-    let mut crawler = Crawler::new(get_start_urls()).await;
+    let pool = utils::init_pool().await;
+    let mut crawler = Crawler::new(get_start_urls(), &pool).await;
 
-    crawler.run().await?;
+    crawler.run(&pool).await?;
 
     Ok(())
 }

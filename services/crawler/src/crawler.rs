@@ -19,7 +19,6 @@ pub struct Crawler {
     // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
     // TODO: Convert to CrawledPage
     crawled: HashSet<Page>,
-    pool: PgPool,
     client: Client,
 }
 
@@ -35,8 +34,8 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 });
 
 impl Crawler {
-    pub async fn new(starting_pages: Vec<Page>) -> Self {
-        let (pool, crawled) = Self::init_crawled_and_pool().await;
+    pub async fn new(starting_pages: Vec<Page>, pool: &sqlx::PgPool) -> Self {
+        let crawled = Self::init_crawled(pool).await;
 
         // TODO: For now, this will be here but it should be in main.rs instead
         ::utils::migrate(&pool).await;
@@ -48,7 +47,6 @@ impl Crawler {
         Crawler {
             queue,
             crawled,
-            pool,
             client,
         }
     }
@@ -58,11 +56,11 @@ impl Crawler {
     /// # Returns
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
-    pub async fn run(&mut self) -> Result<(), Error> {
-        while let Some(page) = self.next_page().await {
-            match self.crawl_page(page.clone()).await {
+    pub async fn run(&mut self, pool: &sqlx::PgPool) -> Result<(), Error> {
+        while let Some(page) = self.next_page(pool).await {
+            match self.crawl_page(page.clone(), pool).await {
                 Ok(crawled_page) => {
-                    crawled_page.add_to_db(&self.pool).await;
+                    crawled_page.add_to_db(pool).await;
                 }
                 Err(e) => {
                     log::warn!("Crawl failed: {}", e);
@@ -79,8 +77,8 @@ impl Crawler {
     /// # Returns
     /// - Return `Some(Page)` if a [`Page`] exists in the queue.
     /// - Returns `None` if the queue is empty.
-    pub async fn next_page(&mut self) -> Option<Page> {
-        self.queue.pop(&self.pool).await
+    pub async fn next_page(&mut self, pool: &sqlx::PgPool) -> Option<Page> {
+        self.queue.pop(pool).await
     }
 
     /// Crawl a single page.
@@ -90,7 +88,11 @@ impl Crawler {
     /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - The [`Page`] is not in English.
     /// - [`Crawler::extract_html_from_page`] fails.
-    pub(crate) async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, Error> {
+    pub(crate) async fn crawl_page(
+        &mut self,
+        page: Page,
+        pool: &sqlx::PgPool,
+    ) -> Result<CrawledPage, Error> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
         let html = Html::parse_document(html.as_str());
@@ -123,7 +125,7 @@ impl Crawler {
             }
 
             // Add the page to the queue of pages to crawl
-            self.queue.queue_page(page.clone(), &self.pool).await;
+            self.queue.queue_page(page.clone(), &pool).await;
 
             log::info!("{} is queued", page.url);
 
@@ -349,19 +351,17 @@ impl Crawler {
 
     /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
     /// Will return an empty hashset if the database is empty.
-    async fn init_crawled_and_pool() -> (sqlx::Pool<sqlx::Postgres>, HashSet<Page>) {
-        let pool = ::utils::init_pool().await;
-
+    async fn init_crawled(pool: &sqlx::PgPool) -> HashSet<Page> {
         // Limit the query to return just 100 rows so startup times are not too long
         let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT 100";
         let mut visited = HashSet::new();
 
         let query = sqlx::query(visited_query);
 
-        let rows = (query.fetch_all(&pool).await).ok();
+        let rows = (query.fetch_all(pool).await).ok();
 
         if rows.is_none() {
-            return (pool, visited);
+            return visited;
         }
 
         rows.unwrap().iter().for_each(|row| {
@@ -370,7 +370,7 @@ impl Crawler {
             visited.insert(page);
         });
 
-        (pool, visited)
+        visited
     }
 
     fn init_client() -> Client {
@@ -465,7 +465,6 @@ impl Crawler {
         Crawler {
             queue,
             crawled,
-            pool,
             client,
         }
     }
