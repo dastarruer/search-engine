@@ -13,6 +13,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     set_up_logging().await?;
 
     let pool = utils::init_pool().await;
+
+    utils::migrate(pool);
+
     let mut crawler = Crawler::new(get_start_urls(), &pool).await;
 
     crawler.run(&pool).await?;

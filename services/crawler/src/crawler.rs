@@ -37,9 +37,6 @@ impl Crawler {
     pub async fn new(starting_pages: Vec<Page>, pool: &sqlx::PgPool) -> Self {
         let crawled = Self::init_crawled(pool).await;
 
-        // TODO: For now, this will be here but it should be in main.rs instead
-        ::utils::migrate(&pool).await;
-
         let queue = Self::init_queue(starting_pages, &pool).await;
 
         let client = Self::init_client();
