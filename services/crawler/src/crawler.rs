@@ -350,10 +350,10 @@ impl Crawler {
     /// Will return an empty hashset if the database is empty.
     async fn init_crawled(pool: &sqlx::PgPool) -> HashSet<Page> {
         // Limit the query to return just 100 rows so startup times are not too long
-        let visited_query = "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT 100";
+        let visited_query = format!("SELECT * FROM pages WHERE is_crawled = TRUE LIMIT {}", utils::QUEUE_LIMIT);
         let mut visited = HashSet::new();
 
-        let query = sqlx::query(visited_query);
+        let query = sqlx::query(visited_query.as_str());
 
         let rows = (query.fetch_all(pool).await).ok();
 
