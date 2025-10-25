@@ -212,7 +212,7 @@ impl Crawler {
     /// - The response contains a non-200 or non-429 HTTP status code, or the request times out.
     /// - Sending the request results in an error.
     /// - Decoding the HTML from the [`reqwest::Response`] throws an error, such as UTF-8 errors.
-    async fn extract_html_from_page(&self, page: Page) -> Result<String, Error> {
+    pub async fn extract_html_from_page(&self, page: Page) -> Result<String, Error> {
         let mut resp = self.make_get_request(page.clone()).await?;
 
         let status = resp.status();
@@ -620,35 +620,6 @@ mod test {
             use httpmock::Method::GET;
             use reqwest::StatusCode;
             use tokio::time::Instant;
-
-            #[tokio::test]
-            async fn test_429_status() {
-                // special setup (retry-after), keep as is
-                const TRY_AFTER_SECS: u64 = 1;
-                let filepath = test_file_path_from_filepath("extract_single_href.html");
-
-                let server = HttpServer::new_with_mock(|when, then| {
-                    when.method(GET).header("user-agent", crate::USER_AGENT);
-                    then.status(StatusCode::TOO_MANY_REQUESTS.as_u16())
-                        .header("content-type", "text/html")
-                        .header("retry-after", TRY_AFTER_SECS.to_string())
-                        .body_from_file(filepath.display().to_string());
-                });
-
-                let page = Page::from(server.base_url());
-                let crawler = Crawler::new(vec![page.clone()], None).await;
-
-                let start = Instant::now();
-                let error = crawler
-                    .extract_html_from_page(page.clone())
-                    .await
-                    .unwrap_err();
-                let end = Instant::now();
-
-                let elapsed = (end - start).as_secs();
-                assert_eq!(elapsed, TRY_AFTER_SECS);
-                assert_eq!(error, Error::RequestTimeout(page))
-            }
 
             #[tokio::test]
             async fn test_429_status_with_large_retry_after() {

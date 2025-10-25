@@ -19,6 +19,7 @@ rustrict = "0.7.36"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["async_tokio"] }
+testcontainers-modules = { workspace = true }
 
 # Necessary for criterion benchmarks (DO NOT REMOVE)
 [[bench]]

@@ -1,5 +1,5 @@
 pub mod crawler;
-mod error;
+pub mod error;
 pub mod page;
 pub mod utils;
 

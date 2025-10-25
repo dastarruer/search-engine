@@ -502,6 +502,7 @@ dependencies = [
  "rustrict",
  "scraper",
  "sqlx",
+ "testcontainers-modules",
  "thiserror",
  "tokio",
  "url",
