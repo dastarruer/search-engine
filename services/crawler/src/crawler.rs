@@ -415,9 +415,6 @@ impl Crawler {
 
 #[cfg(test)]
 mod test {
-    use scraper::Html;
-    use std::collections::HashSet;
-
     use crate::{
         crawler::Crawler,
         page::Page,
@@ -619,7 +616,6 @@ mod test {
             };
             use httpmock::Method::GET;
             use reqwest::StatusCode;
-            use tokio::time::Instant;
 
             #[tokio::test]
             async fn test_429_status_with_large_retry_after() {
