@@ -77,26 +77,6 @@ impl Crawler {
         Ok(())
     }
 
-    // /// Perform a test run without writing to the database.
-    // ///
-    // /// # Returns
-    // /// - Returns `Ok` if no errors happen.
-    // /// - Returns `Err` if an untested fatal error happens.
-    // pub async fn test_run(&mut self) {
-    //     while let Some(page) = self.next_page_test() {
-    //         match self.crawl_page_test(page.clone()).await {
-    //             Ok(_) => {
-    //                 log::info!("Crawl successful.");
-    //             }
-    //             Err(e) => {
-    //                 log::warn!("Crawl failed: {}", e);
-    //             }
-    //         }
-    //     }
-
-    //     log::info!("All done! no more pages left");
-    // }
-
     /// Returns the next [`Page`] in the queue.
     ///
     /// # Returns
