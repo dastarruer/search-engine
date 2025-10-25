@@ -9,7 +9,7 @@ use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use rustrict::{Censor, Type};
 use scraper::{Html, Selector};
-use sqlx::{PgPool, Row};
+use sqlx::Row;
 
 use utils::{AddToDb, ExtractText};
 
@@ -199,7 +199,7 @@ impl Crawler {
         url
     }
 
-    fn query_is_passive(query: &std::borrow::Cow<'_, str>) -> bool {
+    fn query_is_passive(query: &str) -> bool {
         query.contains("utm") || query == "id" || query == "t"
     }
 
@@ -420,7 +420,7 @@ impl Crawler {
     async fn extract_html_from_resp(resp: reqwest::Response) -> Result<Option<String>, Error> {
         let url = resp.url().clone();
 
-        let html = resp.text().await.map_err(|e| Error::HtmlDecodingError {
+        let html = resp.text().await.map_err(|e| Error::HtmlDecoding {
             url,
             error_str: e.to_string(),
         })?;

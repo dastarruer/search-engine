@@ -2,13 +2,12 @@ use std::fs;
 
 use sqlx::{
     Pool,
-    postgres::{PgPoolOptions, types::PgHstore},
+    postgres::{PgPoolOptions},
 };
 use testcontainers_modules::{
     postgres::Postgres,
     testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
 };
-use tf_idf_indexer::Term;
 use utils::migrate;
 
 /// Set up a Postgres Docker container for testing purposes.

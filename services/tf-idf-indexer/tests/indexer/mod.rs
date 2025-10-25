@@ -1,6 +1,5 @@
 use scraper::Html;
 use tf_idf_indexer::*;
-use utils::AddToDb;
 
 use crate::common;
 
