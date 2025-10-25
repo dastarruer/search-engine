@@ -1,4 +1,5 @@
 use reqwest::Url;
+use scraper::Html;
 use sqlx::Row;
 use std::collections::{HashSet, VecDeque};
 use utils::AddToDb;
@@ -9,13 +10,18 @@ pub struct Page {
     pub url: Url,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct CrawledPage {
     pub url: Url,
     pub title: Option<String>,
+    pub html: Html,
+}
 
-    // This is a `String` instead of `Html` because `Html` does not implement the `sqlx::Encode` trait
-    pub html: String,
+impl std::hash::Hash for CrawledPage {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // The url will always be unique, so hash this
+        self.url.hash(state);
+    }
 }
 
 impl Page {
@@ -24,7 +30,7 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a [`CrawledPage`].
-    pub(crate) fn into_crawled(self, title: Option<String>, html: String) -> CrawledPage {
+    pub(crate) fn into_crawled(self, title: Option<String>, html: Html) -> CrawledPage {
         CrawledPage::new(self, title, html)
     }
 }
@@ -58,7 +64,7 @@ impl PartialEq<CrawledPage> for Page {
 }
 
 impl CrawledPage {
-    pub fn new(page: Page, title: Option<String>, html: String) -> Self {
+    pub fn new(page: Page, title: Option<String>, html: Html) -> Self {
         CrawledPage {
             url: page.url,
             title,
@@ -82,7 +88,7 @@ impl AddToDb for CrawledPage {
             WHERE url = $3"#;
 
         sqlx::query(query)
-            .bind(self.html.as_str())
+            .bind(self.html.html())
             .bind(self.title.clone())
             .bind(self.url.to_string())
             .execute(pool)

@@ -140,7 +140,7 @@ impl Crawler {
 
         log::info!("Crawled {:?}...", base_url);
 
-        Ok(page.into_crawled(title, html.html()))
+        Ok(page.into_crawled(title, html))
     }
 
     /// Normalize a url by stripping any passive parameters that do not change
