@@ -110,8 +110,9 @@ impl PageQueue {
             self.hashset.remove(page);
             self.queue.pop_front()
         } else {
+            // TODO: Move this logic out of the pop method
             log::info!("Queue is empty, refreshing...");
-            self.refresh_queue(db_manager);
+            self.refresh_queue(db_manager).await;
 
             if let Some(page) = self.queue.front() {
                 self.hashset.remove(page);
