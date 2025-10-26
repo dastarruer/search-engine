@@ -1,10 +1,7 @@
 use reqwest::Url;
 use scraper::Html;
-use sqlx::Row;
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
-use utils::AddToDb;
-use utils::QUEUE_LIMIT;
 
 use crate::db::DbManager;
 

@@ -10,9 +10,8 @@ use once_cell::sync::Lazy;
 use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
 use rustrict::{Censor, Type};
 use scraper::{Html, Selector};
-use sqlx::Row;
 
-use utils::{AddToDb, ExtractText};
+use utils::ExtractText;
 
 #[derive(Clone)]
 pub struct Crawler {
