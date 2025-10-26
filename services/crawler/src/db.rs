@@ -44,6 +44,7 @@ impl DbManager for RealDbManager {
         queue
     }
 
+    /// Add a [`Page`] instance to a database.
     async fn add_page_to_db(&self, page: &Page) {
         let query = r#"
             INSERT INTO pages (url, is_crawled, is_indexed)
