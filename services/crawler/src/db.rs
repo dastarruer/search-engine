@@ -28,3 +28,27 @@ impl DbManager for RealDbManager {
         queue
     }
 }
+
+#[cfg(test)]
+pub struct MockDbManager {}
+
+#[cfg(test)]
+impl MockDbManager {
+    fn new() -> Self {
+        MockDbManager {}
+    }
+}
+
+#[cfg(test)]
+impl DbManager for MockDbManager {
+    async fn init_queue(&self, starting_pages: Vec<Page>) -> PageQueue {
+        let mut queue = PageQueue::default();
+
+        // Queue each page in starting_pages
+        for page in starting_pages {
+            queue.queue_page(page, None).await;
+        }
+
+        queue
+    }
+}
