@@ -38,17 +38,13 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 
 impl Crawler {
     pub async fn new(starting_pages: Vec<Page>, pool: Option<&sqlx::PgPool>) -> Self {
-        let crawled = if let Some(pool) = pool {
-            Self::init_crawled(pool).await
-        } else {
-            HashSet::new()
-        };
-
         let db_manager: Arc<dyn DbManager> = if let Some(pool) = pool {
             Arc::new(RealDbManager::new(pool.to_owned()))
         } else {
             Arc::new(MockDbManager::new())
         };
+
+        let crawled = db_manager.clone().init_crawled().await;
 
         let queue = db_manager.clone().init_queue(starting_pages).await;
 
@@ -343,32 +339,6 @@ impl Crawler {
         }
 
         urls
-    }
-
-    /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
-    /// Will return an empty hashset if the database is empty.
-    async fn init_crawled(pool: &sqlx::PgPool) -> HashSet<Page> {
-        let visited_query = format!(
-            "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT {}",
-            utils::QUEUE_LIMIT
-        );
-        let mut visited = HashSet::new();
-
-        let query = sqlx::query(visited_query.as_str());
-
-        let rows = (query.fetch_all(pool).await).ok();
-
-        if rows.is_none() {
-            return visited;
-        }
-
-        rows.unwrap().iter().for_each(|row| {
-            let page = Page::from(Url::parse(row.get("url")).unwrap());
-
-            visited.insert(page);
-        });
-
-        visited
     }
 
     fn init_client() -> Client {

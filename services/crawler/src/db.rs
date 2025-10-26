@@ -14,8 +14,11 @@ use crate::page::{CrawledPage, Page, PageQueue};
 #[async_trait(?Send)]
 pub trait DbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue;
+    async fn init_crawled(self: Arc<Self>) -> HashSet<Page>;
+
     async fn add_page_to_db(&self, page: &Page);
     async fn add_crawled_page_to_db(&self, page: &CrawledPage);
+
     async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, HashSet<Page>);
 }
 
@@ -42,6 +45,32 @@ impl DbManager for RealDbManager {
         }
 
         queue
+    }
+
+    /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
+    /// Will return an empty hashset if the database is empty.
+    async fn init_crawled(self: Arc<Self>) -> HashSet<Page> {
+        let visited_query = format!(
+            "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT {}",
+            utils::QUEUE_LIMIT
+        );
+        let mut visited = HashSet::new();
+
+        let query = sqlx::query(visited_query.as_str());
+
+        let rows = (query.fetch_all(&self.pool).await).ok();
+
+        if rows.is_none() {
+            return visited;
+        }
+
+        rows.unwrap().iter().for_each(|row| {
+            let page = Page::from(Url::parse(row.get("url")).unwrap());
+
+            visited.insert(page);
+        });
+
+        visited
     }
 
     /// Add a [`Page`] instance to a database.
@@ -135,6 +164,10 @@ impl DbManager for MockDbManager {
 
         queue
     }
+
+        async fn init_crawled(self: Arc<Self>) -> HashSet<Page> {
+            HashSet::new()
+        }
 
     async fn add_page_to_db(&self, _page: &Page) {
         // Do nothing
