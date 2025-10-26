@@ -21,7 +21,7 @@ fn bench_crawl_page(c: &mut Criterion) {
 
             let mut crawler = Crawler::new(vec![page.clone()], None).await;
 
-            crawler.crawl_page(page.clone(), None).await.unwrap();
+            crawler.crawl_page(page.clone()).await.unwrap();
         })
     });
 }

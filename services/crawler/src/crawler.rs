@@ -43,13 +43,14 @@ impl Crawler {
         } else {
             HashSet::new()
         };
+
         let db_manager: Arc<dyn DbManager> = if let Some(pool) = pool {
             Arc::new(RealDbManager::new(pool.to_owned()))
         } else {
             Arc::new(MockDbManager::new())
         };
 
-        let queue = db_manager.init_queue(starting_pages).await;
+        let queue = db_manager.clone().init_queue(starting_pages).await;
 
         let client = Self::init_client();
 
@@ -68,7 +69,7 @@ impl Crawler {
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self, pool: Option<&sqlx::PgPool>) -> Result<(), Error> {
         while let Some(page) = self.next_page(pool).await {
-            match self.crawl_page(page.clone(), pool).await {
+            match self.crawl_page(page.clone()).await {
                 Ok(crawled_page) => {
                     if let Some(pool) = pool {
                         crawled_page.add_to_db(pool).await;
@@ -105,7 +106,6 @@ impl Crawler {
     pub async fn crawl_page(
         &mut self,
         page: Page,
-        pool: Option<&sqlx::PgPool>,
     ) -> Result<CrawledPage, Error> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
@@ -139,7 +139,7 @@ impl Crawler {
             }
 
             // Add the page to the queue of pages to crawl
-            self.queue.queue_page(page.clone(), pool).await;
+            self.queue.queue_page(page.clone(), self.db_manager.clone()).await;
 
             log::info!("{} is queued", page.url);
 
@@ -348,21 +348,6 @@ impl Crawler {
         }
 
         urls
-    }
-
-    async fn init_queue(starting_pages: Vec<Page>, pool: Option<&sqlx::PgPool>) -> PageQueue {
-        let mut queue = PageQueue::default();
-
-        if let Some(pool) = pool {
-            queue.refresh_queue(pool).await;
-        }
-
-        // Queue each page in starting_pages
-        for page in starting_pages {
-            queue.queue_page(page, pool).await;
-        }
-
-        queue
     }
 
     /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
@@ -715,7 +700,7 @@ mod test {
             expected_queue.push_back(page.clone());
             assert_eq!(crawler.queue, expected_queue);
 
-            crawler.crawl_page(page.clone(), None).await.unwrap();
+            crawler.crawl_page(page.clone()).await.unwrap();
 
             let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
             assert!(crawler.queue.contains_page(&expected_page));
@@ -729,10 +714,10 @@ mod test {
             expected_queue.push_back(page.clone());
             assert_eq!(crawler.queue, expected_queue);
 
-            crawler.crawl_page(page.clone(), None).await.unwrap();
+            crawler.crawl_page(page.clone()).await.unwrap();
             let queue_before = crawler.queue.clone();
 
-            crawler.crawl_page(page.clone(), None).await.unwrap();
+            crawler.crawl_page(page.clone()).await.unwrap();
             assert_eq!(crawler.queue, queue_before)
         }
     }

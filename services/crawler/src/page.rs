@@ -2,8 +2,11 @@ use reqwest::Url;
 use scraper::Html;
 use sqlx::Row;
 use std::collections::{HashSet, VecDeque};
+use std::sync::Arc;
 use utils::AddToDb;
 use utils::QUEUE_LIMIT;
+
+use crate::db::DbManager;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Page {
@@ -32,22 +35,6 @@ impl Page {
     /// 'Crawl' a Page, which turns it into a [`CrawledPage`].
     pub(crate) fn into_crawled(self, title: Option<String>, html: Html) -> CrawledPage {
         CrawledPage::new(self, title, html)
-    }
-}
-
-impl AddToDb for Page {
-    /// Add a [`Page`] instance to a database.
-    async fn add_to_db(&self, pool: &sqlx::PgPool) {
-        let query = r#"
-            INSERT INTO pages (url, is_crawled, is_indexed)
-            VALUES ($1, FALSE, FALSE)
-            ON CONFLICT (url) DO NOTHING"#;
-
-        sqlx::query(query)
-            .bind(self.url.to_string())
-            .execute(pool)
-            .await
-            .unwrap();
     }
 }
 
@@ -104,8 +91,8 @@ impl PartialEq<Page> for CrawledPage {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PageQueue {
-    queue: VecDeque<Page>,
-    hashset: HashSet<Page>,
+    pub queue: VecDeque<Page>,
+    pub hashset: HashSet<Page>,
 }
 
 impl Default for PageQueue {
@@ -123,20 +110,11 @@ impl PageQueue {
     }
 
     /// Adds a queued [`Page`] to the database.
-    pub async fn queue_page(&mut self, page: Page, pool: Option<&sqlx::PgPool>) {
-        if let Some(pool) = pool {
-            page.add_to_db(pool).await;
-        } else {
-            self.queue.push_back(page.clone());
-            self.hashset.insert(page);
-        }
-    }
+    pub async fn queue_page(&mut self, page: Page, db_manager: Arc<dyn DbManager>) {
+        // First add the page to the database
+        db_manager.add_page_to_db(&page).await;
 
-    /// Pushes a [`Page`] into the [`PageQueue`].
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub fn queue_page_test(&mut self, page: Page) {
+        // Then store the page in memory
         self.queue.push_back(page.clone());
         self.hashset.insert(page);
     }
