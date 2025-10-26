@@ -16,6 +16,7 @@ pub trait DbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue;
     async fn add_page_to_db(&self, page: &Page);
     async fn add_crawled_page_to_db(&self, page: &CrawledPage);
+    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, HashSet<Page>);
 }
 
 pub struct RealDbManager {
@@ -33,7 +34,7 @@ impl DbManager for RealDbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue {
         let mut queue = PageQueue::default();
 
-        queue.refresh_queue(&self.pool).await;
+        queue.refresh_queue(self.clone()).await;
 
         // Queue each page in starting_pages
         for page in starting_pages {
@@ -77,6 +78,37 @@ impl DbManager for RealDbManager {
             .await
             .unwrap();
     }
+
+    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, HashSet<Page>) {
+        let mut queue = VecDeque::new();
+        let mut hashset = HashSet::new();
+
+        let query = format!(
+            r#"
+            SELECT url
+            FROM pages
+            WHERE is_crawled = FALSE
+            LIMIT {};"#,
+            QUEUE_LIMIT
+        );
+        let query = query.as_str();
+
+        sqlx::query(query)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|row| {
+                let url: String = row.get("url");
+                let err_msg = format!("Url {} should be a valid url.", url);
+                let page = Page::new(Url::parse(url.as_str()).expect(&err_msg));
+
+                queue.push_back(page.clone());
+                hashset.insert(page);
+            });
+
+        (queue, hashset)
+    }
 }
 
 // #[cfg(test)]
@@ -109,5 +141,9 @@ impl DbManager for MockDbManager {
 
     async fn add_crawled_page_to_db(&self, _page: &CrawledPage) {
         // Do nothing
+    }
+
+    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, HashSet<Page>) {
+        (VecDeque::new(), HashSet::new())
     }
 }

@@ -88,8 +88,8 @@ impl Crawler {
     /// # Returns
     /// - Return `Some(Page)` if a [`Page`] exists in the queue.
     /// - Returns `None` if the queue is empty.
-    pub async fn next_page(&mut self, pool: Option<&sqlx::PgPool>) -> Option<Page> {
-        self.queue.pop(pool).await
+    pub async fn next_page(&mut self) -> Option<Page> {
+        self.queue.pop(self.db_manager.clone()).await
     }
 
     /// Crawl a single page.
@@ -99,10 +99,7 @@ impl Crawler {
     /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - The [`Page`] is not in English.
     /// - [`Crawler::extract_html_from_page`] fails.
-    pub async fn crawl_page(
-        &mut self,
-        page: Page,
-    ) -> Result<CrawledPage, Error> {
+    pub async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, Error> {
         let html = self.extract_html_from_page(page.clone()).await?;
 
         let html = Html::parse_document(html.as_str());
@@ -135,7 +132,9 @@ impl Crawler {
             }
 
             // Add the page to the queue of pages to crawl
-            self.queue.queue_page(page.clone(), self.db_manager.clone()).await;
+            self.queue
+                .queue_page(page.clone(), self.db_manager.clone())
+                .await;
 
             log::info!("{} is queued", page.url);
 

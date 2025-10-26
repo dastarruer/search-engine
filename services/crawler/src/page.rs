@@ -60,29 +60,6 @@ impl CrawledPage {
     }
 }
 
-impl AddToDb for CrawledPage {
-    /// Update the database entry for this [`CrawledPage`].
-    ///
-    /// This will update the row in the `pages` table that matches the
-    /// [`CrawledPage`]'s URL, setting its `html`, `title`, and marking
-    /// `is_crawled` as `TRUE`.
-    async fn add_to_db(&self, pool: &sqlx::PgPool) {
-        let query = r#"
-            UPDATE pages
-            SET html = $1,
-                title = $2,
-                is_crawled = TRUE
-            WHERE url = $3"#;
-
-        sqlx::query(query)
-            .bind(self.html.html())
-            .bind(self.title.clone())
-            .bind(self.url.to_string())
-            .execute(pool)
-            .await
-            .unwrap();
-    }
-}
 impl PartialEq<Page> for CrawledPage {
     fn eq(&self, other: &Page) -> bool {
         self.url == other.url
@@ -91,8 +68,8 @@ impl PartialEq<Page> for CrawledPage {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PageQueue {
-    pub queue: VecDeque<Page>,
-    pub hashset: HashSet<Page>,
+    queue: VecDeque<Page>,
+    hashset: HashSet<Page>,
 }
 
 impl Default for PageQueue {
@@ -128,17 +105,13 @@ impl PageQueue {
     /// - Returns `Some(Page)` if the queue is not empty, or there are still
     ///   uncrawled pages in the database.
     /// - Returns `None` if the database has no more uncrawled pages left.
-    pub async fn pop(&mut self, pool: Option<&sqlx::PgPool>) -> Option<Page> {
+    pub async fn pop(&mut self, db_manager: Arc<dyn DbManager>) -> Option<Page> {
         if let Some(page) = self.queue.front() {
             self.hashset.remove(page);
             self.queue.pop_front()
         } else {
             log::info!("Queue is empty, refreshing...");
-            if let Some(pool) = pool {
-                self.refresh_queue(pool).await;
-            } else {
-                return None;
-            }
+            self.refresh_queue(db_manager);
 
             if let Some(page) = self.queue.front() {
                 self.hashset.remove(page);
@@ -152,30 +125,11 @@ impl PageQueue {
     /// Add as many uncrawled [`Page`]s from the database to the queue as is defined by [`utils::QUEUE_LIMIT`].
     ///
     /// Should be called whenever the queue is empty and needs more pages.
-    pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let query = format!(
-            r#"
-            SELECT url
-            FROM pages
-            WHERE is_crawled = FALSE
-            LIMIT {};"#,
-            QUEUE_LIMIT
-        );
-        let query = query.as_str();
+    pub async fn refresh_queue(&mut self, db_manager: Arc<dyn DbManager>) {
+        let (queue, hashset) = db_manager.fetch_pages_from_db().await;
 
-        sqlx::query(query)
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .for_each(|row| {
-                let url: String = row.get("url");
-                let err_msg = format!("Url {} should be a valid url.", url);
-                let page = Page::new(Url::parse(url.as_str()).expect(&err_msg));
-
-                self.queue.push_back(page.clone());
-                self.hashset.insert(page);
-            });
+        self.queue.extend(queue);
+        self.hashset.extend(hashset);
     }
 
     pub fn contains_page(&self, page: &Page) -> bool {
