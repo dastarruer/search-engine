@@ -493,6 +493,7 @@ dependencies = [
 name = "crawler"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "criterion",
  "flexi_logger",
  "httpmock",

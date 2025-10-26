@@ -1,6 +1,9 @@
+use async_trait::async_trait;
+
 use crate::page::{Page, PageQueue};
 
-trait DbManager {
+#[async_trait]
+pub trait DbManager: Send + Sync + 'static {
     async fn init_queue(&self, starting_pages: Vec<Page>) -> PageQueue;
 }
 
@@ -9,11 +12,12 @@ pub struct RealDbManager {
 }
 
 impl RealDbManager {
-    fn new(pool: sqlx::PgPool) -> Self {
+    pub fn new(pool: sqlx::PgPool) -> Self {
         RealDbManager { pool }
     }
 }
 
+#[async_trait]
 impl DbManager for RealDbManager {
     async fn init_queue(&self, starting_pages: Vec<Page>) -> PageQueue {
         let mut queue = PageQueue::default();
@@ -29,17 +33,18 @@ impl DbManager for RealDbManager {
     }
 }
 
-#[cfg(test)]
+// #[cfg(test)]
 pub struct MockDbManager {}
 
-#[cfg(test)]
+// #[cfg(test)]
 impl MockDbManager {
-    fn new() -> Self {
+    pub fn new() -> Self {
         MockDbManager {}
     }
 }
 
-#[cfg(test)]
+// #[cfg(test)]
+#[async_trait]
 impl DbManager for MockDbManager {
     async fn init_queue(&self, starting_pages: Vec<Page>) -> PageQueue {
         let mut queue = PageQueue::default();

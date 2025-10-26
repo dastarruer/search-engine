@@ -1,6 +1,7 @@
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use crate::{
+    db::{DbManager, MockDbManager, RealDbManager},
     error::Error,
     page::{CrawledPage, Page, PageQueue},
     utils::string_to_url,
@@ -20,6 +21,8 @@ pub struct Crawler {
     // TODO: Convert to CrawledPage
     crawled: HashSet<Page>,
     client: Client,
+    // Use arc since dyn means the compiler doesn't know the size of the object at compilation time
+    db_manager: Arc<dyn DbManager>,
 }
 
 // Should this be a global variable? No, but I need static access to this and this is the easiest solution ok-
@@ -40,8 +43,13 @@ impl Crawler {
         } else {
             HashSet::new()
         };
+        let db_manager: Arc<dyn DbManager> = if let Some(pool) = pool {
+            Arc::new(RealDbManager::new(pool.to_owned()))
+        } else {
+            Arc::new(MockDbManager::new())
+        };
 
-        let queue = Self::init_queue(starting_pages, pool).await;
+        let queue = db_manager.init_queue(starting_pages).await;
 
         let client = Self::init_client();
 
@@ -49,6 +57,7 @@ impl Crawler {
             queue,
             crawled,
             client,
+            db_manager,
         }
     }
 
