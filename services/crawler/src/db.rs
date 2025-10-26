@@ -1,13 +1,21 @@
-use std::sync::Arc;
+use reqwest::Url;
+use sqlx::Row;
+use std::{
+    collections::{HashSet, VecDeque},
+    sync::Arc,
+};
+use utils::QUEUE_LIMIT;
 
 use async_trait::async_trait;
 
-use crate::page::{Page, PageQueue};
+use crate::page::{CrawledPage, Page, PageQueue};
 
-#[async_trait]
-pub trait DbManager: Send + Sync + 'static {
+// Remove Send trait bound, since CrawledPage cannot implement Send
+#[async_trait(?Send)]
+pub trait DbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue;
     async fn add_page_to_db(&self, page: &Page);
+    async fn add_crawled_page_to_db(&self, page: &CrawledPage);
 }
 
 pub struct RealDbManager {
@@ -20,7 +28,7 @@ impl RealDbManager {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl DbManager for RealDbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue {
         let mut queue = PageQueue::default();
@@ -47,6 +55,28 @@ impl DbManager for RealDbManager {
             .await
             .unwrap();
     }
+
+    /// Update the database entry for this [`CrawledPage`].
+    ///
+    /// This will update the row in the `pages` table that matches the
+    /// [`CrawledPage`]'s URL, setting its `html`, `title`, and marking
+    /// `is_crawled` as `TRUE`.
+    async fn add_crawled_page_to_db(&self, page: &CrawledPage) {
+        let query = r#"
+            UPDATE pages
+            SET html = $1,
+                title = $2,
+                is_crawled = TRUE
+            WHERE url = $3"#;
+
+        sqlx::query(query)
+            .bind(page.html.html())
+            .bind(page.title.clone())
+            .bind(page.url.to_string())
+            .execute(&self.pool)
+            .await
+            .unwrap();
+    }
 }
 
 // #[cfg(test)]
@@ -60,7 +90,7 @@ impl MockDbManager {
 }
 
 // #[cfg(test)]
-#[async_trait]
+#[async_trait(?Send)]
 impl DbManager for MockDbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue {
         let mut queue = PageQueue::default();
@@ -74,6 +104,10 @@ impl DbManager for MockDbManager {
     }
 
     async fn add_page_to_db(&self, _page: &Page) {
+        // Do nothing
+    }
+
+    async fn add_crawled_page_to_db(&self, _page: &CrawledPage) {
         // Do nothing
     }
 }

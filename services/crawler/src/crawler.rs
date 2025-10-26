@@ -67,15 +67,11 @@ impl Crawler {
     /// # Returns
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
-    pub async fn run(&mut self, pool: Option<&sqlx::PgPool>) -> Result<(), Error> {
-        while let Some(page) = self.next_page(pool).await {
+    pub async fn run(&mut self) -> Result<(), Error> {
+        while let Some(page) = self.next_page().await {
             match self.crawl_page(page.clone()).await {
                 Ok(crawled_page) => {
-                    if let Some(pool) = pool {
-                        crawled_page.add_to_db(pool).await;
-                    } else {
-                        log::info!("Crawl successful.");
-                    }
+                    self.db_manager.add_crawled_page_to_db(&crawled_page).await;
                 }
                 Err(e) => {
                     log::warn!("Crawl failed: {}", e);

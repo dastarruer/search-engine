@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut crawler = Crawler::new(get_start_urls(), Some(&pool)).await;
 
-    crawler.run(Some(&pool)).await?;
+    crawler.run().await?;
 
     Ok(())
 }
