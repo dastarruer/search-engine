@@ -81,13 +81,15 @@ impl AddToDb for CrawledPage {
                 is_crawled = TRUE
             WHERE url = $3"#;
 
-        sqlx::query(query)
+        // Usually this will throw an error if the url is too large to store in
+        // the db. However, a large url usually redirects to somewhere else, so we
+        // can just ignore this error.
+        let _ = sqlx::query(query)
             .bind(self.html.as_str())
             .bind(self.title.clone())
             .bind(self.url.to_string())
             .execute(pool)
-            .await
-            .unwrap();
+            .await;
     }
 }
 impl PartialEq<Page> for CrawledPage {
