@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     utils::migrate(&pool).await;
 
-    let mut crawler = Crawler::new(get_start_urls(), Some(&pool)).await;
+    let mut crawler = Crawler::new(get_start_urls(), &pool).await;
 
     crawler.run().await?;
 

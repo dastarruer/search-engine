@@ -31,7 +31,6 @@ pub fn test_file_path_from_filepath(filename: &str) -> PathBuf {
 ///   container from being dropped.
 /// - A [`Pool`], which is a connection to the database within the Docker
 ///   container.
-#[allow(dead_code)]
 pub async fn setup(script: &str) -> (ContainerAsync<Postgres>, Pool<sqlx::Postgres>) {
     // Start a database container
     let container = Postgres::default()

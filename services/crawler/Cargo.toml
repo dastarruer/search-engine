@@ -29,3 +29,4 @@ harness = false
 
 [features]
 logging = []
+bench-utils = []

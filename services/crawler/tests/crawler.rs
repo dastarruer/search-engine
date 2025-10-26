@@ -4,10 +4,14 @@ use crawler::{USER_AGENT, crawler::Crawler, error::Error, page::Page, utils::Htt
 use httpmock::Method::GET;
 use reqwest::StatusCode;
 
+use crate::common::setup;
+
 mod common;
 
 #[tokio::test]
 async fn test_429_status() {
+    let (_container, pool) = setup("dummy_data").await;
+
     // special setup (retry-after), keep as is
     const TRY_AFTER_SECS: u64 = 1;
     let filepath = common::test_file_path_from_filepath("dummy.html");
@@ -21,7 +25,7 @@ async fn test_429_status() {
     });
 
     let page = Page::from(server.base_url());
-    let crawler = Crawler::new(vec![page.clone()], None).await;
+    let crawler = Crawler::new(vec![page.clone()], &pool).await;
 
     let start = Instant::now();
     let error = crawler

@@ -141,17 +141,17 @@ impl DbManager for RealDbManager {
     }
 }
 
-// #[cfg(test)]
+#[cfg(any(test, feature = "bench-utils"))]
 pub struct MockDbManager {}
 
-// #[cfg(test)]
+#[cfg(any(test, feature = "bench-utils"))]
 impl MockDbManager {
     pub fn new() -> Self {
         MockDbManager {}
     }
 }
 
-// #[cfg(test)]
+#[cfg(any(test, feature = "bench-utils"))]
 #[async_trait(?Send)]
 impl DbManager for MockDbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue {
@@ -165,9 +165,9 @@ impl DbManager for MockDbManager {
         queue
     }
 
-        async fn init_crawled(self: Arc<Self>) -> HashSet<Page> {
-            HashSet::new()
-        }
+    async fn init_crawled(self: Arc<Self>) -> HashSet<Page> {
+        HashSet::new()
+    }
 
     async fn add_page_to_db(&self, _page: &Page) {
         // Do nothing

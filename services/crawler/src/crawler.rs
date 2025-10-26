@@ -1,7 +1,7 @@
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use crate::{
-    db::{DbManager, MockDbManager, RealDbManager},
+    db::{DbManager, RealDbManager},
     error::Error,
     page::{CrawledPage, Page, PageQueue},
     utils::string_to_url,
@@ -36,12 +36,8 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
 });
 
 impl Crawler {
-    pub async fn new(starting_pages: Vec<Page>, pool: Option<&sqlx::PgPool>) -> Self {
-        let db_manager: Arc<dyn DbManager> = if let Some(pool) = pool {
-            Arc::new(RealDbManager::new(pool.to_owned()))
-        } else {
-            Arc::new(MockDbManager::new())
-        };
+    pub async fn new(starting_pages: Vec<Page>, pool: &sqlx::PgPool) -> Self {
+        let db_manager = Arc::new(RealDbManager::new(pool.to_owned()));
 
         let crawled = db_manager.clone().init_crawled().await;
 
@@ -371,6 +367,28 @@ impl Crawler {
     }
 }
 
+#[cfg(any(test, feature = "bench-utils"))]
+impl Crawler {
+    pub async fn test_new(starting_pages: Vec<Page>) -> Self {
+        use crate::db::MockDbManager;
+
+        let db_manager: Arc<dyn DbManager> = Arc::new(MockDbManager::new());
+
+        let crawled = db_manager.clone().init_crawled().await;
+
+        let queue = db_manager.clone().init_queue(starting_pages).await;
+
+        let client = Self::init_client();
+
+        Crawler {
+            queue,
+            crawled,
+            client,
+            db_manager,
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{
@@ -385,7 +403,7 @@ mod test {
 
         let page = Page::from(server.base_url());
 
-        (Crawler::new(vec![page.clone()], None).await, page)
+        (Crawler::test_new(vec![page.clone()]).await, page)
     }
 
     mod normalize_url {
@@ -538,7 +556,7 @@ mod test {
             });
 
             let page = Page::from(server.base_url());
-            let crawler = Crawler::new(vec![page.clone()], None).await;
+            let crawler = Crawler::test_new(vec![page.clone()]).await;
 
             let error = crawler
                 .extract_html_from_page(page.clone())
@@ -590,7 +608,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::new(vec![page.clone()], None).await;
+                let crawler = Crawler::test_new(vec![page.clone()]).await;
 
                 let error = crawler
                     .extract_html_from_page(page.clone())
@@ -612,7 +630,7 @@ mod test {
                 });
 
                 let page = Page::from(server.base_url());
-                let crawler = Crawler::new(vec![page.clone()], None).await;
+                let crawler = Crawler::test_new(vec![page.clone()]).await;
 
                 let error = crawler
                     .extract_html_from_page(page.clone())
@@ -687,8 +705,7 @@ mod test {
     }
 
     mod extract_urls_from_html {
-        use super::super::Crawler;
-        use crate::utils::test_file_path_from_filepath;
+        use crate::{crawler::Crawler, utils::test_file_path_from_filepath};
         use reqwest::Url;
         use scraper::Html;
         use std::{fs::File, io::Read};
@@ -697,7 +714,7 @@ mod test {
             // We don't need to send http requests in this module, so just provide a nonexistent site
             let non_existent_site = Url::parse("https://does-not-exist.comm").unwrap();
             let page = crate::page::Page::from(non_existent_site);
-            let crawler = Crawler::new(vec![page], None).await;
+            let crawler = Crawler::test_new(vec![page]).await;
 
             let html_file = test_file_path_from_filepath(filename);
 
