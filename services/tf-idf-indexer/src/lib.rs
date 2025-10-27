@@ -350,14 +350,16 @@ impl Indexer {
             log::info!("Parsing page {}...", page.id);
             self.parse_page(page, Some(pool)).await;
 
-            for term in self.terms.values() {
-                log::debug!("Adding/updating term: {}", term.term);
-                term.add_to_db(pool).await;
-            }
-            self.empty_terms();
-
             if self.pages.queue.is_empty() {
-                log::info!("Page queue is empty, refreshing...");
+                log::info!("Page queue is empty...");
+
+                log::info!("Updating terms in the database...");
+                self.update_terms_in_db(pool).await;
+
+                log::info!("Clearing terms in memory...");
+                self.empty_terms();
+
+                log::info!("Refreshing page queue...");
                 self.refresh_queue(pool).await;
             }
         }
@@ -370,7 +372,7 @@ impl Indexer {
     /// If there are no pages currently in the database, then keep looping
     /// until pages are found.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        loop {
+        // loop {
             let query = format!(
                 r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
                 utils::QUEUE_LIMIT
@@ -385,13 +387,13 @@ impl Indexer {
                     self.add_page(Page::from(row));
                 });
 
-            if !self.pages.is_empty() {
-                break;
-            }
+            // if !self.pages.is_empty() {
+            //     break;
+            // }
 
-            log::info!("No pages found in the database, trying again in 10 seconds...");
-            sleep(Duration::from_secs(10));
-        }
+            // log::info!("No pages found in the database, trying again in 10 seconds...");
+            // sleep(Duration::from_secs(10));
+        // }
         log::info!("Queue is refreshed!");
     }
 
@@ -414,22 +416,6 @@ impl Indexer {
         for term in relevant_terms.iter_mut() {
             log::debug!("Found term: {}", term.term);
             self.add_term(term.clone(), pool).await;
-        }
-
-        if let Some(pool) = pool {
-            // yes as much as this sucks I can't really see any other way to update every single term's idf and tf-idf scores
-            let term_query = r#"SELECT * FROM terms;"#;
-
-            sqlx::query(term_query)
-                .fetch_all(pool)
-                .await
-                .expect("Fetching terms should not throw an error")
-                .iter()
-                .for_each(|row| {
-                    if let Ok(term) = Term::try_from(row) {
-                        self.terms.insert(row.get("term"), term);
-                    }
-                });
         }
 
         // Loop through each stored term
@@ -462,6 +448,54 @@ impl Indexer {
         }
 
         log::info!("Page {} indexed successfully in {:.2?}!", page.id, duration);
+    }
+
+    async fn update_terms_in_db(&mut self, pool: &sqlx::PgPool) {
+        // yes as much as this sucks I can't really see any other way to update every single term's idf and tf-idf scores
+        let term_query = r#"SELECT * FROM terms;"#;
+
+        let terms: Vec<Term> = sqlx::query(term_query)
+            .fetch_all(pool)
+            .await
+            .expect("Fetching terms should not throw an error")
+            .iter()
+            .flat_map(|row| {
+                if let Ok(term_a) = Term::try_from(row) {
+                    // If the term is in memory, merge the term in the database and in memory
+                    if let Some(term_b) = self.terms.get(&term_a.term).cloned() {
+                        return Some(self.merge_terms(term_a, term_b));
+                    }
+                    // Otherwise, just return the term from the db
+                    Some(term_a)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for term in terms {
+            term.add_to_db(pool).await;
+        }
+    }
+
+    fn merge_terms(&self, term_a: Term, term_b: Term) -> Term {
+        assert_eq!(term_a.term, term_b.term);
+
+        let merged_term_str = term_a.term;
+        let mut merged_term = Term::try_from(merged_term_str).expect(
+            "Creating a `Term` instance while merging two terms should not throw an error.",
+        );
+
+        // We can assume term_b will have the higher page frequency since term_b should be the most recent term
+        merged_term.page_frequency = term_b.page_frequency;
+        merged_term.update_total_idf(self.num_pages);
+
+        // Again, term_b should be the most recent term
+        merged_term.tf_scores = term_b.tf_scores;
+
+        merged_term.update_tf_idf_scores();
+
+        merged_term
     }
 
     fn empty_terms(&mut self) {
