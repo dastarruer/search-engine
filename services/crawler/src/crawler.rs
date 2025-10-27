@@ -1,3 +1,5 @@
+// TODO: Create struct to handle things like blocking urls
+
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
 use crate::{
@@ -13,17 +15,6 @@ use scraper::{Html, Selector};
 
 use utils::ExtractText;
 
-#[derive(Clone)]
-pub struct Crawler {
-    queue: PageQueue,
-    // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
-    // TODO: Convert to CrawledPage
-    crawled: HashSet<Page>,
-    client: Client,
-    // Use arc since dyn means the compiler doesn't know the size of the object at compilation time
-    db_manager: Arc<dyn DbManager>,
-}
-
 // Should this be a global variable? No, but I need static access to this and this is the easiest solution ok-
 // TODO: Find a way to move this into Crawler struct
 static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
@@ -35,6 +26,72 @@ static BLOCKED_KEYWORDS: Lazy<rustrict::Trie> = Lazy::new(|| {
     trie
 });
 
+#[derive(Clone)]
+struct UrlHandler {
+    blocked_keywords: &'static Lazy<rustrict::Trie>,
+}
+
+impl UrlHandler {
+    fn new() -> UrlHandler {
+        UrlHandler {
+            blocked_keywords: &BLOCKED_KEYWORDS,
+        }
+    }
+
+    fn is_english(html: &Html) -> bool {
+        let selector = Selector::parse("html").unwrap();
+
+        for element in html.select(&selector) {
+            if let Some(lang) = element.value().attr("lang")
+                && lang.starts_with("en")
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Checks URL domain against a list of blocked keywords relating to inappropriate content.
+    fn is_inappropriate_page(&self, page: &Page, html: &Html) -> bool {
+        let mut domain = Censor::from_str(page.url.as_str());
+        domain.with_trie(self.blocked_keywords);
+
+        // First check that the domain is appropriate
+        if Self::is_severity_inappropriate(domain.analyze()) {
+            return true;
+        }
+
+        let content = html.extract_text();
+
+        let mut content = Censor::from_str(content.as_str());
+        content.with_trie(self.blocked_keywords);
+
+        // Then check if the content is appropriate
+        Self::is_severity_inappropriate(content.analyze())
+    }
+
+    /// Checks that the severity of something is at a high enough threshold to
+    /// be considered inappropriate while also minimizing false positives and
+    /// negatives.
+    fn is_severity_inappropriate(severity: rustrict::Type) -> bool {
+        // `Type::SEVERE` is a high enough threshold to prevent a majority of
+        // false positives
+        severity.is(Type::SEVERE)
+    }
+}
+
+#[derive(Clone)]
+pub struct Crawler {
+    queue: PageQueue,
+    // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
+    // TODO: Convert to CrawledPage
+    crawled: HashSet<Page>,
+    client: Client,
+    // Use arc since dyn means the compiler doesn't know the size of the object at compilation time
+    db_manager: Arc<dyn DbManager>,
+    url_handler: UrlHandler,
+}
+
 impl Crawler {
     pub async fn new(starting_pages: Vec<Page>, pool: &sqlx::PgPool) -> Self {
         let db_manager = Arc::new(RealDbManager::new(pool.to_owned()));
@@ -45,11 +102,14 @@ impl Crawler {
 
         let client = Self::init_client();
 
+        let url_handler = UrlHandler::new();
+
         Crawler {
             queue,
             crawled,
             client,
             db_manager,
+            url_handler,
         }
     }
 
@@ -95,11 +155,11 @@ impl Crawler {
 
         let html = Html::parse_document(html.as_str());
 
-        if !Self::is_english(&html) {
+        if !UrlHandler::is_english(&html) {
             return Err(Error::NonEnglishPage(page));
         }
 
-        if Self::is_inappropriate_page(&page, &html) {
+        if self.url_handler.is_inappropriate_page(&page, &html) {
             return Err(Error::InappropriateSite(page));
         }
 
@@ -186,19 +246,6 @@ impl Crawler {
         element.map(|element| element.text().collect::<String>())
     }
 
-    fn is_english(html: &Html) -> bool {
-        let selector = Selector::parse("html").unwrap();
-
-        for element in html.select(&selector) {
-            if let Some(lang) = element.value().attr("lang")
-                && lang.starts_with("en")
-            {
-                return true;
-            }
-        }
-        false
-    }
-
     /// Extracts the HTML from a [`Page`].
     ///
     /// # Errors
@@ -270,34 +317,6 @@ impl Crawler {
             // just give up. it's not worth it.
             _ => Err(Error::MalformedHttpStatus { page, status }),
         }
-    }
-
-    /// Checks URL domain against a list of blocked keywords relating to inappropriate content.
-    fn is_inappropriate_page(page: &Page, html: &Html) -> bool {
-        let mut domain = Censor::from_str(page.url.as_str());
-        domain.with_trie(&BLOCKED_KEYWORDS);
-
-        // First check that the domain is appropriate
-        if Self::is_severity_inappropriate(domain.analyze()) {
-            return true;
-        }
-
-        let content = html.extract_text();
-
-        let mut content = Censor::from_str(content.as_str());
-        content.with_trie(&BLOCKED_KEYWORDS);
-
-        // Then check if the content is appropriate
-        Self::is_severity_inappropriate(content.analyze())
-    }
-
-    /// Checks that the severity of something is at a high enough threshold to
-    /// be considered inappropriate while also minimizing false positives and
-    /// negatives.
-    fn is_severity_inappropriate(severity: rustrict::Type) -> bool {
-        // `Type::SEVERE` is a high enough threshold to prevent a majority of
-        // false positives
-        severity.is(Type::SEVERE)
     }
 
     fn is_page_queued(&self, page: &Page) -> bool {
@@ -380,11 +399,14 @@ impl Crawler {
 
         let client = Self::init_client();
 
+        let url_handler = UrlHandler::new();
+
         Crawler {
             queue,
             crawled,
             client,
             db_manager,
+            url_handler,
         }
     }
 }
@@ -457,6 +479,8 @@ mod test {
     }
 
     mod is_english {
+        use crate::crawler::UrlHandler;
+
         use super::*;
         use scraper::Html;
 
@@ -467,7 +491,7 @@ mod test {
             let html = crawler.extract_html_from_page(page).await.unwrap();
             let html = Html::parse_document(html.as_str());
 
-            assert!(!Crawler::is_english(&html));
+            assert!(!UrlHandler::is_english(&html));
         }
     }
 
@@ -477,13 +501,18 @@ mod test {
         use reqwest::Url;
         use scraper::Html;
 
+        use crate::crawler::UrlHandler;
+
         use super::*;
 
         #[test]
         fn test_inappropriate_page_url() {
             // a common... site that keeps getting crawled
             let page = Page::from(Url::parse("https://xvideos.com").unwrap());
-            assert!(Crawler::is_inappropriate_page(&page, &Html::new_document()));
+
+            let url_handler = UrlHandler::new();
+
+            assert!(url_handler.is_inappropriate_page(&page, &Html::new_document()));
         }
 
         #[test]
@@ -497,7 +526,9 @@ mod test {
 
             let page = Page::from(Url::parse("https://a-very-innocent-site.com").unwrap());
 
-            assert!(Crawler::is_inappropriate_page(&page, &html));
+            let url_handler = UrlHandler::new();
+
+            assert!(url_handler.is_inappropriate_page(&page, &html));
         }
 
         #[test]
@@ -511,13 +542,18 @@ mod test {
                 Url::parse("https://spongebob.fandom.com/wiki/Hog_Huntin%27#References").unwrap(),
             );
 
-            assert!(!Crawler::is_inappropriate_page(&page, &html));
+            let url_handler = UrlHandler::new();
+
+            assert!(!url_handler.is_inappropriate_page(&page, &html));
         }
 
         #[tokio::test]
         async fn test_appropriate_page_url() {
             let page = Page::from(Url::parse("https://safe.com").unwrap());
-            assert!(!Crawler::is_inappropriate_page(
+
+            let url_handler = UrlHandler::new();
+
+            assert!(!url_handler.is_inappropriate_page(
                 &page,
                 &Html::parse_document(
                     r#"
