@@ -35,7 +35,10 @@ impl HttpServer {
     }
 
     pub fn base_url(&self) -> Url {
-        Url::parse(self.server.base_url().as_str()).unwrap()
+        let base_url = self.server.base_url();
+
+        let err_msg = format!("Base URL should be a valid url: {}", base_url);
+        Url::parse(base_url.as_str()).expect(&err_msg)
     }
 }
 

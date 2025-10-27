@@ -31,7 +31,7 @@ async fn test_429_status() {
     let error = crawler
         .extract_html_from_page(page.clone())
         .await
-        .unwrap_err();
+        .expect_err("Sending a request to this page should return a large Retry-After header.");
     let end = Instant::now();
 
     let elapsed = (end - start).as_secs();

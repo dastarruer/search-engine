@@ -27,7 +27,7 @@ impl UrlHandler {
     }
 
     pub fn is_english(html: &Html) -> bool {
-        let selector = Selector::parse("html").unwrap();
+        let selector = Selector::parse("html").expect("Parsing `html` selector should not throw an error.");
 
         for element in html.select(&selector) {
             if let Some(lang) = element.value().attr("lang")
@@ -109,6 +109,7 @@ impl UrlHandler {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     mod normalize_url {
         use url::Url;

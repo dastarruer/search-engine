@@ -30,3 +30,6 @@ harness = false
 [features]
 logging = []
 bench-utils = []
+
+[lints.clippy]
+unwrap_used = "deny"

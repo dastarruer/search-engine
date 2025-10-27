@@ -131,7 +131,8 @@ impl Crawler {
     }
 
     fn extract_title_from_html(html: &Html) -> Option<String> {
-        let selector = Selector::parse("title").unwrap();
+        let selector =
+            Selector::parse("title").expect("Parsing 'title' selector should not throw an error.");
 
         let element = html.select(&selector).next();
 
@@ -158,7 +159,7 @@ impl Crawler {
                     return Err(Error::EmptyPage(page));
                 }
 
-                Ok(html.unwrap())
+                Ok(html.expect("`html` var can only be `Some`."))
             }
             StatusCode::TOO_MANY_REQUESTS => {
                 const MAX_ATTEMPTS: u8 = 10;
@@ -169,7 +170,12 @@ impl Crawler {
                 let retry_after = resp.headers().get(RETRY_AFTER);
 
                 if let Some(retry_after) = retry_after {
-                    let delay_secs: Result<u64, _> = retry_after.to_str().unwrap().parse();
+                    let delay_secs: Result<u64, _> = retry_after
+                        .to_str()
+                        .expect(
+                            "Converting Retry-After header to a string should not return an error.",
+                        )
+                        .parse();
 
                     // If delay_secs is not a valid value in seconds
                     if delay_secs.is_err() {
@@ -179,7 +185,9 @@ impl Crawler {
                         });
                     }
 
-                    let delay_secs = delay_secs.unwrap();
+                    let delay_secs = delay_secs.expect(
+                        "Parsing a Retry-After header into a u64 value should not return an error.",
+                    );
 
                     let delay = Duration::from_secs(delay_secs);
 
@@ -200,7 +208,11 @@ impl Crawler {
 
                     let html = Self::extract_html_from_resp(resp).await?;
 
-                    Ok(html.unwrap())
+                    if html.is_none() {
+                        return Err(Error::EmptyPage(page));
+                    }
+
+                    Ok(html.expect("`html` var can only be `Some`."))
                 } else {
                     // just give up. it's not worth it.
                     Err(Error::InvalidRetryByHeader { page, header: None })
@@ -236,7 +248,7 @@ impl Crawler {
     fn extract_urls_from_html(&self, html: &Html) -> Vec<String> {
         let mut urls = vec![];
 
-        let selector = Selector::parse("a").unwrap();
+        let selector = Selector::parse("a").expect("Parsing `a` selector should not throw an error.");
 
         for element in html.select(&selector) {
             if let Some(url) = element.value().attr("href") {
@@ -254,7 +266,7 @@ impl Crawler {
             .gzip(true)
             .timeout(Duration::from_secs(15))
             .build()
-            .unwrap()
+            .expect("Creating a `reqwest::Client` should not throw an error.")
     }
 
     /// Extracts the HTML from a [`reqwest::Response`].
@@ -304,6 +316,7 @@ impl Crawler {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod test {
     use crate::{
         crawler::Crawler,

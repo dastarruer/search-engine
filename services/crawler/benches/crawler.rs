@@ -3,10 +3,11 @@ use criterion::{Criterion, criterion_group, criterion_main};
 
 /// Benchmark crawling a single page
 fn bench_crawl_page(c: &mut Criterion) {
+    // TODO: Move this setup code to a separate method
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all() // Will panic, for some reason...
         .build()
-        .unwrap();
+        .expect("Creating tokio runtime should not throw an error.");
 
     let index = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("benches")
@@ -21,7 +22,10 @@ fn bench_crawl_page(c: &mut Criterion) {
 
             let mut crawler = Crawler::test_new(vec![page.clone()]).await;
 
-            crawler.crawl_page(page.clone()).await.unwrap();
+            crawler
+                .crawl_page(page.clone())
+                .await
+                .expect("`crawl_page` method should not throw an error.");
         })
     });
 }
@@ -31,7 +35,7 @@ fn bench_test_run(c: &mut Criterion) {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all() // Will panic, for some reason...
         .build()
-        .unwrap();
+        .expect("Creating tokio runtime should not throw an error.");
 
     let index = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("benches")
