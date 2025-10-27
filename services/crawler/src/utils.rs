@@ -1,8 +1,11 @@
-use std::path::PathBuf;
 use httpmock::prelude::*;
 use reqwest::StatusCode;
+use std::path::PathBuf;
 
 use reqwest::Url;
+
+#[cfg(test)]
+use crate::{crawler::Crawler, page::Page};
 
 /// An implementation of a mock HTTP server.
 pub struct HttpServer {
@@ -68,4 +71,14 @@ pub(crate) fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
             }
         }
     }
+}
+
+#[cfg(test)]
+pub async fn create_crawler(starting_filename: &str) -> (Crawler, Page) {
+    let filepath = test_file_path_from_filepath(starting_filename);
+    let server = HttpServer::new_with_filepath(filepath);
+
+    let page = Page::from(server.base_url());
+
+    (Crawler::test_new(vec![page.clone()]).await, page)
 }
