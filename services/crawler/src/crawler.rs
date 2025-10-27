@@ -104,7 +104,7 @@ impl Crawler {
             let url = string_to_url(&base_url, url);
 
             let page = if let Some(url) = url {
-                Page::from(Self::normalize_url(url))
+                Page::from(UrlHandler::normalize_url(url))
             } else {
                 continue;
             };
@@ -128,47 +128,6 @@ impl Crawler {
         log::info!("Crawled {:?}...", base_url);
 
         Ok(page.into_crawled(title, html))
-    }
-
-    /// Normalize a url by stripping any passive parameters that do not change
-    /// the page content.
-    ///
-    /// Also strips fragment identifiers (e.g. `https://example.com/data.csv#row=4`
-    /// is normalized as `https://example.com/data.csv`), since these usually
-    /// do not change page content.
-    // TODO: Move to urlhandler struct
-    fn normalize_url(url: Url) -> Url {
-        // If the url does not have any parameters or fragment, it is
-        // already normalized
-        if let None = url.query()
-            && let None = url.fragment()
-        {
-            return url;
-        }
-
-        let domain = url.domain().expect("Url must have a valid domain.");
-        let path = url.path();
-        let params: Vec<_> = url
-            .query_pairs()
-            .filter(|(query, _)| !Self::query_is_passive(query))
-            .collect();
-
-        let mut url = if !params.is_empty() {
-            Url::parse_with_params(format!("https://{}{}", domain, path).as_str(), params)
-                .expect("Normalized URL must be a valid url.")
-        } else {
-            Url::parse(format!("https://{}{}", domain, path).as_str())
-                .expect("Normalized URL must be a valid url.")
-        };
-
-        // Strip the fragment identifier
-        url.set_fragment(None);
-
-        url
-    }
-
-    fn query_is_passive(query: &str) -> bool {
-        query.contains("utm") || query == "id" || query == "t"
     }
 
     fn extract_title_from_html(html: &Html) -> Option<String> {
@@ -351,56 +310,6 @@ mod test {
         page::Page,
         utils::{HttpServer, create_crawler, test_file_path_from_filepath},
     };
-
-    mod normalize_url {
-        use super::*;
-        use url::Url;
-
-        #[test]
-        fn test_url_with_no_params() {
-            let url = Url::parse("https://safe.com").unwrap();
-
-            assert_eq!(Crawler::normalize_url(url.clone()).as_str(), url.as_str());
-        }
-
-        #[test]
-        fn test_url_with_active_params() {
-            let url = Url::parse("https://safe.com?filter=automatic&rating=5").unwrap();
-
-            assert_eq!(Crawler::normalize_url(url.clone()).as_str(), url.as_str());
-        }
-
-        #[test]
-        fn test_url_with_passive_params() {
-            let url =
-                Url::parse("https://safe.com?utm_source=newsletter&id=seranking&t=60s").unwrap();
-
-            assert_eq!(
-                Crawler::normalize_url(url.clone()).as_str(),
-                Url::parse("https://safe.com").unwrap().as_str()
-            );
-        }
-
-        #[test]
-        fn test_url_with_fragment() {
-            let url = Url::parse("https://safe.com#Header").unwrap();
-
-            assert_eq!(
-                Crawler::normalize_url(url.clone()).as_str(),
-                Url::parse("https://safe.com").unwrap().as_str()
-            );
-        }
-
-        #[test]
-        fn test_url_with_fragment_and_params() {
-            let url = Url::parse("https://safe.com?utm_source=newsletter&rating=5#Header").unwrap();
-
-            assert_eq!(
-                Crawler::normalize_url(url.clone()).as_str(),
-                Url::parse("https://safe.com?rating=5").unwrap().as_str()
-            );
-        }
-    }
 
     mod extract_html_from_page {
         use super::*;

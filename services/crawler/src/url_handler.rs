@@ -1,5 +1,6 @@
 use rustrict::Censor;
 use scraper::{Html, Selector};
+use url::Url;
 use utils::ExtractText;
 
 use crate::page::Page;
@@ -65,10 +66,107 @@ impl UrlHandler {
         // false positives
         severity.is(rustrict::Type::SEVERE)
     }
+
+    /// Normalize a url by stripping any passive parameters that do not change
+    /// the page content.
+    ///
+    /// Also strips fragment identifiers (e.g. `https://example.com/data.csv#row=4`
+    /// is normalized as `https://example.com/data.csv`), since these usually
+    /// do not change page content.
+    pub fn normalize_url(url: Url) -> Url {
+        // If the url does not have any parameters or fragment, it is
+        // already normalized
+        if let None = url.query()
+            && let None = url.fragment()
+        {
+            return url;
+        }
+
+        let domain = url.domain().expect("Url must have a valid domain.");
+        let path = url.path();
+        let params: Vec<_> = url
+            .query_pairs()
+            .filter(|(query, _)| !Self::query_is_passive(query))
+            .collect();
+
+        let mut url = if !params.is_empty() {
+            Url::parse_with_params(format!("https://{}{}", domain, path).as_str(), params)
+                .expect("Normalized URL must be a valid url.")
+        } else {
+            Url::parse(format!("https://{}{}", domain, path).as_str())
+                .expect("Normalized URL must be a valid url.")
+        };
+
+        // Strip the fragment identifier
+        url.set_fragment(None);
+
+        url
+    }
+
+    fn query_is_passive(query: &str) -> bool {
+        query.contains("utm") || query == "id" || query == "t"
+    }
 }
 
 #[cfg(test)]
 mod test {
+    mod normalize_url {
+        use url::Url;
+
+        use crate::url_handler::UrlHandler;
+
+        #[test]
+        fn test_url_with_no_params() {
+            let url = Url::parse("https://safe.com").unwrap();
+
+            assert_eq!(
+                UrlHandler::normalize_url(url.clone()).as_str(),
+                url.as_str()
+            );
+        }
+
+        #[test]
+        fn test_url_with_active_params() {
+            let url = Url::parse("https://safe.com?filter=automatic&rating=5").unwrap();
+
+            assert_eq!(
+                UrlHandler::normalize_url(url.clone()).as_str(),
+                url.as_str()
+            );
+        }
+
+        #[test]
+        fn test_url_with_passive_params() {
+            let url =
+                Url::parse("https://safe.com?utm_source=newsletter&id=seranking&t=60s").unwrap();
+
+            assert_eq!(
+                UrlHandler::normalize_url(url.clone()).as_str(),
+                Url::parse("https://safe.com").unwrap().as_str()
+            );
+        }
+
+        #[test]
+        fn test_url_with_fragment() {
+            let url = Url::parse("https://safe.com#Header").unwrap();
+
+            assert_eq!(
+                UrlHandler::normalize_url(url.clone()).as_str(),
+                Url::parse("https://safe.com").unwrap().as_str()
+            );
+        }
+
+        #[test]
+        fn test_url_with_fragment_and_params() {
+            let url = Url::parse("https://safe.com?utm_source=newsletter&rating=5#Header").unwrap();
+
+            assert_eq!(
+                UrlHandler::normalize_url(url.clone()).as_str(),
+                Url::parse("https://safe.com?rating=5").unwrap().as_str()
+            );
+        }
+    }
+
     mod is_english {
         use crate::{url_handler::UrlHandler, utils::create_crawler};
         use scraper::Html;
@@ -90,7 +188,7 @@ mod test {
         use reqwest::Url;
         use scraper::Html;
 
-        use crate::{url_handler::UrlHandler, page::Page, utils::test_file_path_from_filepath};
+        use crate::{page::Page, url_handler::UrlHandler, utils::test_file_path_from_filepath};
 
         #[test]
         fn test_inappropriate_page_url() {
