@@ -64,11 +64,20 @@ impl DbManager for RealDbManager {
             return visited;
         }
 
-        rows.unwrap().iter().for_each(|row| {
-            let page = Page::from(Url::parse(row.get("url")).unwrap());
+        rows.expect("`rows` var can only be `Some`.")
+            .iter()
+            .for_each(|row| {
+                let url = row.get("url");
 
-            visited.insert(page);
-        });
+                let err_msg = format!(
+                    "URL retrieved from the database should always be valid: {}",
+                    url
+                );
+                let url = Url::parse(url).expect(&err_msg);
+                let page = Page::from(url);
+
+                visited.insert(page);
+            });
 
         visited
     }
@@ -80,11 +89,13 @@ impl DbManager for RealDbManager {
             VALUES ($1, FALSE, FALSE)
             ON CONFLICT (url) DO NOTHING"#;
 
-        sqlx::query(query)
+        // Usually this will throw an error if the url is too large to store in
+        // the db. However, a large url usually redirects to somewhere else, so we
+        // can just ignore this error.
+        let _ = sqlx::query(query)
             .bind(page.url.to_string())
             .execute(&self.pool)
-            .await
-            .unwrap();
+            .await;
     }
 
     /// Update the database entry for this [`CrawledPage`].
@@ -128,7 +139,7 @@ impl DbManager for RealDbManager {
         sqlx::query(query)
             .fetch_all(&self.pool)
             .await
-            .unwrap()
+            .expect("Fetching rows from the database should not throw an error.")
             .iter()
             .for_each(|row| {
                 let url: String = row.get("url");

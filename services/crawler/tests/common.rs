@@ -1,14 +1,11 @@
-
 use std::fs;
 
-use sqlx::{
-    Pool,
-    postgres::{PgPoolOptions},
-};
+use sqlx::{Pool, postgres::PgPoolOptions};
+use std::path::PathBuf;
 use testcontainers_modules::{
     postgres::Postgres,
     testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
-};use std::path::PathBuf;
+};
 use utils::migrate;
 
 pub fn test_file_path_from_filepath(filename: &str) -> PathBuf {
@@ -37,11 +34,14 @@ pub async fn setup(script: &str) -> (ContainerAsync<Postgres>, Pool<sqlx::Postgr
         .with_tag("latest")
         .start()
         .await
-        .unwrap();
+        .expect("Creating a docker container should not throw an error.");
 
     let db_url = construct_db_url(&container).await;
 
-    let pool = PgPoolOptions::new().connect(&db_url).await.unwrap();
+    let pool = PgPoolOptions::new()
+        .connect(&db_url)
+        .await
+        .expect("Connecting to the database in the docker container should not throw an error.");
 
     migrate(&pool).await;
     run_setup_script(script, &pool).await;
@@ -56,18 +56,29 @@ async fn run_setup_script(script: &str, pool: &Pool<sqlx::Postgres>) {
         .join("fixtures")
         .join(format!("{}.sql", script).as_str());
 
-    let err_msg = format!("{} should exist.", script_path.to_str().unwrap());
+    let err_msg = format!(
+        "{} should exist.",
+        script_path
+            .to_str()
+            .expect("Converting path to SQL script to `&str` should not throw an error.")
+    );
     let query = fs::read_to_string(script_path).expect(&err_msg);
 
     // If there are multiple commands in the sql script, then run them
     // separately
     for query in query.split(";") {
-        sqlx::query(query.trim()).execute(pool).await.unwrap();
+        sqlx::query(query.trim())
+            .execute(pool)
+            .await
+            .expect("Executing SQL script should not throw an error.");
     }
 }
 
 async fn construct_db_url(container: &ContainerAsync<Postgres>) -> String {
-    let port = container.get_host_port_ipv4(5432).await.unwrap();
+    let port = container
+        .get_host_port_ipv4(5432)
+        .await
+        .expect("Getting the database port should not throw an error.");
     let host = "127.0.0.1";
     let user = "postgres";
     let password = "postgres";

@@ -56,8 +56,11 @@ fn get_start_urls() -> Vec<Page> {
     let sites_txt_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("sites.txt");
 
     fs::read_to_string(sites_txt_path)
-        .unwrap()
+        .expect("File `sites.txt` should already exist.")
         .lines()
-        .map(|url| Page::from(Url::parse(url).unwrap()))
+        .map(|url| {
+            let err_msg = format!("{} should be a valid URL.", url);
+            Page::from(Url::parse(url).expect(&err_msg))
+        })
         .collect()
 }
