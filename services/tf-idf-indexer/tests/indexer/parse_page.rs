@@ -1,3 +1,4 @@
+// NOTE: These tests do not work, since refresh_queue is not properly implemented for tests
 use sqlx::postgres::types::PgHstore;
 use tf_idf_indexer::{Indexer, Term};
 

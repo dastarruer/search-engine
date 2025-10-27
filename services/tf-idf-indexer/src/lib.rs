@@ -1,9 +1,9 @@
 use anyhow::anyhow;
 use sqlx::{Row, postgres::types::PgHstore};
 use std::{
-    collections::{HashMap, HashSet, VecDeque}, sync::Arc, thread::sleep, time::{Duration, Instant}
+    collections::{HashMap, HashSet, VecDeque}, sync::Arc, time::{Duration, Instant}
 };
-use utils::{AddToDb, ExtractText};
+use utils::{ExtractText};
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
@@ -11,7 +11,7 @@ use scraper::Html;
 
 use crate::db::{DbManager, RealDbManager};
 
-mod db;
+pub mod db;
 
 static STOP_WORDS: Lazy<HashSet<StopWordTerm>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
@@ -222,35 +222,6 @@ impl Term {
     }
 }
 
-impl AddToDb for Term {
-    /// Add a [`Term`] instance to a database.
-    async fn add_to_db(&self, pool: &sqlx::PgPool) {
-        // This query tries to insert the term and its values into a new row.
-        // But if the term already exists, then it updates the existing term's
-        // values instead.
-        let query = r#"
-            INSERT INTO terms (term, idf, page_frequency, tf_scores, tf_idf_scores)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (term)
-            DO UPDATE SET
-                idf = EXCLUDED.idf,
-                page_frequency = EXCLUDED.page_frequency,
-                tf_scores = EXCLUDED.tf_scores,
-                tf_idf_scores = EXCLUDED.tf_idf_scores
-        "#;
-
-        sqlx::query(query)
-            .bind(&self.term)
-            .bind(*self.idf) // Dereferencing gives the inner f32 value
-            .bind(self.page_frequency as i32)
-            .bind(&self.tf_scores)
-            .bind(&self.tf_idf_scores)
-            .execute(pool)
-            .await
-            .unwrap();
-    }
-}
-
 #[derive(PartialEq, Eq, Debug, Hash)]
 /// A simpler verson of [`Term`] just for storing stop words.
 ///
@@ -359,7 +330,7 @@ impl Indexer {
 
             for term in self.terms.values() {
                 log::debug!("Adding/updating term: {}", term.term);
-                term.add_to_db(pool).await;
+                self.db_manager.add_term_to_db(term).await;
             }
             self.empty_terms();
 
@@ -376,6 +347,7 @@ impl Indexer {
     ///
     /// If there are no pages currently in the database, then keep looping
     /// until pages are found.
+    // TODO: Remove the infinite loop in tests
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
         loop {
             let query = format!(
@@ -397,7 +369,7 @@ impl Indexer {
             }
 
             log::info!("No pages found in the database, trying again in 10 seconds...");
-            sleep(Duration::from_secs(10));
+            tokio::time::sleep(Duration::from_secs(10)).await;
         }
         log::info!("Queue is refreshed!");
     }
