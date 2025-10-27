@@ -1,15 +1,17 @@
 use anyhow::anyhow;
 use sqlx::{Row, postgres::types::PgHstore};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    thread::sleep,
-    time::{Duration, Instant},
+    collections::{HashMap, HashSet, VecDeque}, sync::Arc, thread::sleep, time::{Duration, Instant}
 };
 use utils::{AddToDb, ExtractText};
 
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 use scraper::Html;
+
+use crate::db::{DbManager, RealDbManager};
+
+mod db;
 
 static STOP_WORDS: Lazy<HashSet<StopWordTerm>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
@@ -314,18 +316,22 @@ pub struct Indexer {
     terms: HashMap<String, Term>,
     pages: PageQueue,
     num_pages: i64,
+    db_manager: Arc<dyn DbManager>,
 }
 
 impl Indexer {
-    pub async fn new(pool: &sqlx::Pool<sqlx::Postgres>) -> Indexer {
+    pub async fn new(pool: &sqlx::PgPool) -> Indexer {
         let starting_terms: HashMap<i32, Term> = HashMap::new();
 
         let num_pages = 0;
+
+        let db_manager = Arc::new(RealDbManager::new(pool.clone()));
 
         let mut indexer = Indexer {
             terms: HashMap::new(),
             pages: PageQueue::new(HashSet::new()),
             num_pages,
+            db_manager,
         };
 
         // Add starting terms
@@ -333,6 +339,7 @@ impl Indexer {
             indexer.add_term(term, None).await;
         }
 
+        // TODO: Move this to dbmanager struct
         let num_pages_query = r#"SELECT COUNT(*) FROM pages WHERE is_indexed = TRUE;"#;
         indexer.num_pages = sqlx::query_scalar(num_pages_query)
             .fetch_one(pool)
@@ -604,14 +611,14 @@ impl Page {
 mod test {
     use std::{
         collections::{HashMap, HashSet},
-        f32, fs,
+        f32, fs, sync::Arc,
     };
 
     use ordered_float::OrderedFloat;
     use scraper::Html;
     use sqlx::postgres::types::PgHstore;
 
-    use crate::{Indexer, Page, PageQueue, Term, test_file_path_from_filepath};
+    use crate::{db::MockDbManager, test_file_path_from_filepath, Indexer, Page, PageQueue, Term};
 
     const DEFAULT_ID: u32 = 0;
 
@@ -621,6 +628,7 @@ mod test {
                 terms: HashMap::new(),
                 pages: PageQueue::new(HashSet::new()),
                 num_pages: 0,
+                db_manager: Arc::new(MockDbManager::new())
             }
         }
     }

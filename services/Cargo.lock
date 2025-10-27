@@ -3433,6 +3433,7 @@ name = "tf-idf-indexer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "criterion",
  "flexi_logger",
  "log",
