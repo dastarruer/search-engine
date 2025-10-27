@@ -1,3 +1,4 @@
+
 use std::fs;
 
 use sqlx::{
@@ -7,8 +8,16 @@ use sqlx::{
 use testcontainers_modules::{
     postgres::Postgres,
     testcontainers::{ContainerAsync, ImageExt, runners::AsyncRunner},
-};
+};use std::path::PathBuf;
 use utils::migrate;
+
+pub fn test_file_path_from_filepath(filename: &str) -> PathBuf {
+    // CARGO_MANIFEST_DIR gets the source dir of the project
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join(filename)
+}
 
 /// Set up a Postgres Docker container for testing purposes.
 ///

@@ -1,21 +1,27 @@
 use reqwest::Url;
-use sqlx::Row;
+use scraper::Html;
 use std::collections::{HashSet, VecDeque};
-use utils::AddToDb;
-use utils::QUEUE_LIMIT;
+use std::sync::Arc;
+
+use crate::db::DbManager;
 
 #[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub struct Page {
     pub url: Url,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct CrawledPage {
     pub url: Url,
     pub title: Option<String>,
+    pub html: Html,
+}
 
-    // This is a `String` instead of `Html` because `Html` does not implement the `sqlx::Encode` trait
-    pub html: String,
+impl std::hash::Hash for CrawledPage {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // The url will always be unique, so hash this
+        self.url.hash(state);
+    }
 }
 
 impl Page {
@@ -24,24 +30,8 @@ impl Page {
     }
 
     /// 'Crawl' a Page, which turns it into a [`CrawledPage`].
-    pub(crate) fn into_crawled(self, title: Option<String>, html: String) -> CrawledPage {
+    pub(crate) fn into_crawled(self, title: Option<String>, html: Html) -> CrawledPage {
         CrawledPage::new(self, title, html)
-    }
-}
-
-impl AddToDb for Page {
-    /// Add a [`Page`] instance to a database.
-    async fn add_to_db(&self, pool: &sqlx::PgPool) {
-        let query = r#"
-            INSERT INTO pages (url, is_crawled, is_indexed)
-            VALUES ($1, FALSE, FALSE)
-            ON CONFLICT (url) DO NOTHING"#;
-
-        sqlx::query(query)
-            .bind(self.url.to_string())
-            .execute(pool)
-            .await
-            .unwrap();
     }
 }
 
@@ -58,7 +48,7 @@ impl PartialEq<CrawledPage> for Page {
 }
 
 impl CrawledPage {
-    pub fn new(page: Page, title: Option<String>, html: String) -> Self {
+    pub fn new(page: Page, title: Option<String>, html: Html) -> Self {
         CrawledPage {
             url: page.url,
             title,
@@ -67,31 +57,6 @@ impl CrawledPage {
     }
 }
 
-impl AddToDb for CrawledPage {
-    /// Update the database entry for this [`CrawledPage`].
-    ///
-    /// This will update the row in the `pages` table that matches the
-    /// [`CrawledPage`]'s URL, setting its `html`, `title`, and marking
-    /// `is_crawled` as `TRUE`.
-    async fn add_to_db(&self, pool: &sqlx::PgPool) {
-        let query = r#"
-            UPDATE pages
-            SET html = $1,
-                title = $2,
-                is_crawled = TRUE
-            WHERE url = $3"#;
-
-        // Usually this will throw an error if the url is too large to store in
-        // the db. However, a large url usually redirects to somewhere else, so we
-        // can just ignore this error.
-        let _ = sqlx::query(query)
-            .bind(self.html.as_str())
-            .bind(self.title.clone())
-            .bind(self.url.to_string())
-            .execute(pool)
-            .await;
-    }
-}
 impl PartialEq<Page> for CrawledPage {
     fn eq(&self, other: &Page) -> bool {
         self.url == other.url
@@ -119,15 +84,11 @@ impl PageQueue {
     }
 
     /// Adds a queued [`Page`] to the database.
-    pub async fn queue_page(&mut self, page: Page, pool: &sqlx::PgPool) {
-        page.add_to_db(pool).await;
-    }
+    pub async fn queue_page(&mut self, page: Page, db_manager: Arc<dyn DbManager>) {
+        // First add the page to the database
+        db_manager.add_page_to_db(&page).await;
 
-    /// Pushes a [`Page`] into the [`PageQueue`].
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for benchmarks and tests only.
-    pub fn queue_page_test(&mut self, page: Page) {
+        // Then store the page in memory
         self.queue.push_back(page.clone());
         self.hashset.insert(page);
     }
@@ -141,13 +102,14 @@ impl PageQueue {
     /// - Returns `Some(Page)` if the queue is not empty, or there are still
     ///   uncrawled pages in the database.
     /// - Returns `None` if the database has no more uncrawled pages left.
-    pub async fn pop(&mut self, pool: &sqlx::PgPool) -> Option<Page> {
+    pub async fn pop(&mut self, db_manager: Arc<dyn DbManager>) -> Option<Page> {
         if let Some(page) = self.queue.front() {
             self.hashset.remove(page);
             self.queue.pop_front()
         } else {
+            // TODO: Move this logic out of the pop method
             log::info!("Queue is empty, refreshing...");
-            self.refresh_queue(pool).await;
+            self.refresh_queue(db_manager).await;
 
             if let Some(page) = self.queue.front() {
                 self.hashset.remove(page);
@@ -158,52 +120,14 @@ impl PageQueue {
         }
     }
 
-    /// Pop a queued [`Page`] from the [`PageQueue`].
-    ///
-    /// # Returns
-    /// - Returns `Some(Page)` if the queue is not empty, and there are still
-    ///   pages left.
-    /// - Returns `None` if the queue has no more pages left.
-    ///
-    /// # Note
-    /// Even though this is public, this method is meant to be used for
-    /// benchmarks and tests only.
-    pub fn pop_test(&mut self) -> Option<Page> {
-        if let Some(page) = self.queue.front() {
-            self.hashset.remove(page);
-            self.queue.pop_back()
-        } else {
-            None
-        }
-    }
-
     /// Add as many uncrawled [`Page`]s from the database to the queue as is defined by [`utils::QUEUE_LIMIT`].
     ///
     /// Should be called whenever the queue is empty and needs more pages.
-    pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        let query = format!(
-            r#"
-            SELECT url
-            FROM pages
-            WHERE is_crawled = FALSE
-            LIMIT {};"#,
-            QUEUE_LIMIT
-        );
-        let query = query.as_str();
+    pub async fn refresh_queue(&mut self, db_manager: Arc<dyn DbManager>) {
+        let (queue, hashset) = db_manager.fetch_pages_from_db().await;
 
-        sqlx::query(query)
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .for_each(|row| {
-                let url: String = row.get("url");
-                let err_msg = format!("Url {} should be a valid url.", url);
-                let page = Page::new(Url::parse(url.as_str()).expect(&err_msg));
-
-                self.queue.push_back(page.clone());
-                self.hashset.insert(page);
-            });
+        self.queue.extend(queue);
+        self.hashset.extend(hashset);
     }
 
     pub fn contains_page(&self, page: &Page) -> bool {

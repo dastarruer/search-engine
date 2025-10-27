@@ -1,21 +1,17 @@
-#[cfg(any(test, feature = "bench"))]
-use std::path::PathBuf;
-
-#[cfg(any(test, feature = "bench"))]
 use httpmock::prelude::*;
-
-#[cfg(any(test, feature = "bench"))]
 use reqwest::StatusCode;
+use std::path::PathBuf;
 
 use reqwest::Url;
 
+#[cfg(test)]
+use crate::{crawler::Crawler, page::Page};
+
 /// An implementation of a mock HTTP server.
-#[cfg(any(test, feature = "bench"))]
 pub struct HttpServer {
     server: MockServer,
 }
 
-#[cfg(any(test, feature = "bench"))]
 impl HttpServer {
     pub fn new_with_filepath(filepath: PathBuf) -> Self {
         let server = MockServer::start();
@@ -75,4 +71,14 @@ pub(crate) fn string_to_url(base_url: &Url, url: String) -> Option<Url> {
             }
         }
     }
+}
+
+#[cfg(test)]
+pub async fn create_crawler(starting_filename: &str) -> (Crawler, Page) {
+    let filepath = test_file_path_from_filepath(starting_filename);
+    let server = HttpServer::new_with_filepath(filepath);
+
+    let page = Page::from(server.base_url());
+
+    (Crawler::test_new(vec![page.clone()]).await, page)
 }

@@ -1,7 +1,9 @@
 pub mod crawler;
-mod error;
+pub mod error;
 pub mod page;
 pub mod utils;
+pub(crate) mod url_handler;
+mod db;
 
 // From https://docs.rs/reqwest/latest/reqwest/struct.ClientBuilder.html#method.user_agent
 pub const USER_AGENT: &str = concat!(

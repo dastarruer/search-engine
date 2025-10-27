@@ -16,14 +16,17 @@ reqwest = { version = "0.12.24", features = ["gzip"] }
 thiserror = "2.0.17"
 httpmock = "0.8.2"
 rustrict = "0.7.36"
+async-trait = "0.1.89"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["async_tokio"] }
+testcontainers-modules = { workspace = true }
 
+# Necessary for criterion benchmarks (DO NOT REMOVE)
 [[bench]]
 name = "crawler"
 harness = false
 
 [features]
-bench = []
 logging = []
+bench-utils = []

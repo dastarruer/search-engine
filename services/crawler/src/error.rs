@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::page::Page;
 
 #[derive(Debug, Error, PartialEq)]
-pub enum CrawlerError {
+pub enum Error {
     #[error("Request to {url} failed: {error_str}", url = page.url)]
     FailedRequest { page: Page, error_str: String },
 
@@ -25,7 +25,7 @@ pub enum CrawlerError {
     RequestTimeout(Page),
 
     #[error("HTML decoding error from {url}: {error_str}.")]
-    HtmlDecodingError { url: Url, error_str: String },
+    HtmlDecoding { url: Url, error_str: String },
 
     #[error("{url} is a non-English site.", url = .0.url)]
     NonEnglishPage(Page),
