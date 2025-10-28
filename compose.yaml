@@ -19,3 +19,9 @@ services:
       DB_ENDPOINT: ${DB_ENDPOINT}
       DB_PORT: ${DB_PORT}
       DB_NAME: ${DB_NAME}
+  app:
+    build: ./app
+
+    # Expose the port on which the server runs
+    ports:
+      - "5000:5000"
