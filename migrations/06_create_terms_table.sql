@@ -1,5 +1,5 @@
 -- Necessary for the hstore attribute, which is used for key value pairs
-CREATE EXTENSION hstore;
+CREATE EXTENSION IF NOT EXISTS hstore;
 
 CREATE TABLE IF NOT EXISTS terms (
     id serial primary key NOT NULL,
