@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 import psycopg2
 
 import os
@@ -8,6 +8,11 @@ app = Flask(__name__)
 @app.route('/')
 def hello_world():
     return 'Hello World'
+
+@app.route('/search')
+def search_results():
+    query = request.args.get('q')
+    return str(query)
 
 if __name__ == '__main__':
     database = retrieve_env_var("DB_NAME")
@@ -26,3 +31,5 @@ def retrieve_env_var(var: str) -> str:
         return os.environ[key]
     except KeyError:
         raise RuntimeError(f"Missing required environment variable: {key}")
+
+def db_conn() 
