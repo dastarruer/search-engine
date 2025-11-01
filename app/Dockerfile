@@ -14,6 +14,7 @@ ENV FLASK_APP=main
 
 # Tell flash where to host the server
 ENV FLASK_RUN_HOST=0.0.0.0
+ENV FLASK_RUN_PORT=80
 
 # Command to run Flask
 CMD ["flask", "run"]

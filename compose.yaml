@@ -30,7 +30,7 @@ services:
 
     # Expose the port on which the server runs
     ports:
-      - "5000:5000"
+      - "80:80"
 
   # Meant for local use
   db:
@@ -44,6 +44,6 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      
+
 volumes:
   pgdata:
