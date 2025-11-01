@@ -373,26 +373,26 @@ impl Indexer {
     /// until pages are found.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
         // loop {
-            let query = format!(
-                r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
-                utils::QUEUE_LIMIT
-            );
+        let query = format!(
+            r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
+            utils::QUEUE_LIMIT
+        );
 
-            sqlx::query(query.as_str())
-                .fetch_all(pool)
-                .await
-                .unwrap()
-                .iter()
-                .for_each(|row| {
-                    self.add_page(Page::from(row));
-                });
+        sqlx::query(query.as_str())
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|row| {
+                self.add_page(Page::from(row));
+            });
 
-            // if !self.pages.is_empty() {
-            //     break;
-            // }
+        // if !self.pages.is_empty() {
+        //     break;
+        // }
 
-            // log::info!("No pages found in the database, trying again in 10 seconds...");
-            // sleep(Duration::from_secs(10));
+        // log::info!("No pages found in the database, trying again in 10 seconds...");
+        // sleep(Duration::from_secs(10));
         // }
         log::info!("Queue is refreshed!");
     }
@@ -488,10 +488,25 @@ impl Indexer {
 
         // We can assume term_b will have the higher page frequency since term_b should be the most recent term
         merged_term.page_frequency = term_b.page_frequency;
-        merged_term.update_total_idf(self.num_pages);
+        merged_term.idf = term_b.idf;
 
         // Again, term_b should be the most recent term
         merged_term.tf_scores = term_b.tf_scores;
+
+        // Then, add the tf scores from term_a that were missing in term_b
+        for (page_id, score) in term_a.tf_scores {
+            if !merged_term.tf_scores.contains_key(&page_id) {
+                merged_term.tf_scores.insert(page_id, score);
+            }
+        }
+
+        merged_term.tf_idf_scores = term_b.tf_idf_scores;
+        // Then, add the tf-idf scores from term_a that were missing in term_b
+        for (page_id, score) in term_a.tf_idf_scores {
+            if !merged_term.tf_idf_scores.contains_key(&page_id) {
+                merged_term.tf_idf_scores.insert(page_id, score);
+            }
+        }
 
         merged_term.update_tf_idf_scores();
 
@@ -656,6 +671,60 @@ mod test {
                 pages: PageQueue::new(HashSet::new()),
                 num_pages: 0,
             }
+        }
+    }
+
+    mod merge_terms {
+        use super::*;
+
+        #[test]
+        fn test_merge_terms() {
+            let term_a = Term::new(
+                "hippopotamus".to_string(),
+                OrderedFloat(1.5),
+                10,
+                PgHstore::from_iter([("1".into(), Some("1".into()))]),
+                PgHstore::from_iter([("1".into(), Some("1.5".into()))]),
+            )
+            .unwrap();
+
+            let term_b = Term::new(
+                "hippopotamus".to_string(),
+                OrderedFloat(2.5),
+                15,
+                PgHstore::from_iter([("2".into(), Some("1".into()))]),
+                PgHstore::from_iter([("2".into(), Some("2.5".into()))]),
+            )
+            .unwrap();
+
+            let indexer = Indexer::default();
+
+            let merged = indexer.merge_terms(term_a, term_b);
+
+            assert_eq!(merged.page_frequency, 15);
+            // Firstly, the tf score in term a should be present
+            assert_eq!(
+                merged.tf_scores.get_key_value("1").unwrap(),
+                (&String::from("1"), &Some(String::from("1")))
+            );
+
+            // Then, the tf score in term b should be present
+            assert_eq!(
+                merged.tf_scores.get_key_value("2").unwrap(),
+                (&String::from("2"), &Some(String::from("1")))
+            );
+
+            // Firstly, the tf-idf score in term a should be present, with its newly calculated value
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("1").unwrap(),
+                (&String::from("1"), &Some(String::from("2.5")))
+            );
+
+            // Then, the tf score in term b should be present with its old value
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("2").unwrap(),
+                (&String::from("2"), &Some(String::from("2.5")))
+            );
         }
     }
 
