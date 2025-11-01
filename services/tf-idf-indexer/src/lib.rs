@@ -2,8 +2,7 @@ use anyhow::anyhow;
 use sqlx::{Row, postgres::types::PgHstore};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    thread::sleep,
-    time::{Duration, Instant},
+    time::Instant,
 };
 use utils::{AddToDb, ExtractText};
 
@@ -495,17 +494,13 @@ impl Indexer {
 
         // Then, add the tf scores from term_a that were missing in term_b
         for (page_id, score) in term_a.tf_scores {
-            if !merged_term.tf_scores.contains_key(&page_id) {
-                merged_term.tf_scores.insert(page_id, score);
-            }
+            merged_term.tf_scores.entry(page_id).or_insert(score);
         }
 
         merged_term.tf_idf_scores = term_b.tf_idf_scores;
         // Then, add the tf-idf scores from term_a that were missing in term_b
         for (page_id, score) in term_a.tf_idf_scores {
-            if !merged_term.tf_idf_scores.contains_key(&page_id) {
-                merged_term.tf_idf_scores.insert(page_id, score);
-            }
+            merged_term.tf_idf_scores.entry(page_id).or_insert(score);
         }
 
         merged_term.update_tf_idf_scores();
