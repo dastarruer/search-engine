@@ -33,6 +33,6 @@ pub enum Error {
     #[error("{url} is an adult site.", url = .0.url)]
     InappropriateSite(Page),
 
-    #[error("{url} contains an invalid domain.", url = .0.url)]
-    InvalidDomain(Page),
+    #[error("{url} contains an invalid domain.", url = .0)]
+    InvalidDomain(Url),
 }

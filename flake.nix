@@ -51,6 +51,8 @@
 
           # Required for reqwest crate
           openssl
+
+          postgresql
         ];
 
         env = {

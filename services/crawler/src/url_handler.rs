@@ -3,7 +3,7 @@ use scraper::{Html, Selector};
 use url::Url;
 use utils::ExtractText;
 
-use crate::page::Page;
+use crate::{error::Error, page::Page};
 
 static BLOCKED_KEYWORDS: once_cell::sync::Lazy<rustrict::Trie> = once_cell::sync::Lazy::new(|| {
     let mut trie = rustrict::Trie::default();
@@ -27,7 +27,8 @@ impl UrlHandler {
     }
 
     pub fn is_english(html: &Html) -> bool {
-        let selector = Selector::parse("html").expect("Parsing `html` selector should not throw an error.");
+        let selector =
+            Selector::parse("html").expect("Parsing `html` selector should not throw an error.");
 
         for element in html.select(&selector) {
             if let Some(lang) = element.value().attr("lang")
@@ -73,16 +74,23 @@ impl UrlHandler {
     /// Also strips fragment identifiers (e.g. `https://example.com/data.csv#row=4`
     /// is normalized as `https://example.com/data.csv`), since these usually
     /// do not change page content.
-    pub fn normalize_url(url: Url) -> Url {
+    pub fn normalize_url(url: Url) -> Result<Url, Error> {
         // If the url does not have any parameters or fragment, it is
         // already normalized
         if let None = url.query()
             && let None = url.fragment()
         {
-            return url;
+            return Ok(url);
         }
 
-        let domain = url.domain().expect("Url must have a valid domain.");
+        let domain = url.domain();
+
+        let domain = if let Some(domain) = domain {
+            domain
+        } else {
+            return Err(Error::InvalidDomain(url));
+        };
+
         let path = url.path();
         let params: Vec<_> = url
             .query_pairs()
@@ -100,7 +108,7 @@ impl UrlHandler {
         // Strip the fragment identifier
         url.set_fragment(None);
 
-        url
+        Ok(url)
     }
 
     fn query_is_passive(query: &str) -> bool {
@@ -121,7 +129,7 @@ mod test {
             let url = Url::parse("https://safe.com").unwrap();
 
             assert_eq!(
-                UrlHandler::normalize_url(url.clone()).as_str(),
+                UrlHandler::normalize_url(url.clone()).unwrap().as_str(),
                 url.as_str()
             );
         }
@@ -131,7 +139,7 @@ mod test {
             let url = Url::parse("https://safe.com?filter=automatic&rating=5").unwrap();
 
             assert_eq!(
-                UrlHandler::normalize_url(url.clone()).as_str(),
+                UrlHandler::normalize_url(url.clone()).unwrap().as_str(),
                 url.as_str()
             );
         }
@@ -142,7 +150,7 @@ mod test {
                 Url::parse("https://safe.com?utm_source=newsletter&id=seranking&t=60s").unwrap();
 
             assert_eq!(
-                UrlHandler::normalize_url(url.clone()).as_str(),
+                UrlHandler::normalize_url(url.clone()).unwrap().as_str(),
                 Url::parse("https://safe.com").unwrap().as_str()
             );
         }
@@ -152,7 +160,7 @@ mod test {
             let url = Url::parse("https://safe.com#Header").unwrap();
 
             assert_eq!(
-                UrlHandler::normalize_url(url.clone()).as_str(),
+                UrlHandler::normalize_url(url.clone()).unwrap().as_str(),
                 Url::parse("https://safe.com").unwrap().as_str()
             );
         }
@@ -162,7 +170,7 @@ mod test {
             let url = Url::parse("https://safe.com?utm_source=newsletter&rating=5#Header").unwrap();
 
             assert_eq!(
-                UrlHandler::normalize_url(url.clone()).as_str(),
+                UrlHandler::normalize_url(url.clone()).unwrap().as_str(),
                 Url::parse("https://safe.com?rating=5").unwrap().as_str()
             );
         }

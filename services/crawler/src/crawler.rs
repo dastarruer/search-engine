@@ -104,7 +104,7 @@ impl Crawler {
             let url = string_to_url(&base_url, url);
 
             let page = if let Some(url) = url {
-                Page::from(UrlHandler::normalize_url(url))
+                Page::from(UrlHandler::normalize_url(url)?)
             } else {
                 continue;
             };
