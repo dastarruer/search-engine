@@ -370,7 +370,8 @@ impl Indexer {
     /// If there are no pages currently in the database, then keep looping
     /// until pages are found.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        loop {
+        // TODO: Remove loop during tests
+        // loop {
             let query = format!(
                 r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
                 utils::QUEUE_LIMIT
@@ -385,13 +386,13 @@ impl Indexer {
                     self.add_page(Page::from(row));
                 });
 
-            if !self.pages.is_empty() {
-                break;
-            }
+            // if !self.pages.is_empty() {
+            //     break;
+            // }
 
             log::info!("No pages found in the database, trying again in 10 seconds...");
             sleep(Duration::from_secs(10));
-        }
+        // }
         log::info!("Queue is refreshed!");
     }
 
