@@ -74,7 +74,8 @@ impl UrlHandler {
     /// Also strips fragment identifiers (e.g. `https://example.com/data.csv#row=4`
     /// is normalized as `https://example.com/data.csv`), since these usually
     /// do not change page content.
-    pub fn normalize_url(url: Url) -> Result<Url, Error> {
+    // Use Box<Error> since the variant returned in this method is too large
+    pub fn normalize_url(url: Url) -> Result<Url, Box<Error>> {
         // If the url does not have any parameters or fragment, it is
         // already normalized
         if let None = url.query()
@@ -88,7 +89,7 @@ impl UrlHandler {
         let domain = if let Some(domain) = domain {
             domain
         } else {
-            return Err(Error::InvalidDomain(url));
+            return Err(Box::new(Error::InvalidDomain(url)));
         };
 
         let path = url.path();

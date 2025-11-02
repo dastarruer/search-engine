@@ -36,3 +36,10 @@ pub enum Error {
     #[error("{url} contains an invalid domain.", url = .0)]
     InvalidDomain(Url),
 }
+
+// Convert a Box<Error> to an Error so error propogation with `?` works
+impl From<std::boxed::Box<Error>> for Error {
+    fn from(value: std::boxed::Box<Error>) -> Self {
+        *value
+    }
+}

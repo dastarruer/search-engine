@@ -9,7 +9,7 @@ use crate::{
     url_handler::UrlHandler,
     utils::string_to_url,
 };
-use reqwest::{Client, ClientBuilder, StatusCode, Url, header::RETRY_AFTER};
+use reqwest::{Client, ClientBuilder, StatusCode, header::RETRY_AFTER};
 use scraper::{Html, Selector};
 
 #[derive(Clone)]
@@ -248,7 +248,8 @@ impl Crawler {
     fn extract_urls_from_html(&self, html: &Html) -> Vec<String> {
         let mut urls = vec![];
 
-        let selector = Selector::parse("a").expect("Parsing `a` selector should not throw an error.");
+        let selector =
+            Selector::parse("a").expect("Parsing `a` selector should not throw an error.");
 
         for element in html.select(&selector) {
             if let Some(url) = element.value().attr("href") {
