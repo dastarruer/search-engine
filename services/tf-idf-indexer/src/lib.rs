@@ -10,6 +10,15 @@ use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 use scraper::Html;
 
+/// The maximum number of pages that the indexer will store in
+/// memory at a time.
+///
+/// The larger this value, the faster the indexer will run.
+///
+/// Increase this value on systems with more available memory, and decrease it
+/// on systems with limited RAM to reduce memory usage.
+pub const QUEUE_LIMIT: u32 = 500000;
+
 static STOP_WORDS: Lazy<HashSet<StopWordTerm>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
         .iter()
@@ -376,7 +385,7 @@ impl Indexer {
         // loop {
         let query = format!(
             r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
-            utils::QUEUE_LIMIT
+            QUEUE_LIMIT
         );
 
         sqlx::query(query.as_str())

@@ -4,11 +4,10 @@ use std::{
     collections::{HashSet, VecDeque},
     sync::Arc,
 };
-use utils::QUEUE_LIMIT;
 
 use async_trait::async_trait;
 
-use crate::page::{CrawledPage, Page, PageQueue};
+use crate::{page::{CrawledPage, Page, PageQueue}, QUEUE_LIMIT};
 
 // Remove Send trait bound, since CrawledPage cannot implement Send
 #[async_trait(?Send)]
@@ -52,7 +51,7 @@ impl DbManager for RealDbManager {
     async fn init_crawled(self: Arc<Self>) -> HashSet<Page> {
         let visited_query = format!(
             "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT {}",
-            utils::QUEUE_LIMIT
+            QUEUE_LIMIT
         );
         let mut visited = HashSet::new();
 

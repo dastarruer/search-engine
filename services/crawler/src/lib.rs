@@ -12,3 +12,12 @@ pub const USER_AGENT: &str = concat!(
     env!("CARGO_PKG_VERSION"),
     " (https://github.com/dastarruer/search-engine/)"
 );
+
+/// The maximum number of pages that the crawler will store in
+/// memory at a time.
+///
+/// The larger this value, the faster the crawler will run.
+///
+/// Increase this value on systems with more available memory, and decrease it
+/// on systems with limited RAM to reduce memory usage.
+pub const QUEUE_LIMIT: u32 = 1500000;
