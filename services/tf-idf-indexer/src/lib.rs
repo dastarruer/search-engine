@@ -139,7 +139,7 @@ impl Term {
             .filter(|c| !c.is_ascii_punctuation())
             .collect();
 
-        println!("Term: {}", term);
+        log::debug!("Term: {}", term);
         Ok(Term {
             term,
             idf,
@@ -363,7 +363,7 @@ impl Indexer {
             }
         }
 
-        println!("All done!");
+        log::info!("All pages are indexed, exiting...");
     }
 
     /// Refresh the queue by reading from the database.
