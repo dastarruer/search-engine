@@ -352,6 +352,10 @@ impl Indexer {
             if self.pages.queue.is_empty() {
                 log::info!("Page queue is empty...");
 
+                for (_, term) in self.terms.iter_mut() {
+                    term.update_tf_idf_scores();
+                }
+
                 log::info!("Updating terms in the database...");
                 self.update_terms_in_db(pool).await;
 
@@ -431,8 +435,7 @@ impl Indexer {
                     .insert(page.id.to_string(), Some(tf.to_string()));
             }
 
-            // Go back and update the tf_idf scores for every other single page
-            term.update_tf_idf_scores();
+            // Instead of updating tf-idf scores at the end here, we update them in the run method
         }
 
         let duration = start_time.elapsed();
@@ -1101,7 +1104,10 @@ mod test {
 
         for expected_term in expected_terms {
             let err_msg = &format!("Term '{}' not found in indexer", expected_term.term);
-            let term_in_indexer = indexer.terms.get(&expected_term.term).expect(err_msg);
+            let term_in_indexer = indexer.terms.get_mut(&expected_term.term).expect(err_msg);
+
+            // Do this manually since this is actually updated in the run method for efficiency, not the parse_page method
+            term_in_indexer.update_tf_idf_scores();
 
             assert_eq!(
                 term_in_indexer.idf, expected_term.idf,
