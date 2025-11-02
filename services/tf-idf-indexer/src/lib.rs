@@ -2,8 +2,7 @@ use anyhow::anyhow;
 use sqlx::{Row, postgres::types::PgHstore};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    thread::sleep,
-    time::{Duration, Instant},
+    time::Instant,
 };
 use utils::{AddToDb, ExtractText};
 
@@ -350,14 +349,20 @@ impl Indexer {
             log::info!("Parsing page {}...", page.id);
             self.parse_page(page, Some(pool)).await;
 
-            for term in self.terms.values() {
-                log::debug!("Adding/updating term: {}", term.term);
-                term.add_to_db(pool).await;
-            }
-            self.empty_terms();
-
             if self.pages.queue.is_empty() {
-                log::info!("Page queue is empty, refreshing...");
+                log::info!("Page queue is empty...");
+
+                for (_, term) in self.terms.iter_mut() {
+                    term.update_tf_idf_scores();
+                }
+
+                log::info!("Updating terms in the database...");
+                self.update_terms_in_db(pool).await;
+
+                log::info!("Clearing terms in memory...");
+                self.empty_terms();
+
+                log::info!("Refreshing page queue...");
                 self.refresh_queue(pool).await;
             }
         }
@@ -372,26 +377,26 @@ impl Indexer {
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
         // TODO: Remove loop during tests
         // loop {
-            let query = format!(
-                r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
-                utils::QUEUE_LIMIT
-            );
+        let query = format!(
+            r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
+            utils::QUEUE_LIMIT
+        );
 
-            sqlx::query(query.as_str())
-                .fetch_all(pool)
-                .await
-                .unwrap()
-                .iter()
-                .for_each(|row| {
-                    self.add_page(Page::from(row));
-                });
+        sqlx::query(query.as_str())
+            .fetch_all(pool)
+            .await
+            .unwrap()
+            .iter()
+            .for_each(|row| {
+                self.add_page(Page::from(row));
+            });
 
-            // if !self.pages.is_empty() {
-            //     break;
-            // }
+        // if !self.pages.is_empty() {
+        //     break;
+        // }
 
-            log::info!("No pages found in the database, trying again in 10 seconds...");
-            sleep(Duration::from_secs(10));
+        //     log::info!("No pages found in the database, trying again in 10 seconds...");
+        //     sleep(Duration::from_secs(10));
         // }
         log::info!("Queue is refreshed!");
     }
@@ -417,22 +422,6 @@ impl Indexer {
             self.add_term(term.clone(), pool).await;
         }
 
-        if let Some(pool) = pool {
-            // yes as much as this sucks I can't really see any other way to update every single term's idf and tf-idf scores
-            let term_query = r#"SELECT * FROM terms;"#;
-
-            sqlx::query(term_query)
-                .fetch_all(pool)
-                .await
-                .expect("Fetching terms should not throw an error")
-                .iter()
-                .for_each(|row| {
-                    if let Ok(term) = Term::try_from(row) {
-                        self.terms.insert(row.get("term"), term);
-                    }
-                });
-        }
-
         // Loop through each stored term
         for (_, term) in self.terms.iter_mut() {
             let tf = term.get_tf(&relevant_terms);
@@ -447,8 +436,7 @@ impl Indexer {
                     .insert(page.id.to_string(), Some(tf.to_string()));
             }
 
-            // Go back and update the tf_idf scores for every other single page
-            term.update_tf_idf_scores();
+            // Instead of updating tf-idf scores at the end here, we update them in the run method
         }
 
         let duration = start_time.elapsed();
@@ -463,6 +451,70 @@ impl Indexer {
         }
 
         log::info!("Page {} indexed successfully in {:.2?}!", page.id, duration);
+    }
+
+    async fn update_terms_in_db(&mut self, pool: &sqlx::PgPool) {
+        // yes as much as this sucks I can't really see any other way to update every single term's idf and tf-idf scores
+        let term_query = r#"SELECT * FROM terms;"#;
+
+        let db_terms: HashMap<String, Term> = sqlx::query(term_query)
+            .fetch_all(pool)
+            .await
+            .expect("Fetching terms should not throw an error")
+            .iter()
+            .flat_map(|row| {
+                if let Ok(old_term) = Term::try_from(row) {
+                    // If the term is in memory (aka it has a more recent version), then merge the old and new terms
+                    if let Some(new_term) = self.terms.get(&old_term.term).cloned() {
+                        return Some((old_term.term.clone(), self.merge_terms(old_term, new_term)));
+                    }
+                    // Otherwise, just return the old term so its tf-idf scores can be updated
+                    Some((old_term.term.clone(), old_term))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Add terms from the db to the terms in memory
+        // Since self.terms is a hashset, db_terms will overwrite all duplicates
+        self.terms.extend(db_terms);
+
+        // Then add every term to the database
+        for term in self.terms.values() {
+            term.add_to_db(pool).await;
+        }
+    }
+
+    fn merge_terms(&self, old_term: Term, new_term: Term) -> Term {
+        assert_eq!(old_term.term, new_term.term);
+
+        let merged_term_str = old_term.term;
+        let mut merged_term = Term::try_from(merged_term_str).expect(
+            "Creating a `Term` instance while merging two terms should not throw an error.",
+        );
+
+        // We can assume new_term will have the higher page frequency since new_term should be the most recent term
+        merged_term.page_frequency = new_term.page_frequency;
+        merged_term.idf = new_term.idf;
+
+        // Again, new_term should be the most recent term
+        merged_term.tf_scores = new_term.tf_scores;
+
+        // Then, add the tf scores from old_term that were missing in new_term
+        for (page_id, score) in old_term.tf_scores {
+            merged_term.tf_scores.entry(page_id).or_insert(score);
+        }
+
+        merged_term.tf_idf_scores = new_term.tf_idf_scores;
+        // Then, add the tf-idf scores from old_term that were missing in new_term
+        for (page_id, score) in old_term.tf_idf_scores {
+            merged_term.tf_idf_scores.entry(page_id).or_insert(score);
+        }
+
+        merged_term.update_tf_idf_scores();
+
+        merged_term
     }
 
     fn empty_terms(&mut self) {
@@ -623,6 +675,127 @@ mod test {
                 pages: PageQueue::new(HashSet::new()),
                 num_pages: 0,
             }
+        }
+    }
+
+    mod merge_terms {
+        use super::*;
+
+        #[test]
+        fn test_merge_terms() {
+            let old_term = Term::new(
+                "hippopotamus".to_string(),
+                OrderedFloat(1.5),
+                10,
+                PgHstore::from_iter([("1".into(), Some("1".into()))]),
+                PgHstore::from_iter([("1".into(), Some("1.5".into()))]),
+            )
+            .unwrap();
+
+            let new_term = Term::new(
+                "hippopotamus".to_string(),
+                OrderedFloat(2.5),
+                15,
+                PgHstore::from_iter([("2".into(), Some("1".into()))]),
+                PgHstore::from_iter([("2".into(), Some("2.5".into()))]),
+            )
+            .unwrap();
+
+            let indexer = Indexer::default();
+
+            let merged = indexer.merge_terms(old_term, new_term);
+
+            assert_eq!(merged.page_frequency, 15);
+            // Firstly, the tf score in term a should be present
+            assert_eq!(
+                merged.tf_scores.get_key_value("1").unwrap(),
+                (&String::from("1"), &Some(String::from("1")))
+            );
+
+            // Then, the tf score in term b should be present
+            assert_eq!(
+                merged.tf_scores.get_key_value("2").unwrap(),
+                (&String::from("2"), &Some(String::from("1")))
+            );
+
+            // Firstly, the tf-idf score in term a should be present, with its newly calculated value
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("1").unwrap(),
+                (&String::from("1"), &Some(String::from("2.5")))
+            );
+
+            // Then, the tf score in term b should be present with its old value
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("2").unwrap(),
+                (&String::from("2"), &Some(String::from("2.5")))
+            );
+        }
+
+        #[test]
+        fn test_merge_conflicting_terms() {
+            let old_term = Term::new(
+                "hippopotamus".to_string(),
+                OrderedFloat(1.5),
+                10,
+                PgHstore::from_iter([
+                    ("1".into(), Some("1".into())),
+                    ("2".into(), Some("1".into())),
+                ]),
+                PgHstore::from_iter([
+                    ("1".into(), Some("1.5".into())),
+                    ("2".into(), Some("1.5".into())),
+                ]),
+            )
+            .unwrap();
+
+            let new_term = Term::new(
+                "hippopotamus".to_string(),
+                OrderedFloat(2.5),
+                15,
+                PgHstore::from_iter([
+                    ("2".into(), Some("1".into())),
+                    ("3".into(), Some("1".into())),
+                ]),
+                PgHstore::from_iter([
+                    ("2".into(), Some("2.5".into())),
+                    ("3".into(), Some("2.5".into())),
+                ]),
+            )
+            .unwrap();
+
+            let indexer = Indexer::default();
+
+            let merged = indexer.merge_terms(old_term, new_term);
+
+            assert_eq!(merged.page_frequency, 15);
+
+            // The tf scores in term a & b should be present
+            assert_eq!(
+                merged.tf_scores.get_key_value("1").unwrap(),
+                (&String::from("1"), &Some(String::from("1")))
+            );
+            assert_eq!(
+                merged.tf_scores.get_key_value("2").unwrap(),
+                (&String::from("2"), &Some(String::from("1")))
+            );
+            assert_eq!(
+                merged.tf_scores.get_key_value("3").unwrap(),
+                (&String::from("3"), &Some(String::from("1")))
+            );
+
+            // The tf-idf scores of term a & b should be present, along with their newly calculated values
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("1").unwrap(),
+                (&String::from("1"), &Some(String::from("2.5")))
+            );
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("2").unwrap(),
+                (&String::from("2"), &Some(String::from("2.5")))
+            );
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("3").unwrap(),
+                (&String::from("3"), &Some(String::from("2.5")))
+            );
         }
     }
 
@@ -937,7 +1110,10 @@ mod test {
 
         for expected_term in expected_terms {
             let err_msg = &format!("Term '{}' not found in indexer", expected_term.term);
-            let term_in_indexer = indexer.terms.get(&expected_term.term).expect(err_msg);
+            let term_in_indexer = indexer.terms.get_mut(&expected_term.term).expect(err_msg);
+
+            // Do this manually since this is actually updated in the run method for efficiency, not the parse_page method
+            term_in_indexer.update_tf_idf_scores();
 
             assert_eq!(
                 term_in_indexer.idf, expected_term.idf,
