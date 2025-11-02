@@ -279,6 +279,11 @@ pub struct PageQueue {
 }
 
 impl PageQueue {
+    // `html` field in `Page` uses the `Html` type, which has interior
+    // mutability. This is bad for hashing, since the data has to remain
+    // immutable. However, my manual implementation of `Hash` for `Page` does
+    // not access this unsafe field
+    #[allow(clippy::mutable_key_type)]
     fn new(pages: HashSet<Page>) -> Self {
         PageQueue {
             queue: pages.clone().into_iter().collect(),
