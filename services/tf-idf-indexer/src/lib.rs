@@ -816,6 +816,12 @@ mod test {
             let term = Term::try_from(String::from("abc-?>")).unwrap();
             assert_eq!(term.term, "abc");
         }
+
+        #[test]
+        fn test_term_with_diacritics() {
+            let term = Term::try_from(String::from("i̇şimle")).unwrap();
+            assert_eq!(term.term, "isimle");
+        }
     }
 
     #[test]
