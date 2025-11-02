@@ -335,6 +335,7 @@ impl Indexer {
             .expect("Fetching page count should not throw an error.");
 
         // Add pages from the db
+        log::info!("Populating page queue...");
         indexer.refresh_queue(pool).await;
 
         indexer
