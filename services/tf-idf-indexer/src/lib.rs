@@ -743,8 +743,14 @@ mod test {
                 "hippopotamus".to_string(),
                 OrderedFloat(2.5),
                 15,
-                PgHstore::from_iter([("2".into(), Some("1".into()))]),
-                PgHstore::from_iter([("2".into(), Some("2.5".into()))]),
+                PgHstore::from_iter([
+                    ("2".into(), Some("1".into())),
+                    ("3".into(), Some("1".into())),
+                ]),
+                PgHstore::from_iter([
+                    ("2".into(), Some("2.5".into())),
+                    ("3".into(), Some("2.5".into())),
+                ]),
             )
             .unwrap();
 
@@ -763,6 +769,10 @@ mod test {
                 merged.tf_scores.get_key_value("2").unwrap(),
                 (&String::from("2"), &Some(String::from("1")))
             );
+            assert_eq!(
+                merged.tf_scores.get_key_value("3").unwrap(),
+                (&String::from("3"), &Some(String::from("1")))
+            );
 
             // The tf-idf scores of term a & b should be present, along with their newly calculated values
             assert_eq!(
@@ -772,6 +782,10 @@ mod test {
             assert_eq!(
                 merged.tf_idf_scores.get_key_value("2").unwrap(),
                 (&String::from("2"), &Some(String::from("2.5")))
+            );
+            assert_eq!(
+                merged.tf_idf_scores.get_key_value("3").unwrap(),
+                (&String::from("3"), &Some(String::from("2.5")))
             );
         }
     }
