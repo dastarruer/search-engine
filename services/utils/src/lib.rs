@@ -8,7 +8,8 @@ use scraper::{Html, Node, Selector};
 ///
 /// Increase this value on systems with more available memory, and decrease it
 /// on systems with limited RAM to reduce memory usage.
-pub const QUEUE_LIMIT: u32 = 1000000;
+// TODO: Make this two separate constants, one for the indexer and one for the crawler
+pub const QUEUE_LIMIT: u32 = 500000;
 
 static TEXT_SELECTOR: Lazy<Selector> = Lazy::new(|| {
     Selector::parse("body p, pa, p abbr, p acronym, p b, p bdo, p big, p button, p cite, p code, p dfn, p em, p i, p kbd, p label, p output, p q, p samp, p small, p span, p strong, p sub, p sup, p time, p tt, p var, h1, h2, h3, h4, h5, h6, ul li, ol li").unwrap()
