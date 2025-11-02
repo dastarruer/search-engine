@@ -277,10 +277,6 @@ impl PageQueue {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        self.queue.is_empty()
-    }
-
     fn contains(&self, page: &Page) -> bool {
         self.hashset.contains(page)
     }
