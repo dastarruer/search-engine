@@ -456,7 +456,7 @@ impl Indexer {
         // yes as much as this sucks I can't really see any other way to update every single term's idf and tf-idf scores
         let term_query = r#"SELECT * FROM terms;"#;
 
-        let terms: Vec<Term> = sqlx::query(term_query)
+        let db_terms: HashMap<String, Term> = sqlx::query(term_query)
             .fetch_all(pool)
             .await
             .expect("Fetching terms should not throw an error")
@@ -465,17 +465,22 @@ impl Indexer {
                 if let Ok(old_term) = Term::try_from(row) {
                     // If the term is in memory (aka it has a more recent version), then merge the old and new terms
                     if let Some(new_term) = self.terms.get(&old_term.term).cloned() {
-                        return Some(self.merge_terms(old_term, new_term));
+                        return Some((old_term.term.clone(), self.merge_terms(old_term, new_term)));
                     }
-                    // Otherwise, just return nothing since there's no reason to return the old term
-                    None
+                    // Otherwise, just return the old term so its tf-idf scores can be updated
+                    Some((old_term.term.clone(), old_term))
                 } else {
                     None
                 }
             })
             .collect();
 
-        for term in terms {
+        // Add terms from the db to the terms in memory
+        // Since self.terms is a hashset, db_terms will overwrite all duplicates
+        self.terms.extend(db_terms);
+
+        // Then add every term to the database
+        for term in self.terms.values() {
             term.add_to_db(pool).await;
         }
     }
