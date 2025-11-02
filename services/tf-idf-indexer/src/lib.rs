@@ -462,13 +462,13 @@ impl Indexer {
             .expect("Fetching terms should not throw an error")
             .iter()
             .flat_map(|row| {
-                if let Ok(term_a) = Term::try_from(row) {
+                if let Ok(old_term) = Term::try_from(row) {
                     // If the term is in memory, merge the term in the database and in memory
-                    if let Some(term_b) = self.terms.get(&term_a.term).cloned() {
-                        return Some(self.merge_terms(term_a, term_b));
+                    if let Some(new_term) = self.terms.get(&old_term.term).cloned() {
+                        return Some(self.merge_terms(old_term, new_term));
                     }
                     // Otherwise, just return the term from the db
-                    Some(term_a)
+                    Some(old_term)
                 } else {
                     None
                 }
@@ -480,29 +480,29 @@ impl Indexer {
         }
     }
 
-    fn merge_terms(&self, term_a: Term, term_b: Term) -> Term {
-        assert_eq!(term_a.term, term_b.term);
+    fn merge_terms(&self, old_term: Term, new_term: Term) -> Term {
+        assert_eq!(old_term.term, new_term.term);
 
-        let merged_term_str = term_a.term;
+        let merged_term_str = old_term.term;
         let mut merged_term = Term::try_from(merged_term_str).expect(
             "Creating a `Term` instance while merging two terms should not throw an error.",
         );
 
-        // We can assume term_b will have the higher page frequency since term_b should be the most recent term
-        merged_term.page_frequency = term_b.page_frequency;
-        merged_term.idf = term_b.idf;
+        // We can assume new_term will have the higher page frequency since new_term should be the most recent term
+        merged_term.page_frequency = new_term.page_frequency;
+        merged_term.idf = new_term.idf;
 
-        // Again, term_b should be the most recent term
-        merged_term.tf_scores = term_b.tf_scores;
+        // Again, new_term should be the most recent term
+        merged_term.tf_scores = new_term.tf_scores;
 
-        // Then, add the tf scores from term_a that were missing in term_b
-        for (page_id, score) in term_a.tf_scores {
+        // Then, add the tf scores from old_term that were missing in new_term
+        for (page_id, score) in old_term.tf_scores {
             merged_term.tf_scores.entry(page_id).or_insert(score);
         }
 
-        merged_term.tf_idf_scores = term_b.tf_idf_scores;
-        // Then, add the tf-idf scores from term_a that were missing in term_b
-        for (page_id, score) in term_a.tf_idf_scores {
+        merged_term.tf_idf_scores = new_term.tf_idf_scores;
+        // Then, add the tf-idf scores from old_term that were missing in new_term
+        for (page_id, score) in old_term.tf_idf_scores {
             merged_term.tf_idf_scores.entry(page_id).or_insert(score);
         }
 
@@ -677,7 +677,7 @@ mod test {
 
         #[test]
         fn test_merge_terms() {
-            let term_a = Term::new(
+            let old_term = Term::new(
                 "hippopotamus".to_string(),
                 OrderedFloat(1.5),
                 10,
@@ -686,7 +686,7 @@ mod test {
             )
             .unwrap();
 
-            let term_b = Term::new(
+            let new_term = Term::new(
                 "hippopotamus".to_string(),
                 OrderedFloat(2.5),
                 15,
@@ -697,7 +697,7 @@ mod test {
 
             let indexer = Indexer::default();
 
-            let merged = indexer.merge_terms(term_a, term_b);
+            let merged = indexer.merge_terms(old_term, new_term);
 
             assert_eq!(merged.page_frequency, 15);
             // Firstly, the tf score in term a should be present
@@ -727,7 +727,7 @@ mod test {
 
         #[test]
         fn test_merge_conflicting_terms() {
-            let term_a = Term::new(
+            let old_term = Term::new(
                 "hippopotamus".to_string(),
                 OrderedFloat(1.5),
                 10,
@@ -742,7 +742,7 @@ mod test {
             )
             .unwrap();
 
-            let term_b = Term::new(
+            let new_term = Term::new(
                 "hippopotamus".to_string(),
                 OrderedFloat(2.5),
                 15,
@@ -759,7 +759,7 @@ mod test {
 
             let indexer = Indexer::default();
 
-            let merged = indexer.merge_terms(term_a, term_b);
+            let merged = indexer.merge_terms(old_term, new_term);
 
             assert_eq!(merged.page_frequency, 15);
 
