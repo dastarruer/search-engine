@@ -463,12 +463,12 @@ impl Indexer {
             .iter()
             .flat_map(|row| {
                 if let Ok(old_term) = Term::try_from(row) {
-                    // If the term is in memory, merge the term in the database and in memory
+                    // If the term is in memory (aka it has a more recent version), then merge the old and new terms
                     if let Some(new_term) = self.terms.get(&old_term.term).cloned() {
                         return Some(self.merge_terms(old_term, new_term));
                     }
-                    // Otherwise, just return the term from the db
-                    Some(old_term)
+                    // Otherwise, just return nothing since there's no reason to return the old term
+                    None
                 } else {
                     None
                 }
