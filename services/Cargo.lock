@@ -718,6 +718,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "diacritics"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e39a82691e437d97c90836fcee7e1946378123c3fdc1bfec5ae15b769996dda6"
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3434,6 +3440,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "criterion",
+ "diacritics",
  "flexi_logger",
  "log",
  "once_cell",

@@ -96,7 +96,7 @@ impl Term {
     ///
     /// # Parameters
     /// - `term` - The term to be stored. This gets normalized, meaning
-    ///   whitespace and punctuation is trimmed, and the term is converted to
+    ///   whitespace and punctuation is trimmed, diacritics are removed (e.g. `é` becomes `e`), and the term is converted to
     ///   lowercase.
     /// - `idf` - The Inverse Document Frequency of a term. See [`Term::idf`]
     ///   for more information.
@@ -119,8 +119,8 @@ impl Term {
         page_frequency: u32,
         tf_scores: PgHstore,
         tf_idf_scores: PgHstore,
-        // TODO: Return an error if this is a number
     ) -> Result<Self, anyhow::Error> {
+        let term = diacritics::remove_diacritics(term.as_str());
         if term
             .chars()
             .any(|c| !c.is_alphabetic() && !c.is_ascii_punctuation())

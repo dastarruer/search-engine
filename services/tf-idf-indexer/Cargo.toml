@@ -16,6 +16,7 @@ criterion = "0.7.0"
 ordered-float = "5.1.0"
 stop-words = "0.9.0"
 anyhow = "1.0.100"
+diacritics = "0.2.2"
 
 [dev-dependencies]
 testcontainers-modules = { workspace = true }
