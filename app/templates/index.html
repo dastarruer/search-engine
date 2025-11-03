@@ -5,5 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Search Engine</title>
   </head>
-  <body>hello world!!!</body>
+  <body>
+    <!-- Run the `search_results` function in main.py on submission -->
+    <form action="{{ url_for('search_results') }}" method="get">
+      <input type="text" name="q" placeholder="Enter your search" />
+      <button type="submit">Search</button>
+    </form>
+  </body>
 </html>
