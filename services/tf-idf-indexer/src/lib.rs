@@ -17,7 +17,7 @@ use scraper::Html;
 ///
 /// Increase this value on systems with more available memory, and decrease it
 /// on systems with limited RAM to reduce memory usage.
-pub const QUEUE_LIMIT: u32 = 500000;
+pub const QUEUE_LIMIT: u32 = 500;
 
 static STOP_WORDS: Lazy<HashSet<StopWordTerm>> = Lazy::new(|| {
     stop_words::get(stop_words::LANGUAGE::English)
