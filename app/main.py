@@ -1,15 +1,15 @@
 import os
 
 import psycopg2
+from flask import Flask, render_template, request
 from psycopg2.extensions import cursor
-from flask import Flask, request
 
 app = Flask(__name__)
 
 
 @app.route("/")
 def hello_world():
-    return "Hello World"
+    return render_template("index.html")
 
 
 @app.route("/search")
