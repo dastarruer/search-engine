@@ -19,3 +19,4 @@ services/utils/tests
 
 # app
 app/.venv
+app/__pycache__
