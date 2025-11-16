@@ -12,7 +12,7 @@
   <body>
     <!-- Run the `search_results` function in main.py on submission -->
     <form action="{{ url_for('search_results') }}" method="get">
-      <input type="text" name="q" placeholder="search something?" />
+      <input type="text" name="q" placeholder="search something?" autocomplete="off"/>
       <button type="submit">Search</button>
     </form>
   </body>
