@@ -7,7 +7,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code
-COPY . .
+# COPY . .
 
 # Tell flask where to find app
 ENV FLASK_APP=main
@@ -17,4 +17,4 @@ ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=80
 
 # Command to run Flask
-CMD ["flask", "run"]
+CMD ["flask", "run", "--reload"]
