@@ -17,4 +17,4 @@ ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=80
 
 # Command to run Flask
-CMD ["flask", "run", "--reload"]
+CMD ["flask", "run", "--debug"]
