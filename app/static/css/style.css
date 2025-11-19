@@ -8,7 +8,11 @@ body {
 }
 
 .search {
-    background-color: #588157;
+    background-color: #3A5A40;
     border: none;
     outline: none;
+}
+
+.search::placeholder {
+    color: #588157;
 }
