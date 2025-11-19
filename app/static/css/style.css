@@ -9,4 +9,6 @@ body {
 
 .search {
     background-color: #588157;
+    border: none;
+    outline: none;
 }
