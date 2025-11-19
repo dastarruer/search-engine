@@ -2,14 +2,21 @@ body {
     background-color: #344E41;
 }
 
+.questrial-regular {
+  font-family: "Questrial", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
 .logo {
-    font-size: 100px;
+    font-size: 6.25rem;
     color: #A3B18A;
 }
 
 .search {
     background-color: #3A5A40;
     padding: 15px 700px 15px 10px;
+    font-size: 1.25rem;
     border: none;
     outline: none;
 }

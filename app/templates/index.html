@@ -7,13 +7,28 @@
       rel="stylesheet"
       href="{{ url_for('static', filename='css/style.css') }}"
     />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Questrial&display=swap"
+      rel="stylesheet"
+    />
+
     <title>Search Engine</title>
   </head>
   <body>
     <h1 class="logo">Title</h1>
     <!-- Run the `search_results` function in main.py on submission -->
     <form action="{{ url_for('search_results') }}" method="get">
-      <input type="text" name="q" placeholder="search something?" autocomplete="off" class="search" required/>
+      <input
+        type="text"
+        name="q"
+        placeholder="search something?"
+        autocomplete="off"
+        class="search questrial-regular"
+        required
+      />
       <button type="submit">Search</button>
     </form>
   </body>
