@@ -19,8 +19,8 @@ body {
   caret-color: #a3b18a;
 
   padding: 15px 700px 15px 30px;
-
   font-size: 1.25rem;
+  border-radius: 3px;
 
   border: none;
   outline: none;
