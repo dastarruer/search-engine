@@ -35,6 +35,10 @@ body {
   color: #a3b18a;
 }
 
+.search-bar-section {
+    display: flex;
+}
+
 .search {
   background-color: #3a5a40;
   color: #a3b18a;
@@ -50,4 +54,8 @@ body {
 
 .search::placeholder {
   color: #588157;
+}
+
+.search-button {
+  background-color: #3a5a40;
 }
