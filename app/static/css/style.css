@@ -1,5 +1,5 @@
 body {
-    background-color: #344E41;
+  background-color: #344e41;
 }
 
 .questrial-regular {
@@ -9,18 +9,23 @@ body {
 }
 
 .logo {
-    font-size: 6.25rem;
-    color: #A3B18A;
+  font-size: 6.25rem;
+  color: #a3b18a;
 }
 
 .search {
-    background-color: #3A5A40;
-    padding: 15px 700px 15px 10px;
-    font-size: 1.25rem;
-    border: none;
-    outline: none;
+  background-color: #3a5a40;
+  color: #a3b18a;
+  caret-color: #a3b18a;
+
+  padding: 15px 700px 15px 10px;
+
+  font-size: 1.25rem;
+
+  border: none;
+  outline: none;
 }
 
 .search::placeholder {
-    color: #588157;
+  color: #588157;
 }
