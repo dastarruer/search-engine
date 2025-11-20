@@ -1,0 +1,11 @@
+body {
+  /* Prevent user from scrolling */
+  overflow: hidden;
+}
+
+.search-bar-section {
+  display: flex;
+
+  padding-top: 15px;
+  padding-bottom: 15px;
+}

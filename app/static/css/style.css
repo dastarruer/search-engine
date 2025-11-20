@@ -1,8 +1,5 @@
 body {
   background-color: #344e41;
-
-  /* Prevent user from scrolling */
-  overflow: hidden;
 }
 
 ::selection {
@@ -44,13 +41,6 @@ body {
   font-size: 6.25rem;
   margin-bottom: 2px;
   color: #a3b18a;
-}
-
-.search-bar-section {
-  display: flex;
-
-  padding-top: 15px;
-  padding-bottom: 15px;
 }
 
 .search {
