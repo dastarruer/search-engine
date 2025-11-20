@@ -47,5 +47,14 @@
         </div>
       </form>
     </div>
+    <div class="results-section">
+      <ul>
+        {% for url, score in results %}
+            <li>
+                <a href="{{ url }}">{{ url }}</a> - Score: {{ score }}
+            </li>
+        {% endfor %}
+      </ul>
+    </div>
   </body>
 </html>
