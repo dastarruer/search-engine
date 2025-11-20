@@ -1,3 +1,10 @@
+body {
+    display: flex;
+    flex-direction: column;
+    margin-left: 40px;
+    margin-top: -15px;
+}
+
 /* Center search section horizontally and vertically on the page */
 .search-section {
   display: flex;
