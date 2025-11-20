@@ -5,6 +5,11 @@ body {
   overflow: hidden;
 }
 
+::selection {
+    background-color: #a3b18a;
+    color: #3a5a40;
+}
+
 .questrial-regular {
   font-family: "Questrial", sans-serif;
   font-weight: 400;
