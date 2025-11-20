@@ -11,6 +11,14 @@ body {
   font-style: normal;
 }
 
+.alegreya-bold {
+  font-family: "Alegreya", serif;
+  font-optical-sizing: auto;
+  font-weight: 700;
+  font-style: normal;
+  font-variant: small-caps;
+}
+
 /* Center search section horizontally and vertically on the page */
 .search-section {
   display: flex;
