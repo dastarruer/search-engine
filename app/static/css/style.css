@@ -10,6 +10,12 @@ body {
     color: #3a5a40;
 }
 
+.no-select {
+  user-select: none;
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none;     /* Old Edge */
+}
+
 .questrial-regular {
   font-family: "Questrial", sans-serif;
   font-weight: 400;
