@@ -1,8 +1,8 @@
 body {
-    display: flex;
-    flex-direction: column;
-    margin-left: 40px;
-    margin-top: -15px;
+  display: flex;
+  flex-direction: column;
+  margin-left: 40px;
+  margin-top: -15px;
 }
 
 /* Center search section horizontally and vertically on the page */
@@ -14,4 +14,14 @@ body {
 .logo {
   font-size: 3.125rem;
   margin-right: 25px;
+}
+
+.results-section {
+    display: flex;
+    flex-direction: column;
+    margin-left: 157px;
+}
+
+.result-title {
+  color: #dad7cd;
 }
