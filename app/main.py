@@ -36,7 +36,8 @@ def search_results():
     conn.execute(sql, (query,))
     results = conn.fetchall()
 
-    return str(results)
+    # return str(results)
+    return render_template("results.html")
 
 
 if __name__ == "__main__":
