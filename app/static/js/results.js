@@ -1,4 +1,5 @@
-window.addEventListener("DOMContentLoaded", () => {
+// TODO: When inputting a query, and then going back, the query is still in the input box
+window.addEventListener("pageshow", () => {
   const params = new URLSearchParams(window.location.search);
 
   const query = params.get("q");
