@@ -37,6 +37,13 @@ body {
   min-height: 70vh;
 }
 
+.search-bar-section {
+  display: flex;
+
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+
 .logo {
   font-size: 6.25rem;
   margin-bottom: 2px;
