@@ -1,0 +1,10 @@
+/* Center search section horizontally and vertically on the page */
+.search-section {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  font-size: 3.125rem;
+  margin-right: 25px;
+}
