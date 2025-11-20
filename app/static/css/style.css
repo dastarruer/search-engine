@@ -37,6 +37,9 @@ body {
 
 .search-bar-section {
     display: flex;
+
+    padding-top: 15px;
+    padding-bottom: 15px;
 }
 
 .search {
@@ -44,7 +47,8 @@ body {
   color: #a3b18a;
   caret-color: #a3b18a;
 
-  padding: 15px 700px 15px 30px;
+  padding-left: 30px;
+  padding-right: 700px;
   font-size: 1.25rem;
   border-radius: 3px;
 
