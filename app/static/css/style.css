@@ -1,5 +1,8 @@
 body {
   background-color: #344e41;
+
+  /* Prevent user from scrolling */
+  overflow: hidden;
 }
 
 .questrial-regular {
