@@ -17,11 +17,23 @@ body {
 }
 
 .results-section {
-    display: flex;
-    flex-direction: column;
-    margin-left: 157px;
+  display: flex;
+  flex-direction: column;
+  margin-left: 157px;
+}
+
+.result-section {
+  display: flex;
+  flex-direction: column;
 }
 
 .result-title {
   color: #dad7cd;
+  margin-bottom: 4px;
+}
+
+.result-page-title {
+  font-size: 1.0625rem;
+  color: #a3b18a;
+  margin-top: 0;
 }
