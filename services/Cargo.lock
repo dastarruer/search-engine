@@ -496,6 +496,7 @@ dependencies = [
  "async-trait",
  "criterion",
  "flexi_logger",
+ "futures",
  "httpmock",
  "log",
  "once_cell",

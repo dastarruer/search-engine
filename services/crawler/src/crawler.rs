@@ -63,10 +63,32 @@ impl Crawler {
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), Error> {
+        let mut futures: FuturesUnordered<
+            std::pin::Pin<Box<dyn Future<Output = Result<(CrawledPage, Vec<Page>), Error>>>>,
+        > = FuturesUnordered::new();
+
+        let mut pages = Vec::new();
         while let Some(page) = self.next_page().await {
-            match self.crawl_page(page.clone()).await {
-                Ok(crawled_page) => {
-                    self.db_manager.add_crawled_page_to_db(&crawled_page).await;
+            pages.push(page);
+        }
+
+        let db_manager = self.db_manager.clone();
+
+        for page in pages {
+            futures.push(Box::pin(Crawler::crawl_page(
+                page.clone(),
+                self.context.clone(),
+            )));
+        }
+
+        while let Some(result) = futures.next().await {
+            match result {
+                Ok((crawled_page, queue)) => {
+                    db_manager.add_crawled_page_to_db(&crawled_page).await;
+
+                    for page in queue {
+                        self.add_page(page).await;
+                    }
                 }
                 Err(e) => {
                     log::warn!("Crawl failed: {}", e);
