@@ -20,4 +20,4 @@ pub const USER_AGENT: &str = concat!(
 ///
 /// Increase this value on systems with more available memory, and decrease it
 /// on systems with limited RAM to reduce memory usage.
-pub const QUEUE_LIMIT: u32 = 1500000;
+pub const QUEUE_LIMIT: u32 = 10000;
