@@ -20,10 +20,9 @@ fn bench_crawl_page(c: &mut Criterion) {
 
             let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(vec![page.clone()]).await;
+            let crawler = Crawler::test_new(vec![page.clone()]).await;
 
-            crawler
-                .crawl_page(page.clone())
+            Crawler::crawl_page(page.clone(), crawler.context)
                 .await
                 .expect("`crawl_page` method should not throw an error.");
         })

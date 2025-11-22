@@ -28,8 +28,7 @@ async fn test_429_status() {
     let crawler = Crawler::new(vec![page.clone()], &pool).await;
 
     let start = Instant::now();
-    let error = crawler
-        .extract_html_from_page(page.clone())
+    let error = Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
         .await
         .expect_err("Sending a request to this page should return a large Retry-After header.");
     let end = Instant::now();

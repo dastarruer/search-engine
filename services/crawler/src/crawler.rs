@@ -9,19 +9,27 @@ use crate::{
     url_handler::UrlHandler,
     utils::string_to_url,
 };
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 use reqwest::{Client, ClientBuilder, StatusCode, header::RETRY_AFTER};
 use scraper::{Html, Selector};
+use tokio::sync::Mutex;
+
+#[derive(Clone)]
+pub struct CrawlerContext {
+    pub client: Client,
+    url_handler: Arc<UrlHandler>,
+    // TODO: Convert to CrawledPage
+    // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
+    crawled: Arc<Mutex<HashSet<Page>>>,
+    queue: Arc<Mutex<PageQueue>>,
+}
 
 #[derive(Clone)]
 pub struct Crawler {
-    queue: PageQueue,
-    // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
-    // TODO: Convert to CrawledPage
-    crawled: HashSet<Page>,
-    client: Client,
     // Use arc since dyn means the compiler doesn't know the size of the object at compilation time
     db_manager: Arc<dyn DbManager>,
-    url_handler: UrlHandler,
+    pub context: Arc<CrawlerContext>,
 }
 
 impl Crawler {
@@ -36,12 +44,16 @@ impl Crawler {
 
         let url_handler = UrlHandler::new();
 
-        Crawler {
-            queue,
-            crawled,
+        let context = Arc::new(CrawlerContext {
             client,
+            url_handler: Arc::new(url_handler),
+            crawled: Arc::new(Mutex::new(crawled)),
+            queue: Arc::new(Mutex::new(queue)),
+        });
+
+        Crawler {
+            context,
             db_manager,
-            url_handler,
         }
     }
 
@@ -72,18 +84,38 @@ impl Crawler {
     /// - Return `Some(Page)` if a [`Page`] exists in the queue.
     /// - Returns `None` if the queue is empty.
     pub async fn next_page(&mut self) -> Option<Page> {
-        self.queue.pop(self.db_manager.clone()).await
+        self.context
+            .queue
+            .lock()
+            .await
+            .pop(self.db_manager.clone())
+            .await
+    }
+
+    /// Add a [`Page`] to [`Crawler::queue`] and [`Crawler::crawled`]
+    async fn add_page(&mut self, page: Page) {
+        self.context
+            .queue
+            .lock()
+            .await
+            .queue_page(page.clone(), self.db_manager.clone())
+            .await;
+        self.context.crawled.lock().await.insert(page);
     }
 
     /// Crawl a single page.
     ///
+    /// TODO: Add return value section here
     /// # Errors
     /// This function returns a [`CrawlerError`] if:
     /// - The [`Page`]'s HTML could not be fetched due to a fatal HTTP status code or a request timeout.
     /// - The [`Page`] is not in English.
     /// - [`Crawler::extract_html_from_page`] fails.
-    pub async fn crawl_page(&mut self, page: Page) -> Result<CrawledPage, Error> {
-        let html = self.extract_html_from_page(page.clone()).await?;
+    pub async fn crawl_page(
+        page: Page,
+        context: Arc<CrawlerContext>,
+    ) -> Result<(CrawledPage, Vec<Page>), Error> {
+        let html = Crawler::extract_html_from_page(page.clone(), context.client.clone()).await?;
 
         let html = Html::parse_document(html.as_str());
 
@@ -91,15 +123,16 @@ impl Crawler {
             return Err(Error::NonEnglishPage(page));
         }
 
-        if self.url_handler.is_inappropriate_page(&page, &html) {
+        if context.url_handler.is_inappropriate_page(&page, &html) {
             return Err(Error::InappropriateSite(page));
         }
 
         let title = Self::extract_title_from_html(&html);
-        let urls = self.extract_urls_from_html(&html);
+        let urls = Crawler::extract_urls_from_html(&html);
 
         let base_url = page.url.clone();
 
+        let mut queue = Vec::new();
         for url in urls {
             let url = string_to_url(&base_url, url);
 
@@ -109,25 +142,29 @@ impl Crawler {
                 continue;
             };
 
-            if self.crawled.contains(&page) || self.is_page_queued(&page) {
+            if context.crawled.lock().await.contains(&page)
+                || context.queue.lock().await.contains_page(&page)
+            {
                 log::warn!("{} is a duplicate", page.url);
                 continue;
             }
 
-            // Add the page to the queue of pages to crawl
-            self.queue
-                .queue_page(page.clone(), self.db_manager.clone())
-                .await;
+            queue.push(page.clone());
 
             log::info!("{} is queued", page.url);
 
-            // Add the page to self.crawled, so that it is never crawled again
-            self.crawled.insert(page);
+            // NOTE: Adding pages to the queue is now the `run` method's responsibility, so the crawler can run asynchronously
+            // Add the page to the queue of pages to crawl
+            // self.context.queue.lock().await
+            //     .queue_page(page.clone(), self.db_manager.clone())
+            //     .await;
+            // Add the page to self.context.crawled.lock().await, so that it is never crawled again
+            // self.context.crawled.lock().await.insert(page);
         }
 
         log::info!("Crawled {:?}...", base_url);
 
-        Ok(page.into_crawled(title, html))
+        Ok((page.into_crawled(title, html), queue))
     }
 
     fn extract_title_from_html(html: &Html) -> Option<String> {
@@ -147,8 +184,8 @@ impl Crawler {
     /// - The response contains a non-200 or non-429 HTTP status code, or the request times out.
     /// - Sending the request results in an error.
     /// - Decoding the HTML from the [`reqwest::Response`] throws an error, such as UTF-8 errors.
-    pub async fn extract_html_from_page(&self, page: Page) -> Result<String, Error> {
-        let mut resp = self.make_get_request(page.clone()).await?;
+    pub async fn extract_html_from_page(page: Page, client: Client) -> Result<String, Error> {
+        let mut resp = Crawler::make_get_request(page.clone(), client.clone()).await?;
 
         let status = resp.status();
         match status {
@@ -198,7 +235,7 @@ impl Crawler {
                     tokio::time::sleep(delay).await;
 
                     while attempts <= MAX_ATTEMPTS && resp.status() != StatusCode::OK {
-                        resp = self.make_get_request(page.clone()).await?;
+                        resp = Crawler::make_get_request(page.clone(), client.clone()).await?;
                         attempts += 1;
                     }
 
@@ -223,8 +260,8 @@ impl Crawler {
         }
     }
 
-    fn is_page_queued(&self, page: &Page) -> bool {
-        self.queue.contains_page(page)
+    async fn is_page_queued(&self, page: &Page) -> bool {
+        self.context.queue.lock().await.contains_page(page)
     }
 
     /// Make a get request to a specific URL, and return the [`reqwest::Response`].
@@ -234,8 +271,8 @@ impl Crawler {
     /// - There was an error while sending the request.
     /// - The redirect loop was detected.
     /// - The redirect limit was exhausted.
-    async fn make_get_request(&self, page: Page) -> Result<reqwest::Response, Error> {
-        self.client
+    async fn make_get_request(page: Page, client: Client) -> Result<reqwest::Response, Error> {
+        client
             .get(page.url.clone())
             .send()
             .await
@@ -245,7 +282,7 @@ impl Crawler {
             })
     }
 
-    fn extract_urls_from_html(&self, html: &Html) -> Vec<String> {
+    fn extract_urls_from_html(html: &Html) -> Vec<String> {
         let mut urls = vec![];
 
         let selector =
@@ -306,12 +343,16 @@ impl Crawler {
 
         let url_handler = UrlHandler::new();
 
-        Crawler {
-            queue,
-            crawled,
+        let context = Arc::new(CrawlerContext {
             client,
+            url_handler: Arc::new(url_handler),
+            crawled: Arc::new(Mutex::new(crawled)),
+            queue: Arc::new(Mutex::new(queue)),
+        });
+
+        Crawler {
+            context,
             db_manager,
-            url_handler,
         }
     }
 }
@@ -336,7 +377,9 @@ mod test {
         async fn test_200_status() {
             let (crawler, page) = create_crawler("extract_single_href.html").await;
 
-            let html = crawler.extract_html_from_page(page).await.unwrap();
+            let html = Crawler::extract_html_from_page(page, crawler.context.client.clone())
+                .await
+                .unwrap();
             assert!(html.contains(r#"<a href="https://www.wikipedia.org/">This is a link.</a>"#));
         }
 
@@ -356,10 +399,10 @@ mod test {
             let page = Page::from(server.base_url());
             let crawler = Crawler::test_new(vec![page.clone()]).await;
 
-            let error = crawler
-                .extract_html_from_page(page.clone())
-                .await
-                .unwrap_err();
+            let error =
+                Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
+                    .await
+                    .unwrap_err();
 
             assert_eq!(
                 error,
@@ -374,10 +417,10 @@ mod test {
         async fn test_empty_page() {
             let (crawler, page) = create_crawler("empty.html").await;
 
-            let error = crawler
-                .extract_html_from_page(page.clone())
-                .await
-                .unwrap_err();
+            let error =
+                Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
+                    .await
+                    .unwrap_err();
             assert_eq!(error, Error::EmptyPage(page))
         }
 
@@ -408,8 +451,7 @@ mod test {
                 let page = Page::from(server.base_url());
                 let crawler = Crawler::test_new(vec![page.clone()]).await;
 
-                let error = crawler
-                    .extract_html_from_page(page.clone())
+                let error = Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
                     .await
                     .unwrap_err();
                 assert_eq!(error, Error::RequestTimeout(page))
@@ -430,8 +472,7 @@ mod test {
                 let page = Page::from(server.base_url());
                 let crawler = Crawler::test_new(vec![page.clone()]).await;
 
-                let error = crawler
-                    .extract_html_from_page(page.clone())
+                let error = Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
                     .await
                     .unwrap_err();
 
@@ -448,8 +489,12 @@ mod test {
         async fn test_page_with_title() {
             let (crawler, page) = create_crawler("page_with_title.html").await;
 
-            let html =
-                Html::parse_document(crawler.extract_html_from_page(page).await.unwrap().as_str());
+            let html = Html::parse_document(
+                Crawler::extract_html_from_page(page, crawler.context.client.clone())
+                    .await
+                    .unwrap()
+                    .as_str(),
+            );
             let title = Crawler::extract_title_from_html(&html).unwrap();
 
             assert!(title.contains("a page with a title"))
@@ -459,8 +504,12 @@ mod test {
         async fn test_page_without_title() {
             let (crawler, page) = create_crawler("non_english_page.html").await;
 
-            let html =
-                Html::parse_document(crawler.extract_html_from_page(page).await.unwrap().as_str());
+            let html = Html::parse_document(
+                Crawler::extract_html_from_page(page, crawler.context.client.clone())
+                    .await
+                    .unwrap()
+                    .as_str(),
+            );
             let title = Crawler::extract_title_from_html(&html);
 
             assert!(title.is_none())
@@ -478,12 +527,12 @@ mod test {
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
-            assert_eq!(crawler.queue, expected_queue);
+            assert_eq!(crawler.context.queue.lock().await.to_owned(), expected_queue);
 
-            crawler.crawl_page(page.clone()).await.unwrap();
+            Crawler::crawl_page(page.clone(), crawler.context.clone()).await.unwrap();
 
             let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
-            assert!(crawler.queue.contains_page(&expected_page));
+            assert!(crawler.context.queue.lock().await.contains_page(&expected_page));
         }
 
         #[tokio::test]
@@ -492,13 +541,13 @@ mod test {
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
-            assert_eq!(crawler.queue, expected_queue);
+            assert_eq!(crawler.context.queue.lock().await.to_owned(), expected_queue);
 
-            crawler.crawl_page(page.clone()).await.unwrap();
-            let queue_before = crawler.queue.clone();
+            Crawler::crawl_page(page.clone(), crawler.context.clone()).await.unwrap();
+            let queue_before = crawler.context.queue.lock().await.clone();
 
-            crawler.crawl_page(page.clone()).await.unwrap();
-            assert_eq!(crawler.queue, queue_before)
+            Crawler::crawl_page(page.clone(), crawler.context.clone()).await.unwrap();
+            assert_eq!(crawler.context.queue.lock().await.to_owned(), queue_before)
         }
     }
 
@@ -512,7 +561,6 @@ mod test {
             // We don't need to send http requests in this module, so just provide a nonexistent site
             let non_existent_site = Url::parse("https://does-not-exist.comm").unwrap();
             let page = crate::page::Page::from(non_existent_site);
-            let crawler = Crawler::test_new(vec![page]).await;
 
             let html_file = test_file_path_from_filepath(filename);
 
@@ -524,7 +572,7 @@ mod test {
             html.read_to_string(&mut buf).unwrap();
             let buf = Html::parse_document(buf.as_str());
 
-            let urls = crawler.extract_urls_from_html(&buf);
+            let urls = Crawler::extract_urls_from_html(&buf);
             assert_eq!(urls, expected_urls)
         }
 

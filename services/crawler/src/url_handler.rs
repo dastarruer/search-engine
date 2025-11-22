@@ -185,7 +185,12 @@ mod test {
         async fn test_non_english_page() {
             let (crawler, page) = create_crawler("non_english_page.html").await;
 
-            let html = crawler.extract_html_from_page(page).await.unwrap();
+            let html = crate::crawler::Crawler::extract_html_from_page(
+                page,
+                crawler.context.client.clone(),
+            )
+            .await
+            .unwrap();
             let html = Html::parse_document(html.as_str());
 
             assert!(!UrlHandler::is_english(&html));
