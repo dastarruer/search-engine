@@ -387,28 +387,28 @@ impl Indexer {
     /// until pages are found.
     pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
         // TODO: Remove loop during tests
-        // loop {
-        let query = format!(
-            r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
-            QUEUE_LIMIT
-        );
+        loop {
+            let query = format!(
+                r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
+                QUEUE_LIMIT
+            );
 
-        sqlx::query(query.as_str())
-            .fetch_all(pool)
-            .await
-            .unwrap()
-            .iter()
-            .for_each(|row| {
-                self.add_page(Page::from(row));
-            });
+            sqlx::query(query.as_str())
+                .fetch_all(pool)
+                .await
+                .unwrap()
+                .iter()
+                .for_each(|row| {
+                    self.add_page(Page::from(row));
+                });
 
-        // if !self.pages.is_empty() {
-        //     break;
-        // }
+            if !self.pages.queue.is_empty() {
+                break;
+            }
 
-        //     log::info!("No pages found in the database, trying again in 10 seconds...");
-        //     sleep(Duration::from_secs(10));
-        // }
+            log::info!("No pages found in the database, trying again in 10 seconds...");
+            std::thread::sleep(std::time::Duration::from_secs(10));
+        }
         log::info!("Queue is refreshed!");
     }
 
