@@ -15,18 +15,27 @@ fn bench_crawl_page(c: &mut Criterion) {
         .join("index.html");
 
     c.bench_function("crawl_from_page", |b| {
-        b.to_async(&runtime).iter(|| async {
-            let server = HttpServer::new_with_filepath(index.clone());
+        // iter_batched will run setup code after every iteration without measuring the setup time
+        b.to_async(&runtime).iter_batched(
+            || async {
+                let server = HttpServer::new_with_filepath(index.clone());
 
-            let page = Page::from(server.base_url());
+                let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(vec![page.clone()]).await;
+                let crawler = Crawler::test_new(vec![page.clone()]).await;
 
-            crawler
-                .crawl_page(page.clone())
-                .await
-                .expect("`crawl_page` method should not throw an error.");
-        })
+                (page, crawler)
+            },
+            |data| async {
+                let (page, mut crawler) = data.await;
+
+                crawler
+                    .crawl_page(page.clone())
+                    .await
+                    .expect("`crawl_page` method should not throw an error.");
+            },
+            criterion::BatchSize::SmallInput,
+        )
     });
 }
 
@@ -43,15 +52,19 @@ fn bench_test_run(c: &mut Criterion) {
         .join("index.html");
 
     c.bench_function("test_run", |b| {
-        b.to_async(&runtime).iter(|| async {
-            let server = HttpServer::new_with_filepath(index.clone());
+        b.to_async(&runtime).iter_batched(
+            || {
+                let server = HttpServer::new_with_filepath(index.clone());
 
-            let page = Page::from(server.base_url());
+                let page = Page::from(server.base_url());
 
-            let mut crawler = Crawler::test_new(vec![page.clone()]).await;
-
-            let _ = crawler.run().await;
-        })
+                runtime.block_on(async { Crawler::test_new(vec![page.clone()]).await })
+            },
+            |mut crawler| async move {
+                let _ = crawler.run().await;
+            },
+            criterion::BatchSize::SmallInput,
+        )
     });
 }
 
