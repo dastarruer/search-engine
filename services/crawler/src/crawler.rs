@@ -151,7 +151,7 @@ impl Crawler {
             return Err(Error::InappropriateSite(page));
         }
 
-        let title = Self::extract_title_from_html(&html);
+        let title = Crawler::extract_title_from_html(&html);
         let urls = Crawler::extract_urls_from_html(&html);
 
         let base_url = page.url.clone();
@@ -545,7 +545,7 @@ mod test {
 
         #[tokio::test]
         async fn test_basic_site() {
-            let (crawler, page) = create_crawler("extract_single_href.html").await;
+            let (mut crawler, page) = create_crawler("extract_single_href.html").await;
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
@@ -554,9 +554,11 @@ mod test {
                 expected_queue
             );
 
-            Crawler::crawl_page(page.clone(), crawler.context.clone())
+            let (_, queue) = Crawler::crawl_page(page.clone(), crawler.context.clone())
                 .await
                 .unwrap();
+
+            crawler.add_page(queue[0].clone()).await;
 
             let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
             assert!(
