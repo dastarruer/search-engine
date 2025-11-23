@@ -15,6 +15,10 @@ use reqwest::{Client, ClientBuilder, StatusCode, header::RETRY_AFTER};
 use scraper::{Html, Selector};
 use tokio::sync::Mutex;
 
+type CrawledPageFutures = FuturesUnordered<
+    std::pin::Pin<Box<dyn Future<Output = Result<(CrawledPage, Vec<Page>), Error>>>>,
+>;
+
 #[derive(Clone)]
 pub struct CrawlerContext {
     pub client: Client,
@@ -63,9 +67,7 @@ impl Crawler {
     /// - Returns `Ok` if no unrecoverable errors occur.
     /// - Returns `Err` if an untested fatal error happens.
     pub async fn run(&mut self) -> Result<(), Error> {
-        let mut futures: FuturesUnordered<
-            std::pin::Pin<Box<dyn Future<Output = Result<(CrawledPage, Vec<Page>), Error>>>>,
-        > = FuturesUnordered::new();
+        let mut futures: CrawledPageFutures = FuturesUnordered::new();
 
         let mut pages = Vec::new();
         while let Some(page) = self.next_page().await {
@@ -282,10 +284,6 @@ impl Crawler {
         }
     }
 
-    async fn is_page_queued(&self, page: &Page) -> bool {
-        self.context.queue.lock().await.contains_page(page)
-    }
-
     /// Make a get request to a specific URL, and return the [`reqwest::Response`].
     ///
     /// # Errors
@@ -473,9 +471,10 @@ mod test {
                 let page = Page::from(server.base_url());
                 let crawler = Crawler::test_new(vec![page.clone()]).await;
 
-                let error = Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
-                    .await
-                    .unwrap_err();
+                let error =
+                    Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
+                        .await
+                        .unwrap_err();
                 assert_eq!(error, Error::RequestTimeout(page))
             }
 
@@ -494,9 +493,10 @@ mod test {
                 let page = Page::from(server.base_url());
                 let crawler = Crawler::test_new(vec![page.clone()]).await;
 
-                let error = Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
-                    .await
-                    .unwrap_err();
+                let error =
+                    Crawler::extract_html_from_page(page.clone(), crawler.context.client.clone())
+                        .await
+                        .unwrap_err();
 
                 assert_eq!(error, Error::InvalidRetryByHeader { page, header: None })
             }
@@ -545,45 +545,59 @@ mod test {
 
         #[tokio::test]
         async fn test_basic_site() {
-            let (mut crawler, page) = create_crawler("extract_single_href.html").await;
+            let (crawler, page) = create_crawler("extract_single_href.html").await;
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
-            assert_eq!(crawler.context.queue.lock().await.to_owned(), expected_queue);
+            assert_eq!(
+                crawler.context.queue.lock().await.to_owned(),
+                expected_queue
+            );
 
-            Crawler::crawl_page(page.clone(), crawler.context.clone()).await.unwrap();
+            Crawler::crawl_page(page.clone(), crawler.context.clone())
+                .await
+                .unwrap();
 
             let expected_page = Page::from(Url::parse("https://www.wikipedia.org/").unwrap());
-            assert!(crawler.context.queue.lock().await.contains_page(&expected_page));
+            assert!(
+                crawler
+                    .context
+                    .queue
+                    .lock()
+                    .await
+                    .contains_page(&expected_page)
+            );
         }
 
         #[tokio::test]
         async fn test_already_visited_url() {
-            let (mut crawler, page) = create_crawler("extract_single_href.html").await;
+            let (crawler, page) = create_crawler("extract_single_href.html").await;
 
             let mut expected_queue = VecDeque::new();
             expected_queue.push_back(page.clone());
-            assert_eq!(crawler.context.queue.lock().await.to_owned(), expected_queue);
+            assert_eq!(
+                crawler.context.queue.lock().await.to_owned(),
+                expected_queue
+            );
 
-            Crawler::crawl_page(page.clone(), crawler.context.clone()).await.unwrap();
+            Crawler::crawl_page(page.clone(), crawler.context.clone())
+                .await
+                .unwrap();
             let queue_before = crawler.context.queue.lock().await.clone();
 
-            Crawler::crawl_page(page.clone(), crawler.context.clone()).await.unwrap();
+            Crawler::crawl_page(page.clone(), crawler.context.clone())
+                .await
+                .unwrap();
             assert_eq!(crawler.context.queue.lock().await.to_owned(), queue_before)
         }
     }
 
     mod extract_urls_from_html {
         use crate::{crawler::Crawler, utils::test_file_path_from_filepath};
-        use reqwest::Url;
         use scraper::Html;
         use std::{fs::File, io::Read};
 
         async fn test_and_extract_urls_from_html_file(filename: &str, expected_urls: Vec<String>) {
-            // We don't need to send http requests in this module, so just provide a nonexistent site
-            let non_existent_site = Url::parse("https://does-not-exist.comm").unwrap();
-            let page = crate::page::Page::from(non_existent_site);
-
             let html_file = test_file_path_from_filepath(filename);
 
             let error_msg = format!("'{}' should exist.", filename);
