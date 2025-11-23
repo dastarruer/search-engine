@@ -58,7 +58,7 @@ fn bench_test_run(c: &mut Criterion) {
                 let page = Page::from(server.base_url());
 
                 let mut pages = Vec::new();
-                for _ in 0..1000 {
+                for _ in 0..100 {
                     pages.push(page.clone());
                 }
 
