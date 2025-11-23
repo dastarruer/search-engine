@@ -57,7 +57,12 @@ fn bench_test_run(c: &mut Criterion) {
 
                 let page = Page::from(server.base_url());
 
-                Crawler::test_new(vec![page.clone()]).await
+                let mut pages = Vec::new();
+                for _ in 0..1000 {
+                    pages.push(page.clone());
+                }
+
+                Crawler::test_new(pages).await
             },
             |crawler| async move {
                 let _ = crawler.await.run().await;
@@ -71,7 +76,7 @@ criterion_group! {
     name = benches;
     // Sacrifice time for more consistent benchmarks
     config = Criterion::default()
-        .sample_size(150)
+        .sample_size(40)
         .measurement_time(std::time::Duration::from_secs(15))
         .warm_up_time(std::time::Duration::from_secs(5))
         .nresamples(200_000);
