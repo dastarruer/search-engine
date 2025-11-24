@@ -27,6 +27,18 @@ body {
   font-variant: small-caps;
 }
 
+.prompt-regular {
+  font-family: "Prompt", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.prompt-bold {
+  font-family: "Prompt", sans-serif;
+  font-weight: 700;
+  font-style: normal;
+}
+
 .search-bar-section {
   display: flex;
 
