@@ -1,24 +1,28 @@
+use dashmap::DashSet;
 use reqwest::Url;
 use sqlx::Row;
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::{VecDeque},
     sync::Arc,
 };
 
 use async_trait::async_trait;
 
-use crate::{page::{CrawledPage, Page, PageQueue}, QUEUE_LIMIT};
+use crate::{
+    QUEUE_LIMIT,
+    page::{CrawledPage, Page, PageQueue},
+};
 
 // Remove Send trait bound, since CrawledPage cannot implement Send
 #[async_trait(?Send)]
 pub trait DbManager {
     async fn init_queue(self: Arc<Self>, starting_pages: Vec<Page>) -> PageQueue;
-    async fn init_crawled(self: Arc<Self>) -> HashSet<Page>;
+    async fn init_crawled(self: Arc<Self>) -> DashSet<Page>;
 
     async fn add_page_to_db(&self, page: &Page);
     async fn add_crawled_page_to_db(&self, page: &CrawledPage);
 
-    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, HashSet<Page>);
+    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, DashSet<Page>);
 }
 
 pub struct RealDbManager {
@@ -46,14 +50,14 @@ impl DbManager for RealDbManager {
         queue
     }
 
-    /// Initialize the hashset of visited [`Page`]'s and the Postgres pool.
-    /// Will return an empty hashset if the database is empty.
-    async fn init_crawled(self: Arc<Self>) -> HashSet<Page> {
+    /// Initialize the DashSet of visited [`Page`]'s and the Postgres pool.
+    /// Will return an empty DashSet if the database is empty.
+    async fn init_crawled(self: Arc<Self>) -> DashSet<Page> {
         let visited_query = format!(
             "SELECT * FROM pages WHERE is_crawled = TRUE LIMIT {}",
             QUEUE_LIMIT
         );
-        let mut visited = HashSet::new();
+        let visited = DashSet::new();
 
         let query = sqlx::query(visited_query.as_str());
 
@@ -121,9 +125,9 @@ impl DbManager for RealDbManager {
             .await;
     }
 
-    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, HashSet<Page>) {
+    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, DashSet<Page>) {
         let mut queue = VecDeque::new();
-        let mut hashset = HashSet::new();
+        let hashset = DashSet::new();
 
         let query = format!(
             r#"
@@ -177,8 +181,8 @@ impl DbManager for MockDbManager {
         queue
     }
 
-    async fn init_crawled(self: Arc<Self>) -> HashSet<Page> {
-        HashSet::new()
+    async fn init_crawled(self: Arc<Self>) -> DashSet<Page> {
+        DashSet::new()
     }
 
     async fn add_page_to_db(&self, _page: &Page) {
@@ -189,7 +193,7 @@ impl DbManager for MockDbManager {
         // Do nothing
     }
 
-    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, HashSet<Page>) {
-        (VecDeque::new(), HashSet::new())
+    async fn fetch_pages_from_db(&self) -> (VecDeque<Page>, DashSet<Page>) {
+        (VecDeque::new(), DashSet::new())
     }
 }

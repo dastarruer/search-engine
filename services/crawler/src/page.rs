@@ -1,6 +1,7 @@
+use dashmap::DashSet;
 use reqwest::Url;
 use scraper::Html;
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::db::DbManager;
@@ -63,10 +64,10 @@ impl PartialEq<Page> for CrawledPage {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct PageQueue {
     queue: VecDeque<Page>,
-    hashset: HashSet<Page>,
+    hashset: DashSet<Page>,
 }
 
 impl Default for PageQueue {
@@ -75,10 +76,22 @@ impl Default for PageQueue {
     }
 }
 
+// Inefficient, but this is only necessary for tests
+impl PartialEq for PageQueue {
+    fn eq(&self, other: &Self) -> bool {
+        for element in other.hashset.clone() {
+            if !self.hashset.contains(&element) {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 impl PageQueue {
     pub fn new() -> Self {
         let queue = VecDeque::new();
-        let hashset = HashSet::new();
+        let hashset = DashSet::new();
 
         PageQueue { queue, hashset }
     }

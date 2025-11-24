@@ -1,6 +1,6 @@
 // TODO: Add missing docstrings for methods
 
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use crate::{
     db::{DbManager, RealDbManager},
@@ -9,6 +9,7 @@ use crate::{
     url_handler::UrlHandler,
     utils::string_to_url,
 };
+use dashmap::DashSet;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use reqwest::{Client, ClientBuilder, StatusCode, header::RETRY_AFTER};
@@ -24,8 +25,8 @@ pub struct CrawlerContext {
     pub client: Client,
     url_handler: Arc<UrlHandler>,
     // TODO: Convert to CrawledPage
-    // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in hashsets for some reason
-    crawled: Arc<Mutex<HashSet<Page>>>,
+    // Use [`Page`] instead of `CrawledPage` because comparing [`Page`] with `CrawledPage` does not work in DashSets for some reason
+    crawled: Arc<DashSet<Page>>,
     queue: Arc<Mutex<PageQueue>>,
 }
 
@@ -51,7 +52,7 @@ impl Crawler {
         let context = Arc::new(CrawlerContext {
             client,
             url_handler: Arc::new(url_handler),
-            crawled: Arc::new(Mutex::new(crawled)),
+            crawled: Arc::new(crawled),
             queue: Arc::new(Mutex::new(queue)),
         });
 
@@ -124,7 +125,7 @@ impl Crawler {
             .await
             .queue_page(page.clone(), self.db_manager.clone())
             .await;
-        self.context.crawled.lock().await.insert(page);
+        self.context.crawled.insert(page);
     }
 
     /// Crawl a single page.
@@ -166,9 +167,7 @@ impl Crawler {
                 continue;
             };
 
-            if context.crawled.lock().await.contains(&page)
-                || context.queue.lock().await.contains_page(&page)
-            {
+            if context.crawled.contains(&page) || context.queue.lock().await.contains_page(&page) {
                 log::warn!("{} is a duplicate", page.url);
                 continue;
             }
@@ -182,8 +181,8 @@ impl Crawler {
             // self.context.queue.lock().await
             //     .queue_page(page.clone(), self.db_manager.clone())
             //     .await;
-            // Add the page to self.context.crawled.lock().await, so that it is never crawled again
-            // self.context.crawled.lock().await.insert(page);
+            // Add the page to self.context, so that it is never crawled again
+            // self.context.insert(page);
         }
 
         log::info!("Crawled {:?}...", base_url);
@@ -366,7 +365,7 @@ impl Crawler {
         let context = Arc::new(CrawlerContext {
             client,
             url_handler: Arc::new(url_handler),
-            crawled: Arc::new(Mutex::new(crawled)),
+            crawled: Arc::new(crawled),
             queue: Arc::new(Mutex::new(queue)),
         });
 

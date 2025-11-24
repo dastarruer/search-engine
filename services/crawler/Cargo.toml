@@ -18,6 +18,7 @@ httpmock = "0.8.2"
 rustrict = "0.7.36"
 async-trait = "0.1.89"
 futures = "0.3.31"
+dashmap = "6.1.0"
 
 [dev-dependencies]
 criterion = { version = "0.7.0", features = ["async_tokio"] }
