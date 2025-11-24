@@ -77,8 +77,8 @@ criterion_group! {
     name = benches;
     // Sacrifice time for more consistent benchmarks
     config = Criterion::default()
-        .sample_size(40)
-        .measurement_time(std::time::Duration::from_secs(15))
+        .sample_size(150)
+        .measurement_time(std::time::Duration::from_secs(17))
         .warm_up_time(std::time::Duration::from_secs(5))
         .nresamples(200_000);
     targets = bench_crawl_page, bench_test_run
