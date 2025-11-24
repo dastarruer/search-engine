@@ -11,7 +11,7 @@ fn bench_crawl_page(c: &mut Criterion) {
 
     let index = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("benches")
-        .join("files")
+        .join("fixtures")
         .join("index.html");
 
     c.bench_function("crawl_from_page", |b| {
@@ -48,7 +48,7 @@ fn bench_test_run(c: &mut Criterion) {
 
     let index = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("benches")
-        .join("files")
+        .join("fixtures")
         .join("index.html");
 
     c.bench_function("test_run", |b| {
