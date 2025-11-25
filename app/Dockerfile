@@ -6,6 +6,9 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Update public suffixes for url parsing
+RUN tldextract --update
+
 # Copy app code
 COPY . .
 
