@@ -39,7 +39,7 @@ def search_results():
     conn.execute(sql, (query,))
     results = conn.fetchall()
 
-    # Add the page domain to the results
+    # Add the page domain and breadcrumb to the results, so it can be shown to the user on the frontend
     for i, result in enumerate(results):
         url = result[0]
 
