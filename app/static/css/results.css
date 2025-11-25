@@ -30,6 +30,8 @@ body {
 .result-title {
   color: #dad7cd;
   text-decoration: none;
+
+  margin-top: 0;
   margin-bottom: 4px;
 }
 

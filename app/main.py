@@ -1,4 +1,5 @@
 import os
+import tldextract
 
 import psycopg2
 from flask import Flask, render_template, request
@@ -35,6 +36,11 @@ def search_results():
 
     conn.execute(sql, (query,))
     results = conn.fetchall()
+
+    # Add the page domain to the results
+    for i, result in enumerate(results):
+        domain = tldextract.extract(result[0]).domain.title()
+        results[i] = result + (domain,)
 
     # return str(results)
     return render_template("results.html", results=results)
