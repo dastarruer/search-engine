@@ -51,6 +51,7 @@ body {
 .result-breadcrumb {
   font-size: 0.875rem;
   font-style: italic;
+  font-weight: 300;
   color: #a3b18a;
 
   margin-top: 0;
