@@ -34,8 +34,8 @@ body {
 }
 
 .result-title:hover {
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 
 .result-page-title {
