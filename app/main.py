@@ -61,8 +61,11 @@ if __name__ == "__main__":
 
 def generate_breadcrumb(url: str) -> str:
     url = urlparse(url)
+
     breadcrumb = url.netloc + url.path
     breadcrumb = breadcrumb.replace("/", " > ")
+    breadcrumb = breadcrumb.removesuffix(" > ")  # Some paths may have a trailing `/`
+
     return breadcrumb
 
 
