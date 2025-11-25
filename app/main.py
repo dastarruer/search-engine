@@ -18,7 +18,7 @@ def search_results():
     conn = db_conn()
 
     sql = """
-        SELECT pages.url, SUM(tf_idf_score::real) AS total_score
+        SELECT pages.url, SUM(tf_idf_score::real) AS total_score, pages.title
         FROM terms
         -- Basically, each() will extract each value in an hstore into an array. Then,
         -- CROSS JOIN LATERAL will then extract the array elements into separate rows,
@@ -28,7 +28,7 @@ def search_results():
         JOIN pages ON pages.id = page_id::integer
         WHERE term = ANY(%s)
         -- If two terms have TF-IDF scores for the same page, then add them up
-        GROUP BY pages.id
+        GROUP BY pages.id, pages.url, pages.title
         -- Order with tf_idf scores from largest to smallest
         ORDER BY total_score DESC;
     """
