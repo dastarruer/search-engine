@@ -29,7 +29,13 @@ body {
 
 .result-title {
   color: #dad7cd;
+  text-decoration: none;
   margin-bottom: 4px;
+}
+
+.result-title:hover {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
 }
 
 .result-page-title {
