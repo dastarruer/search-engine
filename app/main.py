@@ -1,5 +1,6 @@
 import os
 import tldextract
+from urllib.parse import urlparse, parse_qs
 
 import psycopg2
 from flask import Flask, render_template, request
@@ -31,7 +32,8 @@ def search_results():
         -- If two terms have TF-IDF scores for the same page, then add them up
         GROUP BY pages.id, pages.url, pages.title
         -- Order with tf_idf scores from largest to smallest
-        ORDER BY total_score DESC;
+        ORDER BY total_score DESC
+        LIMIT 10;
     """
 
     conn.execute(sql, (query,))
@@ -39,8 +41,15 @@ def search_results():
 
     # Add the page domain to the results
     for i, result in enumerate(results):
-        domain = tldextract.extract(result[0]).domain.title()
-        results[i] = result + (domain,)
+        url = result[0]
+
+        domain = tldextract.extract(url).domain.title()
+        breadcrumb = generate_breadcrumb(url)
+
+        results[i] = result + (
+            domain,
+            breadcrumb,
+        )
 
     # return str(results)
     return render_template("results.html", results=results)
@@ -48,6 +57,13 @@ def search_results():
 
 if __name__ == "__main__":
     app.run()
+
+
+def generate_breadcrumb(url: str) -> str:
+    url = urlparse(url)
+    breadcrumb = url.netloc + url.path
+    breadcrumb = breadcrumb.replace("/", " > ")
+    return breadcrumb
 
 
 def retrieve_env_var(var: str) -> str:
