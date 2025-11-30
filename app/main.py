@@ -79,6 +79,7 @@ def generate_breadcrumb(url: str) -> str:
 def extract_text(html_string: str) -> str:
     tree = html.fromstring(html_string)
     paragraphs = tree.xpath("//p")
+    # TODO: Replace <br> tags with spaces
     return " ".join(p.text_content() for p in paragraphs)
 
 
@@ -101,10 +102,16 @@ def get_snippet(html_string: str, query: list[str]) -> str:
     snippet = ""
     for i, phrase in enumerate(phrases):
         if pattern.search(phrase):
-            if len(phrase) < 50 and i + 1 < len(phrases):
-                phrase = phrase + phrases[i + 1]
-            elif len(phrase) < 50 and i + 1 >= len(phrases):
-                phrase = phrase + phrases[i - 1]
+            counter = 1
+            # If the phrase is too small, then add more phrases
+            while len(phrase) < 50:
+                if i + counter < len(phrases):
+                    phrase = phrase + phrases[i + counter]
+                elif i + counter >= len(phrases):
+                    phrase = phrase + phrases[i - 1]
+                    break
+                counter += 1
+
 
             snippet += rf'<span class="prompt-bold">{phrase}</span>'
 
