@@ -48,23 +48,24 @@ def search_results():
 
     # Add the page domain and breadcrumb to the results, so it can be shown to the user on the frontend
     for i, result in enumerate(results):
-        # TODO: Make `results` a dict instead of a tuple
         url = result[0]
+        title = result[2]
         html_string = result[3]
 
-        title = shorten(result[2], width=60, placeholder="...")
+        title = shorten(title, width=60, placeholder="...")
         domain = tldextract.extract(url).domain.title()
         breadcrumb = generate_breadcrumb(url)
         snippet = get_snippet(html_string, query)
 
-        result = list(result)
+        result = {
+            "url": url,
+            "title": title,
+            "snippet": snippet,
+            "domain": domain,
+            "breadcrumb": breadcrumb,
+        }
 
-        result[2] = title
-        result[3] = snippet
-        result.append(domain)
-        result.append(breadcrumb)
-
-        results[i] = tuple(result)
+        results[i] = result
 
     # return str(results)
     return render_template("results.html", results=results)
