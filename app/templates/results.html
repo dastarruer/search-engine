@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/results.css') }}"
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Questrial&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,700;1,700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,400;0,700;1,300&display=swap"
+      rel="stylesheet"
+    />
+
+    <script
+      src="{{ url_for('static', filename='js/results.js') }}"
+      defer
+    ></script>
+    <title>Search Engine</title>
+  </head>
+  <body>
+    <div class="search-section">
+      <h1 class="logo alegreya-bold no-select">title</h1>
+      <!-- Run the `search_results` function in main.py on submission -->
+      <form action="{{ url_for('search_results') }}" method="get">
+        <div class="search-bar-section">
+          <input
+            type="text"
+            name="q"
+            placeholder="search something?"
+            autocomplete="off"
+            class="search questrial-regular"
+            required
+          />
+          <button type="submit" class="search-button"></button>
+        </div>
+      </form>
+    </div>
+    <div class="results-section">
+      {% for url, score, title, snippet, domain, breadcrumb in results %}
+      <div class="result-section">
+        <!-- Use `result-title` class as a hacky way to remove default margin for the header -->
+        <h2 class="result-title">
+          <a class="result-title questrial-regular" href="{{ url }}">
+            {{ title }}
+          </a>
+        </h2>
+        <h3 class="result-page-title questrial-regular">{{ domain }}</h3>
+        <h3 class="result-breadcrumb questrial-regular">{{ breadcrumb }}</h3>
+        <p class="result-text prompt-regular">{{ snippet | safe }}</p>
+      </div>
+      {% endfor %}
+      <!-- <div class="result-section">
+        <h2 class="result-title questrial-regular">
+          Hello (Adele Song) - Wikipedia
+        </h2>
+        <h3 class="result-page-title questrial-regular">Wikipedia</h3>
+        <h3 class="result-breadcrumb questrial-regular">
+          en.wikipedia.org > wiki > Hello_(Adele_song)
+        </h3>
+        <p class="result-text prompt-regular">
+          <span class="prompt-bold"
+            >"Hello" is a song recorded by British singer-songwriter
+            Adele,</span
+          >
+          released on 23 October 2015 by XL Recordings as the lead single from
+          her third studio album, 25 (2015). Written by Adele and the album's
+          producer, Greg Kurstin, "Hello" is a piano ballad with soul
+          influences...
+        </p>
+      </div> -->
+    </div>
+  </body>
+</html>

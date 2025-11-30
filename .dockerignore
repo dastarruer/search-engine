@@ -16,3 +16,7 @@ services/crawler/logs
 # tests
 services/tf-idf-indexer/tests
 services/utils/tests
+
+# app
+app/.venv
+app/__pycache__
