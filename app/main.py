@@ -1,7 +1,9 @@
 import os
 import tldextract
 from urllib.parse import urlparse
-from html_text import extract_text
+from lxml import html
+import re
+from textwrap import shorten
 
 import psycopg2
 from flask import Flask, render_template, request
@@ -47,7 +49,7 @@ def search_results():
 
         domain = tldextract.extract(url).domain.title()
         breadcrumb = generate_breadcrumb(url)
-        snippet = get_snippet(html_string)
+        snippet = get_snippet(html_string, query)
 
         result = list(result)
         result[3] = snippet
@@ -73,9 +75,55 @@ def generate_breadcrumb(url: str) -> str:
 
     return breadcrumb
 
-def get_snippet(html_string: str) -> str:
+
+def extract_text(html_string: str) -> str:
+    tree = html.fromstring(html_string)
+    paragraphs = tree.xpath("//p")
+    return " ".join(p.text_content() for p in paragraphs)
+
+
+def get_snippet(html_string: str, query: list[str]) -> str:
+    # text = shorten(extract_text(html_string), width=270, placeholder="...")
     text = extract_text(html_string)
-    return f"<span class=\"prompt-bold\">{text}</span> hello"
+
+    # Remove the character before the placeholder if it is punctuation
+    if len(text) >= 4 and not text[-4].isalnum():
+        text = text[:-4] + text[-3:]
+
+    # Create a regex to match query terms
+    pattern = re.compile(
+        r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
+    )
+
+    # Split text by punctuation
+    phrases = re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
+
+    snippet = ""
+    for i, phrase in enumerate(phrases):
+        if pattern.search(phrase):
+            if len(phrase) < 50 and i + 1 < len(phrases):
+                phrase = phrase + phrases[i + 1]
+            elif len(phrase) < 50 and i + 1 >= len(phrases):
+                phrase = phrase + phrases[i - 1]
+
+            snippet += rf'<span class="prompt-bold">{phrase}</span>'
+
+            if i + 1 < len(phrases):
+                snippet += phrases[i + 1]
+            # Add the phrase before the current one if there is no phrase afterwards
+            else:
+                new_snippet = phrases[i - 1] + snippet
+                snippet = new_snippet
+            break
+
+    snippet = shorten(snippet, width=270, placeholder="...")
+
+    if snippet[-1] != "." or snippet[-1] != "?" or snippet[-1] != "!":
+        snippet = snippet[:-1]
+        snippet += "..."
+
+    return snippet
+
 
 def retrieve_env_var(var: str) -> str:
     try:

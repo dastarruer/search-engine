@@ -1,4 +1,4 @@
 Flask
 psycopg2-binary
 tldextract
-html-text
+lxml
