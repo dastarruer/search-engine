@@ -129,9 +129,8 @@ def get_snippet(html_string: str, query: list[str]) -> str:
 
     snippet = shorten(snippet, width=270, placeholder="...")
 
-    if snippet[-1] != "." or snippet[-1] != "?" or snippet[-1] != "!":
-        snippet = snippet[:-1]
-        snippet += "..."
+    if snippet and snippet[-1] not in ".!?":
+        snippet = snippet[:-1] + "..."
 
     return snippet
 
