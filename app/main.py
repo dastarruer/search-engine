@@ -1,7 +1,7 @@
 import os
 import tldextract
 from urllib.parse import urlparse
-import lxml
+from html_text import extract_text
 
 import psycopg2
 from flask import Flask, render_template, request
@@ -43,11 +43,11 @@ def search_results():
     # Add the page domain and breadcrumb to the results, so it can be shown to the user on the frontend
     for i, result in enumerate(results):
         url = result[0]
-        html = result[3]
+        html_string = result[3]
 
         domain = tldextract.extract(url).domain.title()
         breadcrumb = generate_breadcrumb(url)
-        snippet = get_snippet(html)
+        snippet = get_snippet(html_string)
 
         result = list(result)
         result[3] = snippet
@@ -73,8 +73,9 @@ def generate_breadcrumb(url: str) -> str:
 
     return breadcrumb
 
-def get_snippet(html: str) -> str:
-    return "<span class=\"prompt-bold\">hello</span> hello"
+def get_snippet(html_string: str) -> str:
+    text = extract_text(html_string)
+    return f"<span class=\"prompt-bold\">{text}</span> hello"
 
 def retrieve_env_var(var: str) -> str:
     try:
