@@ -102,19 +102,20 @@ def get_snippet(html_string: str, query: list[str]) -> str:
     snippet = ""
     for i, phrase in enumerate(phrases):
         if pattern.search(phrase):
+            snippet += rf'<span class="prompt-bold">{phrase}</span>'
+
             counter = 1
-            # If the phrase is too small, then add more phrases
+            # If the snippet is too small, then add more phrases
             while len(phrase) < 50:
                 if i + counter < len(phrases):
-                    phrase = phrase + phrases[i + counter]
+                    snippet = snippet + phrases[i + counter]
                 elif i + counter >= len(phrases):
-                    phrase = phrase + phrases[i - 1]
+                    snippet = phrases[i - 1] + snippet
                     break
                 counter += 1
 
-
-            snippet += rf'<span class="prompt-bold">{phrase}</span>'
-
+            # very janky, but this will always add a second phrase to the snippet even if the length is too small
+            # TODO: Move this into while loop
             if i + 1 < len(phrases):
                 snippet += phrases[i + 1]
             # Add the phrase before the current one if there is no phrase afterwards
