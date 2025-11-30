@@ -42,16 +42,23 @@ def search_results():
     conn.execute(sql, (query,))
     results = conn.fetchall()
 
+    if not results:
+        return render_template("no_results.html")
+
     # Add the page domain and breadcrumb to the results, so it can be shown to the user on the frontend
     for i, result in enumerate(results):
+        # TODO: Make `results` a dict instead of a tuple
         url = result[0]
         html_string = result[3]
 
+        title = shorten(result[2], width=60, placeholder="...")
         domain = tldextract.extract(url).domain.title()
         breadcrumb = generate_breadcrumb(url)
         snippet = get_snippet(html_string, query)
 
         result = list(result)
+
+        result[2] = title
         result[3] = snippet
         result.append(domain)
         result.append(breadcrumb)
@@ -114,7 +121,7 @@ def get_snippet(html_string: str, query: list[str]) -> str:
                     break
                 counter += 1
 
-            # very janky, but this will always add a second phrase to the snippet even if the length is too small
+            # very janky, but this will always add a second phrase to the snippet even if the length is large enough
             # TODO: Move this into while loop
             if i + 1 < len(phrases):
                 snippet += phrases[i + 1]
@@ -126,9 +133,8 @@ def get_snippet(html_string: str, query: list[str]) -> str:
 
     snippet = shorten(snippet, width=270, placeholder="...")
 
-    if snippet[-1] != "." or snippet[-1] != "?" or snippet[-1] != "!":
-        snippet = snippet[:-1]
-        snippet += "..."
+    if snippet and snippet[-1] not in ".!?":
+        snippet = snippet[:-1] + "..."
 
     return snippet
 

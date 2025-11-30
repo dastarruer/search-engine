@@ -1,0 +1,15 @@
+.no-result-title {
+  color: #dad7cd;
+  text-decoration: none;
+
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.no-result-text {
+  font-size: 0.9375rem;
+  color: #a3b18a;
+
+  width: 1000px;
+  margin-top: 0;
+}
