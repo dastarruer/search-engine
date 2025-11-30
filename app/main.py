@@ -50,11 +50,14 @@ def search_results():
         url = result[0]
         html_string = result[3]
 
+        title = shorten(result[2], width=60, placeholder="...")
         domain = tldextract.extract(url).domain.title()
         breadcrumb = generate_breadcrumb(url)
         snippet = get_snippet(html_string, query)
 
         result = list(result)
+
+        result[2] = title
         result[3] = snippet
         result.append(domain)
         result.append(breadcrumb)
