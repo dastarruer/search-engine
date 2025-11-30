@@ -47,6 +47,7 @@ def search_results():
 
     # Add the page domain and breadcrumb to the results, so it can be shown to the user on the frontend
     for i, result in enumerate(results):
+        # TODO: Make `results` a dict instead of a tuple
         url = result[0]
         html_string = result[3]
 
