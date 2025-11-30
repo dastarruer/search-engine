@@ -120,7 +120,7 @@ def get_snippet(html_string: str, query: list[str]) -> str:
                     break
                 counter += 1
 
-            # very janky, but this will always add a second phrase to the snippet even if the length is too small
+            # very janky, but this will always add a second phrase to the snippet even if the length is large enough
             # TODO: Move this into while loop
             if i + 1 < len(phrases):
                 snippet += phrases[i + 1]
