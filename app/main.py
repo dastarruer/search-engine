@@ -7,6 +7,7 @@ import psycopg2
 import tldextract
 from flask import Flask, render_template, request
 from lxml import html
+from markupsafe import escape
 from psycopg2.extensions import cursor
 
 app = Flask(__name__)
@@ -109,6 +110,7 @@ def get_snippet(html_string: str, query: list[str]) -> str:
     snippet = ""
     for i, phrase in enumerate(phrases):
         if pattern.search(phrase):
+            phrase = escape(phrase)
             snippet += rf'<span class="prompt-bold">{phrase}</span>'
 
             counter = 1
