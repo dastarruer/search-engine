@@ -1,6 +1,7 @@
 import os
 import tldextract
 from urllib.parse import urlparse
+import lxml
 
 import psycopg2
 from flask import Flask, render_template, request
@@ -20,7 +21,7 @@ def search_results():
     conn = db_conn()
 
     sql = """
-        SELECT pages.url, SUM(tf_idf_score::real) AS total_score, pages.title
+        SELECT pages.url, SUM(tf_idf_score::real) AS total_score, pages.title, pages.html
         FROM terms
         -- Basically, each() will extract each value in an hstore into an array. Then,
         -- CROSS JOIN LATERAL will then extract the array elements into separate rows,
@@ -30,7 +31,7 @@ def search_results():
         JOIN pages ON pages.id = page_id::integer
         WHERE term = ANY(%s)
         -- If two terms have TF-IDF scores for the same page, then add them up
-        GROUP BY pages.id, pages.url, pages.title
+        GROUP BY pages.id, pages.url, pages.title, pages.html
         -- Order with tf_idf scores from largest to smallest
         ORDER BY total_score DESC
         LIMIT 10;
@@ -42,14 +43,18 @@ def search_results():
     # Add the page domain and breadcrumb to the results, so it can be shown to the user on the frontend
     for i, result in enumerate(results):
         url = result[0]
+        html = result[3]
 
         domain = tldextract.extract(url).domain.title()
         breadcrumb = generate_breadcrumb(url)
+        snippet = get_snippet(html)
 
-        results[i] = result + (
-            domain,
-            breadcrumb,
-        )
+        result = list(result)
+        result[3] = snippet
+        result.append(domain)
+        result.append(breadcrumb)
+
+        results[i] = tuple(result)
 
     # return str(results)
     return render_template("results.html", results=results)
@@ -68,6 +73,8 @@ def generate_breadcrumb(url: str) -> str:
 
     return breadcrumb
 
+def get_snippet(html: str) -> str:
+    return "<span class=\"prompt-bold\">hello</span> hello"
 
 def retrieve_env_var(var: str) -> str:
     try:

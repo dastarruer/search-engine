@@ -52,7 +52,7 @@
       </form>
     </div>
     <div class="results-section">
-      {% for url, score, title, domain, breadcrumb in results %}
+      {% for url, score, title, snippet, domain, breadcrumb in results %}
       <div class="result-section">
         <!-- Use `result-title` class as a hacky way to remove default margin for the header -->
         <h2 class="result-title">
@@ -62,6 +62,7 @@
         </h2>
         <h3 class="result-page-title questrial-regular">{{ domain }}</h3>
         <h3 class="result-breadcrumb questrial-regular">{{ breadcrumb }}</h3>
+        <p class="result-text prompt-regular">{{ snippet | safe }}</p>
       </div>
       {% endfor %}
       <!-- <div class="result-section">
