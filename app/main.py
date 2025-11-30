@@ -1,12 +1,12 @@
 import os
-import tldextract
-from urllib.parse import urlparse
-from lxml import html
 import re
 from textwrap import shorten
+from urllib.parse import urlparse
 
 import psycopg2
+import tldextract
 from flask import Flask, render_template, request
+from lxml import html
 from psycopg2.extensions import cursor
 
 app = Flask(__name__)
