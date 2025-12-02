@@ -3,21 +3,22 @@ import re
 from textwrap import shorten
 from urllib.parse import urlparse
 
+import nltk
 import psycopg2
 import tldextract
 from flask import Flask, render_template, request
 from lxml import html
 from markupsafe import escape
-from psycopg2.extensions import cursor
-import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+from psycopg2.extensions import cursor
 
 app = Flask(__name__)
 
-nltk.download('stopwords')
-nltk.download('punkt_tab')
-stop_words = set(stopwords.words('english'))
+nltk.download("stopwords")
+nltk.download("punkt_tab")
+stop_words = set(stopwords.words("english"))
+
 
 @app.route("/")
 def hello_world():
