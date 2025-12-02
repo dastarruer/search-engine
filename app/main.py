@@ -32,7 +32,7 @@ def search_results():
     conn = db_conn()
 
     sql = """
-        SELECT pages.url, SUM(tf_idf_score::real) AS total_score, pages.title, pages.html
+        SELECT pages.url, pages.title, pages.html
         FROM terms
         -- Basically, each() will extract each value in an hstore into an array. Then,
         -- CROSS JOIN LATERAL will then extract the array elements into separate rows,
@@ -43,8 +43,8 @@ def search_results():
         WHERE term = ANY(%s)
         -- If two terms have TF-IDF scores for the same page, then add them up
         GROUP BY pages.id, pages.url, pages.title, pages.html
-        -- Order with tf_idf scores from largest to smallest
-        ORDER BY total_score DESC
+        -- Order with tf_idf scores from largest to smallest, giving a boost to pages with more terms in the query
+        ORDER BY SUM(tf_idf_score::real) * COUNT(term) DESC
         LIMIT 10;
     """
 
@@ -57,8 +57,8 @@ def search_results():
     # Add the page domain and breadcrumb to the results, so it can be shown to the user on the frontend
     for i, result in enumerate(results):
         url = result[0]
-        title = result[2]
-        html_string = result[3]
+        title = result[1]
+        html_string = result[2]
 
         title = shorten(title, width=60, placeholder="...")
         domain = tldextract.extract(url).domain.title()
