@@ -12,14 +12,15 @@ body {
 }
 
 .logo {
-  font-size: 3.125rem;
+  font-size: 2.7rem;
   margin-right: 25px;
+  margin-left: -10px;
 }
 
 .results-section {
   display: flex;
   flex-direction: column;
-  margin-left: 157px;
+  margin-left: 185px;
 }
 
 .result-section {
