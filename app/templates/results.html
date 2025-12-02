@@ -35,7 +35,13 @@
   </head>
   <body>
     <div class="search-section">
-      <h1 class="logo alegreya-bold no-select">title</h1>
+      <h1
+        onclick="window.location.href='/'"
+        style="cursor: pointer"
+        class="logo alegreya-bold no-select"
+      >
+        title
+      </h1>
       <!-- Run the `search_results` function in main.py on submission -->
       <form action="{{ url_for('search_results') }}" method="get">
         <div class="search-bar-section">
@@ -61,7 +67,9 @@
           </a>
         </h2>
         <h3 class="result-page-title questrial-regular">{{ result.domain }}</h3>
-        <h3 class="result-breadcrumb questrial-regular">{{ result.breadcrumb }}</h3>
+        <h3 class="result-breadcrumb questrial-regular">
+          {{ result.breadcrumb }}
+        </h3>
         <p class="result-text prompt-regular">{{ result.snippet | safe }}</p>
       </div>
       {% endfor %}
