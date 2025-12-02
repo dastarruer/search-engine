@@ -9,9 +9,15 @@ from flask import Flask, render_template, request
 from lxml import html
 from markupsafe import escape
 from psycopg2.extensions import cursor
+import nltk
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
 
 app = Flask(__name__)
 
+nltk.download('stopwords')
+nltk.download('punkt_tab')
+stop_words = set(stopwords.words('english'))
 
 @app.route("/")
 def hello_world():
@@ -20,7 +26,9 @@ def hello_world():
 
 @app.route("/search")
 def search_results():
-    query = request.args.get("q").split()
+    query = word_tokenize(request.args.get("q").lower())
+    query = [term for term in query if term not in stop_words]
+
     conn = db_conn()
 
     sql = """
@@ -67,7 +75,6 @@ def search_results():
 
         results[i] = result
 
-    # return str(results)
     return render_template("results.html", results=results)
 
 

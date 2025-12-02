@@ -2,3 +2,4 @@ Flask
 psycopg2-binary
 tldextract
 lxml
+nltk
