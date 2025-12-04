@@ -20,6 +20,15 @@ nltk.download("punkt_tab")
 stop_words = set(stopwords.words("english"))
 
 
+class SearchResult:
+    def __init__(self, url="", title="", snippet="", domain="", breadcrumb=""):
+        self.url = url
+        self.title = title
+        self.snippet = snippet
+        self.domain = domain
+        self.breadcrumb = breadcrumb
+
+
 @app.route("/")
 def hello_world():
     return render_template("index.html")
@@ -66,13 +75,9 @@ def search_results():
         breadcrumb = generate_breadcrumb(url)
         snippet = get_snippet(html_string, query)
 
-        result = {
-            "url": url,
-            "title": title,
-            "snippet": snippet,
-            "domain": domain,
-            "breadcrumb": breadcrumb,
-        }
+        result = SearchResult(
+            url=url, title=title, snippet=snippet, domain=domain, breadcrumb=breadcrumb
+        )
 
         results[i] = result
 
