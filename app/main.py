@@ -32,9 +32,15 @@ class SearchResult:
     def set_snippet(self, html_string, query) -> None:
         self.snippet = self.__generate_snippet(html_string, query)
 
+    def __extract_text(self, html_string: str) -> str:
+        tree = html.fromstring(html_string)
+        paragraphs = tree.xpath("//p")
+        # TODO: Replace <br> tags with spaces
+        return " ".join(p.text_content() for p in paragraphs)
+
     def __generate_snippet(self, html_string: str, query: list[str]) -> str:
         # text = shorten(extract_text(html_string), width=270, placeholder="...")
-        text = extract_text(html_string)
+        text = self.__extract_text(html_string)
 
         # Remove the character before the placeholder if it is punctuation
         if len(text) >= 4 and not text[-4].isalnum():
@@ -150,13 +156,6 @@ def search_results():
 
 if __name__ == "__main__":
     app.run()
-
-
-def extract_text(html_string: str) -> str:
-    tree = html.fromstring(html_string)
-    paragraphs = tree.xpath("//p")
-    # TODO: Replace <br> tags with spaces
-    return " ".join(p.text_content() for p in paragraphs)
 
 
 def retrieve_env_var(var: str) -> str:
