@@ -21,12 +21,14 @@ stop_words = set(stopwords.words("english"))
 
 
 class SearchResult:
-    def __init__(self, url="", title="", snippet="", domain="", breadcrumb=""):
+    def __init__(self, url="", title="", snippet=""):
         self.url = url
         self.title = title
         self.snippet = snippet
-        self.domain = domain
-        self.breadcrumb = breadcrumb
+
+        if url:
+            self.domain = tldextract.extract(url).domain.title()
+            self.breadcrumb = generate_breadcrumb(url)
 
 
 @app.route("/")
@@ -70,13 +72,10 @@ def search_results():
         title = result[1]
         html_string = result[2]
 
-        title = shorten(title, width=60, placeholder="...")
-        domain = tldextract.extract(url).domain.title()
-        breadcrumb = generate_breadcrumb(url)
-        snippet = get_snippet(html_string, query)
-
         result = SearchResult(
-            url=url, title=title, snippet=snippet, domain=domain, breadcrumb=breadcrumb
+            url=url,
+            title=shorten(title, width=60, placeholder="..."),
+            snippet=get_snippet(html_string, query),
         )
 
         results[i] = result
