@@ -21,14 +21,65 @@ stop_words = set(stopwords.words("english"))
 
 
 class SearchResult:
-    def __init__(self, url="", title="", snippet=""):
+    def __init__(self, url="", title=""):
         self.url = url
         self.title = title
-        self.snippet = snippet
 
         if url:
             self.domain = self.__get_domain(url)
             self.breadcrumb = self.__generate_breadcrumb(url)
+
+    def set_snippet(self, html_string, query) -> None:
+        self.snippet = self.__generate_snippet(html_string, query)
+
+    def __generate_snippet(self, html_string: str, query: list[str]) -> str:
+        # text = shorten(extract_text(html_string), width=270, placeholder="...")
+        text = extract_text(html_string)
+
+        # Remove the character before the placeholder if it is punctuation
+        if len(text) >= 4 and not text[-4].isalnum():
+            text = text[:-4] + text[-3:]
+
+        # Create a regex to match query terms
+        pattern = re.compile(
+            r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
+        )
+
+        # Split text by punctuation
+        phrases = re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
+
+        snippet = ""
+        for i, phrase in enumerate(phrases):
+            if pattern.search(phrase):
+                phrase = escape(phrase)
+                snippet += rf'<span class="prompt-bold">{phrase}</span>'
+
+                counter = 1
+                # If the snippet is too small, then add more phrases
+                while len(phrase) < 50:
+                    if i + counter < len(phrases):
+                        snippet = snippet + phrases[i + counter]
+                    elif i + counter >= len(phrases):
+                        snippet = phrases[i - 1] + snippet
+                        break
+                    counter += 1
+
+                # very janky, but this will always add a second phrase to the snippet even if the length is large enough
+                # TODO: Move this into while loop
+                if i + 1 < len(phrases):
+                    snippet += phrases[i + 1]
+                # Add the phrase before the current one if there is no phrase afterwards
+                else:
+                    new_snippet = phrases[i - 1] + snippet
+                    snippet = new_snippet
+                break
+
+        snippet = shorten(snippet, width=270, placeholder="...")
+
+        if snippet and snippet[-1] not in ".!?":
+            snippet = snippet[:-1] + "..."
+
+        return snippet
 
     def __get_domain(self, url: str) -> str:
         return tldextract.extract(url).domain.title()
@@ -89,8 +140,8 @@ def search_results():
         result = SearchResult(
             url=url,
             title=shorten(title, width=60, placeholder="..."),
-            snippet=get_snippet(html_string, query),
         )
+        result.set_snippet(html_string, query)
 
         results[i] = result
 
@@ -106,56 +157,6 @@ def extract_text(html_string: str) -> str:
     paragraphs = tree.xpath("//p")
     # TODO: Replace <br> tags with spaces
     return " ".join(p.text_content() for p in paragraphs)
-
-
-def get_snippet(html_string: str, query: list[str]) -> str:
-    # text = shorten(extract_text(html_string), width=270, placeholder="...")
-    text = extract_text(html_string)
-
-    # Remove the character before the placeholder if it is punctuation
-    if len(text) >= 4 and not text[-4].isalnum():
-        text = text[:-4] + text[-3:]
-
-    # Create a regex to match query terms
-    pattern = re.compile(
-        r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
-    )
-
-    # Split text by punctuation
-    phrases = re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
-
-    snippet = ""
-    for i, phrase in enumerate(phrases):
-        if pattern.search(phrase):
-            phrase = escape(phrase)
-            snippet += rf'<span class="prompt-bold">{phrase}</span>'
-
-            counter = 1
-            # If the snippet is too small, then add more phrases
-            while len(phrase) < 50:
-                if i + counter < len(phrases):
-                    snippet = snippet + phrases[i + counter]
-                elif i + counter >= len(phrases):
-                    snippet = phrases[i - 1] + snippet
-                    break
-                counter += 1
-
-            # very janky, but this will always add a second phrase to the snippet even if the length is large enough
-            # TODO: Move this into while loop
-            if i + 1 < len(phrases):
-                snippet += phrases[i + 1]
-            # Add the phrase before the current one if there is no phrase afterwards
-            else:
-                new_snippet = phrases[i - 1] + snippet
-                snippet = new_snippet
-            break
-
-    snippet = shorten(snippet, width=270, placeholder="...")
-
-    if snippet and snippet[-1] not in ".!?":
-        snippet = snippet[:-1] + "..."
-
-    return snippet
 
 
 def retrieve_env_var(var: str) -> str:
