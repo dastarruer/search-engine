@@ -39,7 +39,6 @@ class SearchResult:
         return " ".join(p.text_content() for p in paragraphs)
 
     def __generate_snippet(self, html_string: str, query: list[str]) -> str:
-        # text = shorten(extract_text(html_string), width=270, placeholder="...")
         text = self.__extract_text(html_string)
 
         # Remove the character before the placeholder if it is punctuation
@@ -80,7 +79,8 @@ class SearchResult:
                     snippet = new_snippet
                 break
 
-        snippet = shorten(snippet, width=270, placeholder="...")
+        SNIPPET_WIDTH_CHARS = 270
+        snippet = shorten(snippet, width=SNIPPET_WIDTH_CHARS, placeholder="...")
 
         if snippet and snippet[-1] not in ".!?":
             snippet = snippet[:-1] + "..."
@@ -143,9 +143,10 @@ def search_results():
         title = result[1]
         html_string = result[2]
 
+        TITLE_WIDTH_CHARS = 60
         result = SearchResult(
             url=url,
-            title=shorten(title, width=60, placeholder="..."),
+            title=shorten(title, width=TITLE_WIDTH_CHARS, placeholder="..."),
         )
         result.set_snippet(html_string, query)
 
