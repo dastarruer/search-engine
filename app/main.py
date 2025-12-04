@@ -27,8 +27,11 @@ class SearchResult:
         self.snippet = snippet
 
         if url:
-            self.domain = tldextract.extract(url).domain.title()
+            self.domain = self.__get_domain(url)
             self.breadcrumb = generate_breadcrumb(url)
+
+    def __get_domain(self, url: str) -> str:
+        return tldextract.extract(url).domain.title()
 
 
 @app.route("/")
