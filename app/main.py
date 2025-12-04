@@ -28,10 +28,21 @@ class SearchResult:
 
         if url:
             self.domain = self.__get_domain(url)
-            self.breadcrumb = generate_breadcrumb(url)
+            self.breadcrumb = self.__generate_breadcrumb(url)
 
     def __get_domain(self, url: str) -> str:
         return tldextract.extract(url).domain.title()
+
+    def __generate_breadcrumb(self, url: str) -> str:
+        url = urlparse(url)
+
+        breadcrumb = url.netloc + url.path
+        breadcrumb = breadcrumb.replace("/", " > ")
+        breadcrumb = breadcrumb.removesuffix(
+            " > "
+        )  # Some paths may have a trailing `/`
+
+        return breadcrumb
 
 
 @app.route("/")
@@ -88,16 +99,6 @@ def search_results():
 
 if __name__ == "__main__":
     app.run()
-
-
-def generate_breadcrumb(url: str) -> str:
-    url = urlparse(url)
-
-    breadcrumb = url.netloc + url.path
-    breadcrumb = breadcrumb.replace("/", " > ")
-    breadcrumb = breadcrumb.removesuffix(" > ")  # Some paths may have a trailing `/`
-
-    return breadcrumb
 
 
 def extract_text(html_string: str) -> str:
