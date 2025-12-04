@@ -30,7 +30,7 @@ class SearchResult:
 
 
 @app.route("/")
-def hello_world():
+def front_page():
     return render_template("index.html")
 
 
