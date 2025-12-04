@@ -41,10 +41,6 @@ class SearchResult:
     def __generate_snippet(self, html_string: str, query: list[str]) -> str:
         text = self.__extract_text(html_string)
 
-        # Remove the character before the placeholder if it is punctuation
-        if len(text) >= 4 and not text[-4].isalnum():
-            text = text[:-4] + text[-3:]
-
         # Create a regex to match query terms
         pattern = re.compile(
             r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
