@@ -38,16 +38,18 @@ class SearchResult:
         # TODO: Replace <br> tags with spaces
         return " ".join(p.text_content() for p in paragraphs)
 
+    def __split_text_by_punctuation(self, text):
+        return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
+
+    def __compile_regex_for_query(self, query):
+        return re.compile(
+                    r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
+                )
+
     def __generate_snippet(self, html_string: str, query: list[str]) -> str:
         text = self.__extract_text(html_string)
-
-        # Create a regex to match query terms
-        pattern = re.compile(
-            r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
-        )
-
-        # Split text by punctuation
-        phrases = re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
+        pattern = self.__compile_regex_for_query(query)
+        phrases = self.__split_text_by_punctuation(text)
 
         snippet = ""
         for i, phrase in enumerate(phrases):
