@@ -20,45 +20,16 @@ nltk.download("punkt_tab")
 stop_words = set(stopwords.words("english"))
 
 
-class SearchResult:
-    def __init__(self, url="", title=""):
-        self.url = url
-        self.title = title
+def extract_text(html_string: str) -> str:
+    tree = html.fromstring(html_string)
+    paragraphs = tree.xpath("//p")
+    # TODO: Replace <br> tags with spaces
+    return " ".join(p.text_content() for p in paragraphs)
 
-        if url:
-            self.domain = self.__get_domain(url)
-            self.breadcrumb = self.__generate_breadcrumb(url)
 
-    def set_snippet(self, html_string, query) -> None:
-        self.snippet = self.__generate_snippet(html_string, query)
-
-    def __extract_text(self, html_string: str) -> str:
-        tree = html.fromstring(html_string)
-        paragraphs = tree.xpath("//p")
-        # TODO: Replace <br> tags with spaces
-        return " ".join(p.text_content() for p in paragraphs)
-
-    def __split_text_by_punctuation(self, text):
-        return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
-
-    def __compile_regex_for_query(self, query):
-        return re.compile(
-            r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
-        )
-
-    def __elongate_phrase(
-        self, current_index: int, phrases: list[str], snippet: str, current_phrase: str
-    ) -> str:
-        # Add second phrase to snippet
-        if current_index + 1 < len(phrases):
-            snippet += phrases[current_index + 1]
-        # Add the phrase before the current one if there is no phrase afterwards
-        else:
-            snippet = phrases[current_index - 1] + snippet
-        return snippet
-
-    def __generate_snippet(self, html_string: str, query: list[str]) -> str:
-        text = self.__extract_text(html_string)
+class _SnippetGenerator:
+    def generate_snippet(self, html_string: str, query: list[str]) -> str:
+        text = extract_text(html_string)
         pattern = self.__compile_regex_for_query(query)
         phrases = self.__split_text_by_punctuation(text)
 
@@ -82,6 +53,39 @@ class SearchResult:
             snippet = snippet[:-1] + "..."
 
         return snippet
+
+    def __split_text_by_punctuation(self, text):
+        return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
+
+    def __compile_regex_for_query(self, query):
+        return re.compile(
+            r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
+        )
+
+    def __elongate_phrase(
+        self, current_index: int, phrases: list[str], snippet: str, current_phrase: str
+    ) -> str:
+        # Add second phrase to snippet
+        if current_index + 1 < len(phrases):
+            snippet += phrases[current_index + 1]
+        # Add the phrase before the current one if there is no phrase afterwards
+        else:
+            snippet = phrases[current_index - 1] + snippet
+        return snippet
+
+
+class SearchResult:
+    def __init__(self, url="", title=""):
+        self.url = url
+        self.title = title
+        self.snippet_generator = _SnippetGenerator()
+
+        if url:
+            self.domain = self.__get_domain(url)
+            self.breadcrumb = self.__generate_breadcrumb(url)
+
+    def set_snippet(self, html_string, query) -> None:
+        self.snippet = self.snippet_generator.generate_snippet(html_string, query)
 
     def __get_domain(self, url: str) -> str:
         return tldextract.extract(url).domain.title()
