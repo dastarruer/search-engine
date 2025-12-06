@@ -43,8 +43,19 @@ class SearchResult:
 
     def __compile_regex_for_query(self, query):
         return re.compile(
-                    r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
-                )
+            r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
+        )
+
+    def __elongate_phrase(
+        self, current_index: int, phrases: list[str], snippet: str, current_phrase: str
+    ) -> str:
+        # Add second phrase to snippet
+        if current_index + 1 < len(phrases):
+            snippet += phrases[current_index + 1]
+        # Add the phrase before the current one if there is no phrase afterwards
+        else:
+            snippet = phrases[current_index - 1] + snippet
+        return snippet
 
     def __generate_snippet(self, html_string: str, query: list[str]) -> str:
         text = self.__extract_text(html_string)
@@ -61,24 +72,7 @@ class SearchResult:
                 # Bolden the phrase with the term from the query
                 snippet += rf'<span class="prompt-bold">{phrase}</span>'
 
-                counter = 1
-                # If the snippet is too small, then add more phrases
-                while len(phrase) < 50:
-                    if i + counter < len(phrases):
-                        snippet = snippet + phrases[i + counter]
-                    elif i + counter >= len(phrases):
-                        snippet = phrases[i - 1] + snippet
-                        break
-                    counter += 1
-
-                # very janky, but this will always add a second phrase to the snippet even if the length is large enough
-                # TODO: Move this into while loop
-                if i + 1 < len(phrases):
-                    snippet += phrases[i + 1]
-                # Add the phrase before the current one if there is no phrase afterwards
-                else:
-                    new_snippet = phrases[i - 1] + snippet
-                    snippet = new_snippet
+                snippet = self.__elongate_phrase(i, phrases, snippet, phrase)
                 break
 
         SNIPPET_WIDTH_CHARS = 270
