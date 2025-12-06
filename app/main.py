@@ -53,8 +53,12 @@ class SearchResult:
 
         snippet = ""
         for i, phrase in enumerate(phrases):
+            # If a term in the query is found in the phrase
             if pattern.search(phrase):
+                # Convert any html tags to plain-text
                 phrase = escape(phrase)
+
+                # Bolden the phrase with the term from the query
                 snippet += rf'<span class="prompt-bold">{phrase}</span>'
 
                 counter = 1
