@@ -12,6 +12,8 @@ RUN tldextract --update
 # Copy app code
 COPY . .
 
+RUN pytest tests/
+
 # Tell flask where to find app
 ENV FLASK_APP=main
 
