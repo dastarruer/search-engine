@@ -42,8 +42,8 @@ class _SnippetGenerator:
 
         return snippet
 
-    def __split_text_by_punctuation(self, text):
-        return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
+    def __split_text_by_punctuation(self, text) -> list[str]:
+        return list(map(str.strip, re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)))
 
     def __compile_regex_for_query(self, query):
         return re.compile(
