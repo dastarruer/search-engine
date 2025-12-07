@@ -43,7 +43,17 @@ class _SnippetGenerator:
         return snippet
 
     def __split_text_by_punctuation(self, text) -> list[str]:
-        return list(map(str.strip, re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)))
+        # No I don't understand this but it works
+        pattern = r"""
+            [^\s()]+(?:\s*\([^\s()]*\))?
+            | \([^\s()]*
+            | [()]
+            | [.!?]
+        """
+
+        segments = re.findall(pattern, text, re.VERBOSE)
+        segments = [seg.strip() for seg in segments if seg.strip()]
+        return segments
 
     def __compile_regex_for_query(self, query):
         return re.compile(

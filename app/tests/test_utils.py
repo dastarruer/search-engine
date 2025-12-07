@@ -22,3 +22,13 @@ def test_split_text_by_punctuation(snippet_generator: _SnippetGenerator):
         "hello?",
         "hello!",
     ]
+
+def test_split_text_by_punctuation_with_brackets(snippet_generator: _SnippetGenerator):
+    text = "hello. hello (hello) (hello!)"
+    assert snippet_generator._SnippetGenerator__split_text_by_punctuation(text) == [
+        "hello.",
+        "hello (hello)",
+        "(hello!",
+        ")",
+    ]
+
