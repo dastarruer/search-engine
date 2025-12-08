@@ -19,13 +19,11 @@ def test_generate_snippet(snippet_generator: _SnippetGenerator):
 
 
 def test_split_text_by_punctuation(snippet_generator: _SnippetGenerator):
-    text = r""""Hello" is a song recorded by British singer-songwriter Adele"""
-    assert snippet_generator._SnippetGenerator__split_text_into_semantic_chunks(
-        text
-    ) == [
-        '"Hello"',
-        "is a song recorded by British",
-        "singer-songwriter Adele",
+    text = "hello. hello hello! hello?"
+    assert snippet_generator._SnippetGenerator__split_text_by_punctuation(text) == [
+        "hello.",
+        " hello hello!",
+        " hello?",
     ]
 
 

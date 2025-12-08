@@ -21,7 +21,7 @@ class _SnippetGenerator:
     def generate_snippet(self, html_string: str, query: list[str]) -> str:
         text = extract_text(html_string)
         pattern = self.__compile_regex_for_query(query)
-        phrases = self.__split_text_into_semantic_chunks(text)
+        phrases = self.__split_text_by_punctuation(text)
 
         snippet = ""
         for i, phrase in enumerate(phrases):
@@ -46,12 +46,8 @@ class _SnippetGenerator:
 
         return snippet
 
-    def __split_text_into_semantic_chunks(self, text: str) -> list[str]:
-        CHUNK_SIZE = 10
-        chunker = semchunk.chunkerify(
-            AutoTokenizer.from_pretrained("isaacus/kanon-tokenizer"), CHUNK_SIZE
-        )
-        return [chunk.strip() for chunk in chunker(text)]
+    def __split_text_by_punctuation(self, text: str) -> list[str]:
+        return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
 
     def __compile_regex_for_query(self, query):
         return re.compile(
