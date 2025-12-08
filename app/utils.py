@@ -33,7 +33,7 @@ class _SnippetGenerator:
                 # Bolden the phrase with the term from the query
                 snippet += rf'<span class="prompt-bold">{phrase}</span>'
 
-                snippet = self.__elongate_phrase(i, phrases, snippet, phrase)
+                snippet = self.__elongate_snippet(i, phrases, snippet, phrase)
                 break
 
         SNIPPET_WIDTH_CHARS = 270
@@ -56,7 +56,7 @@ class _SnippetGenerator:
             r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
         )
 
-    def __elongate_phrase(
+    def __elongate_snippet(
         self, current_index: int, phrases: list[str], snippet: str, current_phrase: str
     ) -> str:
         # Add second phrase to snippet
