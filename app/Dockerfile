@@ -14,7 +14,7 @@ COPY . .
 
 # Tell pytest where root is
 ENV PYTHONPATH=/app
-RUN pytest tests/
+RUN pytest tests/ -vv
 
 # Tell flask where to find app
 ENV FLASK_APP=main
