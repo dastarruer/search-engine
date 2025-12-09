@@ -3,8 +3,6 @@ import re
 from textwrap import shorten
 
 import psycopg2
-from transformers import AutoTokenizer
-import semchunk
 from lxml import html
 from markupsafe import escape
 from psycopg2.extensions import cursor
@@ -30,19 +28,17 @@ class _SnippetGenerator:
                 (phrase, phrases) = self.__elongate_phrase(i, phrases, phrase)
 
                 # Convert any html tags to plain-text
-                phrase = escape(phrase)
+                phrase = escape(phrase.lstrip())
 
                 # Bolden the phrase with the term from the query
                 snippet += rf'<span class="prompt-bold">{phrase}</span>'
 
-                snippet = self.__elongate_snippet(i, phrases, snippet, phrase)
-                break
+                snippet = self.__elongate_snippet(i, phrases, snippet)
 
-        SNIPPET_WIDTH_CHARS = 270
-        snippet = shorten(snippet, width=SNIPPET_WIDTH_CHARS, placeholder="...")
+                SNIPPET_WIDTH_CHARS = 200
+                snippet = shorten(snippet, width=SNIPPET_WIDTH_CHARS, placeholder="...")
 
-        if snippet and snippet[-1] not in ".!?":
-            snippet = snippet[:-1] + "..."
+                return snippet
 
         return snippet
 
@@ -55,10 +51,10 @@ class _SnippetGenerator:
         )
 
     def __elongate_snippet(
-        self, current_index: int, phrases: list[str], snippet: str, current_phrase: str
+        self, current_index: int, phrases: list[str], snippet: str
     ) -> str:
         counter = 1
-        while len(snippet) < 70 or counter < 3:
+        while len(snippet) < 200 or counter < 3:
             # Add second phrase to snippet
             if current_index + counter < len(phrases):
                 snippet += " " + phrases[current_index + counter]
@@ -73,18 +69,15 @@ class _SnippetGenerator:
         self, current_index: int, phrases: list[str], current_phrase: str
     ) -> tuple[str, list[str]]:
         # Keep track of which phrases are used so we can remove them later
-        last_used_index = len(phrases) - 1
+        _last_used_index = len(phrases) - 1
 
         counter = 1
         while len(current_phrase) < 60 and current_index + counter < len(phrases):
             current_phrase += " " + phrases[current_index + counter]
-            last_used_index = current_index + counter
+            _last_used_index = current_index + counter
             counter += 1
 
-        # Remove all used phrases
-        del phrases[current_index : last_used_index]
-
-        return current_phrase, phrases
+        return (current_phrase, phrases)
 
 
 def retrieve_env_var(var: str) -> str:

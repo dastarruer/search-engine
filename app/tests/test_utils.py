@@ -13,7 +13,7 @@ def test_generate_snippet(snippet_generator: _SnippetGenerator):
     with open(fixture_path, "r") as f:
         html_string = f.read()
     query = ["hello"]
-    expected_snippet = r"""<span class="prompt-bold">&#34;Hello&#34; is a song recorded by British singer-songwriter Adele,</span> released on 23 October 2015 by XL Recordings as the lead single from her third studi..."""
+    expected_snippet = r"""<span class="prompt-bold">&#34;Hello&#34; is a song recorded by British singer-songwriter Adele,</span> released on 23 October 2015 by XL Recordings as the lead single from her third studio album,..."""
 
     assert snippet_generator.generate_snippet(html_string, query) == expected_snippet
 
