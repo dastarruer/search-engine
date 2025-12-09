@@ -17,6 +17,15 @@ def extract_text(html_string: str) -> str:
 
 class _SnippetGenerator:
     def generate_snippet(self, html_string: str, query: list[str]) -> str:
+        """
+        Returns an HTML snippet of visible text in an HTML string based on a list of query terms.
+
+        The function extracts visible text, which is any text that is displayed to the user. This excludes tags like <script>, <style>, alt text on images, etc.
+
+        This text is then split by punctuation into multiple phrases, and finds the first phrase that contains at least one term from the query. This phrase is the root phrase of the snippet, and will be wrapped in a <span> tag to add styling. The final snippet will be truncated with a '...' if it exceeds a certain character count.`
+
+        An empty string will be returned if no phrases with terms from the query are found.
+        """
         text = extract_text(html_string)
         pattern = self.__compile_regex_for_query(query)
         phrases = self.__split_text_by_punctuation(text)
