@@ -16,7 +16,7 @@ def extract_text(html_string: str) -> str:
 
 
 class _SnippetGenerator:
-    def generate_snippet(self, html_string: str, query: list[str]) -> str:
+    def generate_snippet(self, html_string: str, query_terms: list[str]) -> str:
         """
         Returns an HTML snippet of visible text in an HTML string based on a list of query terms.
 
@@ -27,7 +27,7 @@ class _SnippetGenerator:
         An empty string will be returned if no phrases with terms from the query are found.
         """
         text = extract_text(html_string)
-        pattern = self.__compile_regex_for_query(query)
+        pattern = self.__compile_regex_for_query(query_terms)
         phrases = self.__split_text_by_punctuation(text)
 
         snippet = ""
