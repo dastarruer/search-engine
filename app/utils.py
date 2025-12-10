@@ -63,6 +63,9 @@ class _SnippetGenerator:
     def __elongate_snippet(
         self, current_index: int, phrases: list[str], snippet: str
     ) -> str:
+        """
+        Elongate `snippet` by adding other phrases from `phrases` until `snippet` reaches a certain character count.
+        """
         counter = 1
         while len(snippet) < 200 or counter < 3:
             # Add second phrase to snippet
