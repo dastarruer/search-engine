@@ -78,6 +78,11 @@ class _SnippetGenerator:
     def __elongate_phrase(
         self, current_index: int, phrases: list[str], current_phrase: str
     ) -> tuple[str]:
+        """
+        Elongate `current_phrase` by adding other phrases from `phrases` until `current_phrase` reaches a certain character count.
+
+        Note that `current_phrase` is the section of the snippet that is wrapped with a <span> tag to add styling (see `_SnippetGenerator.generate_snippet()`).
+        """
         counter = 1
         while len(current_phrase) < 60 and current_index + counter < len(phrases):
             current_phrase += " " + phrases[current_index + counter]
