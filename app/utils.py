@@ -8,7 +8,10 @@ from markupsafe import escape
 from psycopg2.extensions import cursor
 
 
-def extract_text(html_string: str) -> str:
+def extract_visible_text(html_string: str) -> str:
+    """
+    Extract 'visible text' from a string of HTML, where visible text is any text that is shown to the user. These can include tags such as <h1>, <p>, <li>, etc. but this function only extracts <p> tags, which contain more pertinent content for generating a snippet using `_SnippetGenerator.generate_snippet()`.
+    """
     tree = html.fromstring(html_string)
     paragraphs = tree.xpath("//p")
     # TODO: Replace <br> tags with spaces
@@ -26,7 +29,7 @@ class _SnippetGenerator:
 
         An empty string will be returned if no phrases with terms from the query are found.
         """
-        text = extract_text(html_string)
+        text = extract_visible_text(html_string)
         pattern = self.__compile_regex_for_query(query_terms)
         phrases = self.__split_text_by_punctuation(text)
 
