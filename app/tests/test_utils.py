@@ -1,5 +1,5 @@
 import pytest
-from utils import extract_visible_text, _SnippetGenerator
+from utils import extract_paragraph_text, _SnippetGenerator
 from pathlib import Path
 
 
@@ -31,4 +31,6 @@ def test_extract_text():
     html_string = r"""<body>
                         <p>hippopotamus hippopotamus hippopotamus</p>
                       </body>"""
-    assert extract_visible_text(html_string) == "hippopotamus hippopotamus hippopotamus"
+    assert (
+        extract_paragraph_text(html_string) == "hippopotamus hippopotamus hippopotamus"
+    )
