@@ -35,7 +35,7 @@ class _SnippetGenerator:
         for i, phrase in enumerate(phrases):
             # If a term in the query is found in the phrase
             if pattern.search(phrase):
-                (phrase, phrases) = self.__elongate_phrase(i, phrases, phrase)
+                phrase = self.__elongate_phrase(i, phrases, phrase)
 
                 # Convert any html tags to plain-text
                 phrase = escape(phrase.lstrip())
@@ -77,17 +77,13 @@ class _SnippetGenerator:
 
     def __elongate_phrase(
         self, current_index: int, phrases: list[str], current_phrase: str
-    ) -> tuple[str, list[str]]:
-        # Keep track of which phrases are used so we can remove them later
-        _last_used_index = len(phrases) - 1
-
+    ) -> tuple[str]:
         counter = 1
         while len(current_phrase) < 60 and current_index + counter < len(phrases):
             current_phrase += " " + phrases[current_index + counter]
-            _last_used_index = current_index + counter
             counter += 1
 
-        return (current_phrase, phrases)
+        return current_phrase
 
 
 def retrieve_env_var(var: str) -> str:
