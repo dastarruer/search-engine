@@ -22,7 +22,7 @@ def _split_text_by_punctuation(text: str) -> list[str]:
     return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
 
 
-def _compile_regex_for_query(query: list[str]):
+def _compile_regex_for_query(query: list[str]) -> re.Pattern[str]:
     return re.compile(
         r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
     )

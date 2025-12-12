@@ -44,12 +44,12 @@ class SearchResult:
 
 
 @app.route("/")
-def front_page():
+def front_page() -> str:
     return render_template("index.html")
 
 
 @app.route("/search")
-def search_results():
+def search_results() -> str:
     query = word_tokenize(request.args.get("q").lower())
     query = [term for term in query if term not in stop_words]
 
