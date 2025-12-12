@@ -2,6 +2,24 @@
 
 A general-purpose search engine, similar to Google or DuckDuckGo.
 
+## Demo
+
+https://github.com/user-attachments/assets/631c23b8-5a65-4eb5-981c-214309882228
+
+### Screenshots
+
+<!-- This table was 'stolen' from here: https://github.com/poogas/Ax-Shell/blob/5610a831c36493036a1a10fcb9547d8cda204005/README.md?plain=1#L32 -->
+<table align="center">
+  <tr>
+    <td colspan="4"><img src="assets/main_page.png"></td>
+  </tr>
+  <tr>
+    <td colspan="1"><img alt="Screenshot of main page." src="assets/gumball.png"></td>
+    <td colspan="1"><img alt="Screenshot of 'gumball' search results" src="assets/persona_5_strikers.png"></td>
+    <td colspan="1" align="center"><img alt="Screenshot of 'persona 5 strikers' search results" src="assets/hitman.png"></td>
+  </tr>
+</table>
+
 ## Features
 
 - A synchronous web-crawler built from scratch
