@@ -1,5 +1,9 @@
 import pytest
-from utils import extract_paragraph_text, split_text_by_punctuation, _SnippetGenerator
+from utils import (
+    _extract_paragraph_text,
+    _split_text_by_punctuation,
+    _SnippetGenerator,
+)
 from pathlib import Path
 
 
@@ -20,7 +24,7 @@ def test_generate_snippet(snippet_generator: _SnippetGenerator):
 
 def test_split_text_by_punctuation():
     text = "hello. hello hello! hello?"
-    assert split_text_by_punctuation(text) == [
+    assert _split_text_by_punctuation(text) == [
         "hello.",
         " hello hello!",
         " hello?",
@@ -32,5 +36,5 @@ def test_extract_text():
                         <p>hippopotamus hippopotamus hippopotamus</p>
                       </body>"""
     assert (
-        extract_paragraph_text(html_string) == "hippopotamus hippopotamus hippopotamus"
+        _extract_paragraph_text(html_string) == "hippopotamus hippopotamus hippopotamus"
     )

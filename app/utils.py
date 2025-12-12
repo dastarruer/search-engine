@@ -8,7 +8,7 @@ from markupsafe import escape
 from psycopg2.extensions import cursor
 
 
-def extract_paragraph_text(html_string: str) -> str:
+def _extract_paragraph_text(html_string: str) -> str:
     """
     Extract text from <p> tags in a string of HTML.
     """
@@ -18,11 +18,11 @@ def extract_paragraph_text(html_string: str) -> str:
     return " ".join(p.text_content() for p in paragraphs)
 
 
-def split_text_by_punctuation(text: str) -> list[str]:
+def _split_text_by_punctuation(text: str) -> list[str]:
     return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
 
 
-def compile_regex_for_query(query: list[str]):
+def _compile_regex_for_query(query: list[str]):
     return re.compile(
         r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
     )
@@ -37,9 +37,9 @@ class _SnippetGenerator:
 
         An empty string will be returned if no phrases with terms from the query are found.
         """
-        text = extract_paragraph_text(html_string)
-        pattern = compile_regex_for_query(query_terms)
-        phrases = split_text_by_punctuation(text)
+        text = _extract_paragraph_text(html_string)
+        pattern = _compile_regex_for_query(query_terms)
+        phrases = _split_text_by_punctuation(text)
 
         snippet = ""
         for i, phrase in enumerate(phrases):
