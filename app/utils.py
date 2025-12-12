@@ -18,6 +18,16 @@ def extract_paragraph_text(html_string: str) -> str:
     return " ".join(p.text_content() for p in paragraphs)
 
 
+def split_text_by_punctuation(text: str) -> list[str]:
+    return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
+
+
+def compile_regex_for_query(query: list[str]):
+    return re.compile(
+        r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
+    )
+
+
 class _SnippetGenerator:
     def generate_snippet(self, html_string: str, query_terms: list[str]) -> str:
         """
@@ -28,8 +38,8 @@ class _SnippetGenerator:
         An empty string will be returned if no phrases with terms from the query are found.
         """
         text = extract_paragraph_text(html_string)
-        pattern = self.__compile_regex_for_query(query_terms)
-        phrases = self.__split_text_by_punctuation(text)
+        pattern = compile_regex_for_query(query_terms)
+        phrases = split_text_by_punctuation(text)
 
         snippet = ""
         for i, phrase in enumerate(phrases):
@@ -51,14 +61,6 @@ class _SnippetGenerator:
                 return snippet
 
         return snippet
-
-    def __split_text_by_punctuation(self, text: str) -> list[str]:
-        return re.findall(r"[^?.,!]+[?.,!]?|[^?.,!]+$", text)
-
-    def __compile_regex_for_query(self, query):
-        return re.compile(
-            r"(" + "|".join(map(re.escape, query)) + r")[^\w\s]*", re.IGNORECASE
-        )
 
     def __elongate_snippet(
         self, current_index: int, phrases: list[str], snippet: str
