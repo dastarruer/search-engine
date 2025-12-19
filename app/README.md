@@ -7,10 +7,10 @@ A website to serve search results to users built with Flask.
 - Displays 10 search results to the user based on their query
 - Filters out stop words from the user's query for more relevant results
 - Displays results in the same format as other, modern search engines:
-  - Displays the [title of the result](../assets/title.png) as a clickable link.
-  - Displays the [domain of the result](../assets/domain.png).
-  - Displays a [breadcrumb of the URL route](../assets/breadcrumb.png).
-  - Displays a [summary of each result](../assets/summary.png) based on the user's query.
+  - Displays the [title of the result](../assets/result-anatomy/title.png) as a clickable link.
+  - Displays the [domain of the result](../assets/result-anatomy/domain.png).
+  - Displays a [breadcrumb of the URL route](../assets/result-anatomy/breadcrumb.png).
+  - Displays a [summary of each result](../assets/result-anatomy/summary.png) based on the user's query.
 
 ## How it works
 
