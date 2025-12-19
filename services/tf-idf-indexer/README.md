@@ -2,17 +2,7 @@
 
 An implementation of a [TF-IDF](https://www.geeksforgeeks.org/machine-learning/understanding-tf-idf-term-frequency-inverse-document-frequency/) indexer.
 
-## Usage
-
-To run the indexer by itself, run:
-
-```sh
-docker compose up indexer -d
-```
-
-Keep in mind that the indexer will not do anything if there are no crawled pages in the database. It will keep running until it finds pages to index.
-
-### Tests
+## Tests
 
 To run all tests (integration and unit tests), run:
 
