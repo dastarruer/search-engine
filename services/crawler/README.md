@@ -1,6 +1,6 @@
 # Crawler
 
-An implementation of a web-crawler, built entirely from scratch.
+An implementation of a web crawler, built entirely from scratch.
 
 ## Usage
 

@@ -22,7 +22,7 @@ https://github.com/user-attachments/assets/631c23b8-5a65-4eb5-981c-214309882228
 
 ## Features
 
-- A [web-crawler](./services/crawler/README.md) built from scratch
+- A [web crawler](./services/crawler/README.md) built from scratch
 - An [indexer](./services/tf-idf-indexer/README.md) using the [TF-IDF](https://www.geeksforgeeks.org/machine-learning/understanding-tf-idf-term-frequency-inverse-document-frequency/) algorithm, also built from scratch
 - A [website](./app/README.md) with an interface similar to other search engines, such as Google or DuckDuckGo
 - An extensive test suite of 50+ unit/integration tests for all services
