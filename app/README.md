@@ -12,6 +12,16 @@ A website to serve search results to users built with Flask.
   - Displays a [breadcrumb of the URL route](../assets/result-anatomy/breadcrumb.png).
   - Displays a [summary of each result](../assets/result-anatomy/summary.png) based on the user's query.
 
+## Tests
+
+All tests are run when starting the app with:
+
+```sh
+docker compose up app -d
+```
+
+(This is obviously not the best solution, but it's the best one I could come up with).
+
 ## How it works
 
 1. The user types a query into the search box.
