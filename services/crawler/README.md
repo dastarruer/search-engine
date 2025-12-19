@@ -12,6 +12,20 @@ To run the crawler by itself, run:
 docker compose up crawler -d
 ```
 
+### Benchmarks/Tests
+
+To run all tests (integration and unit tests), run:
+
+```sh
+cargo test
+```
+
+To run all benchmarks, run:
+
+```sh
+cargo bench --features bench-utils
+```
+
 ## Features
 
 - Blocks all non-English sites
