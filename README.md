@@ -11,7 +11,7 @@ https://github.com/user-attachments/assets/631c23b8-5a65-4eb5-981c-214309882228
 <!-- This table was 'stolen' from here: https://github.com/poogas/Ax-Shell/blob/5610a831c36493036a1a10fcb9547d8cda204005/README.md?plain=1#L32 -->
 <table align="center">
   <tr>
-    <td colspan="4"><img src="assets/example-results/main_page.png"></td>
+    <td colspan="4"><img src="assets/main_page.png"></td>
   </tr>
   <tr>
     <td colspan="1"><img alt="Screenshot of main page." src="assets/example-results/gumball.png"></td>
