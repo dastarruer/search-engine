@@ -8,7 +8,7 @@ async fn test_parse_page() {
     let (_container, pool) = common::setup("dummy_pages").await;
 
     let mut indexer = Indexer::new(&pool).await;
-    indexer.run(&pool).await;
+    indexer.run(&pool, false).await;
 
     let actual_terms_query = r#"SELECT * FROM terms;"#;
     let actual_terms: Vec<Term> = sqlx::query(actual_terms_query)
@@ -31,7 +31,7 @@ async fn test_parse_page_with_existing_terms() {
     let (_container, pool) = common::setup("test_parse_page_with_existing_terms").await;
 
     let mut indexer = Indexer::new(&pool).await;
-    indexer.run(&pool).await;
+    indexer.run(&pool, false).await;
 
     let actual_terms_query = r#"SELECT * FROM terms;"#;
     let actual_terms: Vec<Term> = sqlx::query(actual_terms_query)

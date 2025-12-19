@@ -350,12 +350,12 @@ impl Indexer {
 
         // Add pages from the db
         log::info!("Populating page queue...");
-        indexer.refresh_queue(pool).await;
+        indexer.refresh_queue(pool, true).await;
 
         indexer
     }
 
-    pub async fn run(&mut self, pool: &sqlx::PgPool) {
+    pub async fn run(&mut self, pool: &sqlx::PgPool, retry_until_found: bool) {
         while let Some(page) = self.pages.pop() {
             log::info!("Parsing page {}...", page.id);
             self.parse_page(page, Some(pool)).await;
@@ -374,7 +374,7 @@ impl Indexer {
                 self.empty_terms();
 
                 log::info!("Refreshing page queue...");
-                self.refresh_queue(pool).await;
+                self.refresh_queue(pool, retry_until_found).await;
             }
         }
 
@@ -383,10 +383,10 @@ impl Indexer {
 
     /// Refresh the queue by reading from the database.
     ///
-    /// If there are no pages currently in the database, then keep looping
-    /// until pages are found.
-    pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool) {
-        // TODO: Remove loop during tests
+    /// If there are no pages currently in the database, and
+    /// `retry_until_found` is set to `true`, then keep looping until pages are
+    /// found.
+    pub async fn refresh_queue(&mut self, pool: &sqlx::PgPool, retry_until_found: bool) {
         loop {
             let query = format!(
                 r#"SELECT id, html FROM pages WHERE is_indexed = FALSE AND is_crawled = TRUE LIMIT {};"#,
@@ -402,7 +402,7 @@ impl Indexer {
                     self.add_page(Page::from(row));
                 });
 
-            if !self.pages.queue.is_empty() {
+            if !self.pages.queue.is_empty() || !retry_until_found {
                 break;
             }
 
