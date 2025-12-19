@@ -27,7 +27,7 @@ async fn test_refresh_queue() -> sqlx::Result<()> {
         ),
     ];
 
-    indexer.refresh_queue(&pool).await;
+    indexer.refresh_queue(&pool, falseA).await;
 
     assert_eq!(indexer.num_pages(), expected_pages.len() as i64);
 

@@ -17,7 +17,7 @@ async fn main() {
     let mut indexer = Indexer::new(&pool).await;
 
     log::info!("Running indexer...");
-    indexer.run(&pool).await;
+    indexer.run(&pool, true).await;
     log::info!("Indexer is finished!");
 }
 
